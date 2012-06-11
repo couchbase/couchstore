@@ -51,7 +51,7 @@ static size_t encode_by_id_reduce(char *dst, uint64_t notdeleted, uint64_t delet
 
 couchstore_error_t by_id_reduce(char *dst, size_t *size_r, const nodelist *leaflist, int count, void *ctx)
 {
-    uint64_t notdeleted = 0, deleted = 0, size = 0;
+    uint64_t notdeleted = 0, deleted = 0, physical_size = 0;
     const nodelist *i = leaflist;
 
     (void) ctx;
@@ -63,13 +63,13 @@ couchstore_error_t by_id_reduce(char *dst, size_t *size_r, const nodelist *leafl
         } else {
             notdeleted++;
         }
-        size += decode_raw32(raw->size);
+        physical_size += decode_raw32(raw->physical_size);
 
         i = i->next;
         count--;
     }
 
-    *size_r = encode_by_id_reduce(dst, notdeleted, deleted, size);
+    *size_r = encode_by_id_reduce(dst, notdeleted, deleted, physical_size);
 
     return COUCHSTORE_SUCCESS;
 

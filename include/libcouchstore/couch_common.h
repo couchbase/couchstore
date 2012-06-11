@@ -86,7 +86,7 @@ extern "C" {
         int deleted;                /**< Is this a deleted revision? */
         couchstore_content_meta_flags content_meta;  /**< Content metadata flags */
         uint64_t bp;                /**< Byte offset of document data in file */
-        size_t size;                /**< Data size in bytes */
+        size_t physical_size;       /**< Physical space occupied by data (*not* its length) */
     } DocInfo;
 
 #define DOC_INITIALIZER { {0, 0}, {0, 0} }

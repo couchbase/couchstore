@@ -56,7 +56,8 @@ typedef struct {
 
 typedef struct {
     raw_48 db_seq;
-    raw_32 size;
+    /* physical on-disk size of the value (including headers). */
+    raw_32 physical_size;
     raw_48 bp;                 /* high bit is 'deleted' flag */
     raw_48 rev_seq;
     raw_08 content_meta;
@@ -64,6 +65,7 @@ typedef struct {
 } raw_id_index_value;
 
 typedef struct {
+    /* value length - physical on-disk size of the value (including headers). */
     raw_kv_length sizes;
     raw_48 bp;                 /* high bit is 'deleted' flag */
     raw_48 rev_seq;

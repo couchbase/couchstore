@@ -208,14 +208,14 @@ static void compare_docinfo(compare_context* ctx,
     // Instead compare uncompressed length later, in compare_documents (when we
     // have the document value to decompress).
     compressed = (a_datatype & 0x2) == 0;
-    if (a->size != b->size && !compressed) {
+    if (a->physical_size != b->physical_size && !compressed) {
         ctx->diff = 1;
         if (!quiet) {
             printf("Document size differs for \"");
             print_key(a->id);
             printf("\": %" PRIu64 " - %" PRIu64 "\n",
-                   (uint64_t)a->size,
-                   (uint64_t)b->size);
+                   (uint64_t)a->physical_size,
+                   (uint64_t)b->physical_size);
         }
     }
 }

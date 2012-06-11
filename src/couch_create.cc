@@ -526,7 +526,7 @@ public:
         doc.data.buf = data;
         doc.data.size = dlen;
         doc_info.id = doc.id;
-        doc_info.size = doc.data.size;
+        doc_info.physical_size = doc.data.size;
         doc_info.db_seq = 0; // db_seq;
         doc_info.rev_seq = 1; // ++db_seq;
 

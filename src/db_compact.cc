@@ -193,7 +193,7 @@ static couchstore_error_t output_seqtree_item(const sized_buf *k,
 
     raw = (raw_id_index_value*)id_v.buf;
     raw->db_seq = *(raw_48*)k->buf;  //Copy db seq from seq tree key
-    raw->size = encode_raw32(datasize);
+    raw->physical_size = encode_raw32(datasize);
     raw->bp = rawSeq->bp;
     raw->content_meta = rawSeq->content_meta;
     raw->rev_seq = rawSeq->rev_seq;

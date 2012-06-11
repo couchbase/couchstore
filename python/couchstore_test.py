@@ -49,7 +49,6 @@ class CouchStoreTest (unittest.TestCase):
         self.assertEqual(info.id, "foo")
         self.assertEqual(info.sequence, sequence)
         self.assertFalse(info.deleted)
-        #self.assertEqual(info.size, len(value))   #FIXME: Not currently equal, due to bug in CouchStore itself
         self.assertEqual(info.getContents(), value)
 
     def testInfoBySequence(self):
@@ -60,7 +59,6 @@ class CouchStoreTest (unittest.TestCase):
         self.assertEqual(info.id, "foo")
         self.assertEqual(info.sequence, sequence)
         self.assertFalse(info.deleted)
-        #self.assertEqual(info.size, len(value))   #FIXME: Not currently equal, due to bug in CouchStore itself
         self.assertEqual(info.getContents(), value)
 
     def testMissingSequence(self):

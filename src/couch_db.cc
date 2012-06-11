@@ -623,7 +623,7 @@ couchstore_error_t by_seq_read_docinfo(DocInfo **pInfo,
     docInfo->rev_seq = rev_seq;
     docInfo->deleted = deleted;
     docInfo->bp = bp;
-    docInfo->size = datasize;
+    docInfo->physical_size = datasize;
     docInfo->content_meta = content_meta;
     *pInfo = docInfo;
     return COUCHSTORE_SUCCESS;
@@ -643,7 +643,7 @@ couchstore_error_t by_id_read_docinfo(DocInfo** pInfo,
     uint64_t bp, seq, revnum;
 
     seq = decode_raw48(raw->db_seq);
-    datasize = decode_raw32(raw->size);
+    datasize = decode_raw32(raw->physical_size);
     bp = decode_raw48(raw->bp);
     deleted = (bp & BP_DELETED_FLAG) != 0;
     bp &= ~BP_DELETED_FLAG;
@@ -660,7 +660,7 @@ couchstore_error_t by_id_read_docinfo(DocInfo** pInfo,
     docInfo->rev_seq = revnum;
     docInfo->deleted = deleted;
     docInfo->bp = bp;
-    docInfo->size = datasize;
+    docInfo->physical_size = datasize;
     docInfo->content_meta = content_meta;
     *pInfo = docInfo;
     return COUCHSTORE_SUCCESS;

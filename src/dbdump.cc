@@ -333,11 +333,11 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
     if (dumpJson) {
         printf("\"rev\":%" PRIu64 ",\"content_meta\":%d,", docinfo->rev_seq,
                                                          docinfo->content_meta);
-        printf("\"physical_size\":%" PRIu64 ",", (uint64_t)docinfo->size);
+        printf("\"physical_size\":%" PRIu64 ",", (uint64_t)docinfo->physical_size);
     } else {
         printf("     rev: %" PRIu64 "\n", docinfo->rev_seq);
         printf("     content_meta: %d\n", docinfo->content_meta);
-        printf("     size (on disk): %" PRIu64 "\n", (uint64_t)docinfo->size);
+        printf("     size (on disk): %" PRIu64 "\n", (uint64_t)docinfo->physical_size);
     }
 
     if (docinfo->rev_meta.size >= sizeof(CouchbaseRevMeta)) {
@@ -564,7 +564,7 @@ static int visit_node(Db *db,
         int *count;
         /* This is a document: */
         printf("%c (%" PRIu64 ") ", (docinfo->deleted ? 'x' : '*'),
-               (uint64_t)docinfo->size);
+               (uint64_t)docinfo->physical_size);
         if (mode == DumpBySequence) {
             printf("#%" PRIu64 " ", docinfo->db_seq);
         }

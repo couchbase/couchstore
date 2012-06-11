@@ -127,7 +127,7 @@ static int recover_file_hook(Db* target,
                       R"("error message":"%s",)"
                       R"("id":"%s",)"
                       R"("bp")" ":%" PRIu64 ","
-                      R"("size":%zu,)"
+                      R"("physical size":%zu,)"
                       R"("seq")" ":%" PRIu64
                       "}\n";
             } else {
@@ -135,7 +135,7 @@ static int recover_file_hook(Db* target,
                       "(error code %d, %s): "
                       "id '%s', "
                       "bp %" PRIu64 ", "
-                      "size %zu, "
+                      "physical size %zu, "
                       "seq %" PRIu64
                       "\n";
             }
@@ -144,7 +144,7 @@ static int recover_file_hook(Db* target,
                     errcode, couchstore_strerror(errcode),
                     get_printable_string(docinfo->id).c_str(),
                     docinfo->bp,
-                    docinfo->size,
+                    docinfo->physical_size,
                     docinfo->db_seq);
         }
         param->num_corrupted_docs++;
@@ -226,7 +226,7 @@ static int rewind_hook(Db *db,
             fprintf(stdout, fmt.c_str(),
                     get_printable_string(doc_info->id).c_str(),
                     doc_info->bp,
-                    doc_info->size,
+                    doc_info->physical_size,
                     doc_info->db_seq);
         }
 

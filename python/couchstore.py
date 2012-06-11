@@ -102,8 +102,7 @@ class DocInfoStruct(ctypes.Structure):
                 ("deleted", ctypes.c_int),
                 ("content_meta", ctypes.c_ubyte),
                 ("bp", ctypes.c_ulonglong),
-                ("size", ctypes.c_size_t)]
-
+                ("physical_size", ctypes.c_size_t)]
 
 class LocalDocStruct(ctypes.Structure):
     _fields_ = [("id", SizedBuf),
@@ -150,7 +149,7 @@ class DocumentInfo(object):
         self.contentType = info.content_meta & 0x0F
         self.compressed = (info.content_meta & 0x80) != 0
         self._bp = info.bp
-        self.physSize = info.size
+        self.physicalSize = info.physical_size
         return self
 
     def _asStruct(self):
@@ -169,20 +168,20 @@ class DocumentInfo(object):
             struct.content_meta |= 0x80
         if hasattr(self, "_bp"):
             struct.bp = self._bp
-        if hasattr(self, "physSize"):
-            struct.size = self.physSize
+        if hasattr(self, "physicalSize"):
+            struct.physical_size = self.physicalSize
         return struct
 
-    def __str__(self):
-        return "DocumentInfo('%s', %d bytes)" % (self.id, self.physSize)
+    def __str__ (self):
+        return "DocumentInfo('%s', seq=%d)" % (self.id, self.sequence)
 
-    def __repr__(self):
-        return "DocumentInfo('%s', %d bytes)" % (self.id, self.physSize)
+    def __repr__ (self):
+        return str(self)
 
     def dump(self):
         return "DocumentInfo('%s', %d bytes, seq=%d, revSeq=%d, deleted=%s, " \
                "contentType=%d, compressed=%d, bp=%d)" % \
-            (self.id, self.physSize, self.sequence, self.revSequence,
+            (self.id, self.physicalSize, self.sequence, self.revSequence,
              self.deleted, self.contentType, self.compressed, self._bp)
 
     def getContents(self, options=0):

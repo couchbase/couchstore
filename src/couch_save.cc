@@ -28,7 +28,7 @@ static size_t assemble_seq_index_value(DocInfo *docinfo, char *dst)
 {
     char* const start = dst;
     raw_seq_index_value *raw = (raw_seq_index_value*)dst;
-    raw->sizes = encode_kv_length(docinfo->id.size, docinfo->size);
+    raw->sizes = encode_kv_length(docinfo->id.size, docinfo->physical_size);
     encode_raw48(docinfo->bp | (docinfo->deleted ? 1LL<<47 : 0), &raw->bp);
     raw->content_meta = encode_raw08(docinfo->content_meta);
     encode_raw48(docinfo->rev_seq, &raw->rev_seq);
@@ -48,7 +48,7 @@ static size_t assemble_id_index_value(DocInfo *docinfo, char *dst)
     char* const start = dst;
     raw_id_index_value *raw = (raw_id_index_value*)dst;
     encode_raw48(docinfo->db_seq, &raw->db_seq);
-    raw->size = encode_raw32((uint32_t)docinfo->size);
+    raw->physical_size = encode_raw32((uint32_t)docinfo->physical_size);
     encode_raw48(docinfo->bp | (docinfo->deleted ? 1LL<<47 : 0), &raw->bp);
     raw->content_meta = encode_raw08(docinfo->content_meta);
     encode_raw48(docinfo->rev_seq, &raw->rev_seq);
@@ -329,11 +329,11 @@ static couchstore_error_t add_doc_to_update_list(Db *db,
         if (errcode != COUCHSTORE_SUCCESS) {
             return errcode;
         }
-        updated.size = disk_size;
+        updated.physical_size = disk_size;
     } else {
         updated.deleted = 1;
         updated.bp = 0;
-        updated.size = 0;
+        updated.physical_size = 0;
     }
 
     *idterm = updated.id;
