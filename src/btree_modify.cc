@@ -405,6 +405,20 @@ static couchstore_error_t maybe_purgekp(couchfile_modify_request *rq, node_point
     return errcode;
 }
 
+// private method for invoking the callback provided by
+//   - couchstore_save_documents_and_callback
+static void do_save_callback(couchfile_modify_request* rq,
+                             couchstore_updated_how how,
+                             const sized_buf* key,
+                             const sized_buf* value) {
+    DocInfo* info = nullptr;
+    (*rq->docinfo_callback)(&info, key, value);
+
+    (*rq->save_callback)(info, how, rq->save_callback_ctx);
+
+    couchstore_free_docinfo(info);
+}
+
 static couchstore_error_t modify_node(couchfile_modify_request *rq,
                                       node_pointer *nptr,
                                       int start, int end,
@@ -449,6 +463,12 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                     case ACTION_INSERT:
                         local_result->modified = 1;
                         mr_push_item(rq->actions[start].key, rq->actions[start].value.data, local_result);
+                        if (rq->save_callback && rq->docinfo_callback) {
+                            do_save_callback(rq,
+                                             COUCHSTORE_ADDED,
+                                             rq->actions[start].key,
+                                             rq->actions[start].value.data);
+                        }
                         break;
 
                     case ACTION_REMOVE:
@@ -470,6 +490,12 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                     case ACTION_INSERT:
                         local_result->modified = 1;
                         mr_push_item(rq->actions[start].key, rq->actions[start].value.data, local_result);
+                        if (rq->save_callback && rq->docinfo_callback) {
+                            do_save_callback(rq,
+                                             COUCHSTORE_REPLACED,
+                                             rq->actions[start].key,
+                                             &val_buf);
+                        }
                         break;
 
                     case ACTION_REMOVE:
@@ -502,6 +528,12 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
             case ACTION_INSERT:
                 local_result->modified = 1;
                 mr_push_item(rq->actions[start].key, rq->actions[start].value.data, local_result);
+                if (rq->save_callback && rq->docinfo_callback) {
+                    do_save_callback(rq,
+                                     COUCHSTORE_ADDED,
+                                     rq->actions[start].key,
+                                     rq->actions[start].value.data);
+                }
                 break;
 
             case ACTION_REMOVE:

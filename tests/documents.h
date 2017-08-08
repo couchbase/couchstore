@@ -52,8 +52,16 @@ public:
         Just generate documents.
         Key is doc<index>
         Document is doc<index>-data
+        @param keyPrefix optional prefix
     **/
-    void generateDocs();
+    void generateDocs(std::string keyPrefix = "doc");
+
+    /**
+     * Generate docs with random keys
+     */
+    void generateRandomDocs(int seed,
+                            std::string keyPrefix = "doc",
+                            std::string keySuffix = "doc");
 
     void setContentMeta(int index, int flag);
 

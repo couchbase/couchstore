@@ -151,13 +151,14 @@ static void idfetch_update_cb(couchfile_modify_request *rq,
     ctx->actpos++;
 }
 
-static couchstore_error_t update_indexes(Db *db,
-                                         sized_buf *seqs,
-                                         sized_buf *seqvals,
-                                         sized_buf *ids,
-                                         sized_buf *idvals,
-                                         int numdocs)
-{
+static couchstore_error_t update_indexes(Db* db,
+                                         sized_buf* seqs,
+                                         sized_buf* seqvals,
+                                         sized_buf* ids,
+                                         sized_buf* idvals,
+                                         int numdocs,
+                                         save_callback_fn save_callback,
+                                         void* save_callback_ctx) {
     couchfile_modify_action *idacts;
     couchfile_modify_action *seqacts;
     const sized_buf **sorted_ids = NULL;
@@ -210,6 +211,9 @@ static couchstore_error_t update_indexes(Db *db,
         idacts[ii * 2].value.arg = &fetcharg;
         idacts[ii * 2 + 1].type = ACTION_INSERT;
         idacts[ii * 2 + 1].value.data = &idvals[isorted];
+        // Allow the by_id building to find the by_seqno for each id.
+        // The save_callback method passes back id and seqno to the caller.
+        idacts[ii * 2 + 1].seq = &seqs[isorted];
         idacts[ii * 2].key = &ids[isorted];
         idacts[ii * 2 + 1].key = &ids[isorted];
     }
@@ -227,6 +231,9 @@ static couchstore_error_t update_indexes(Db *db,
     idrq.purge_kv = NULL;
     idrq.kv_chunk_threshold = db->file.options.kv_nodesize;
     idrq.kp_chunk_threshold = db->file.options.kp_nodesize;
+    idrq.save_callback = save_callback;
+    idrq.save_callback_ctx = save_callback_ctx;
+    idrq.docinfo_callback = by_id_read_docinfo;
 
     new_id_root = modify_btree(&idrq, db->header.by_id_root, &err);
     error_pass(err);
@@ -332,13 +339,14 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
-couchstore_error_t couchstore_save_documents(Db *db,
-                                             Doc* const docs[],
-                                             DocInfo *infos[],
-                                             unsigned numdocs,
-                                             couchstore_save_options options)
-{
+couchstore_error_t couchstore_save_documents_and_callback(
+        Db* db,
+        Doc* const docs[],
+        DocInfo* infos[],
+        unsigned numdocs,
+        couchstore_save_options options,
+        save_callback_fn save_cb,
+        void* save_cb_ctx) {
     COLLECT_LATENCY();
 
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
@@ -396,8 +404,14 @@ couchstore_error_t couchstore_save_documents(Db *db,
     }
 
     if (errcode == COUCHSTORE_SUCCESS) {
-        errcode = update_indexes(db, seqklist, seqvlist,
-                                 idklist, idvlist, numdocs);
+        errcode = update_indexes(db,
+                                 seqklist,
+                                 seqvlist,
+                                 idklist,
+                                 idvlist,
+                                 numdocs,
+                                 save_cb,
+                                 save_cb_ctx);
     }
 
     fatbuf_free(fb);
@@ -424,9 +438,19 @@ couchstore_error_t couchstore_save_documents(Db *db,
     return errcode;
 }
 
+couchstore_error_t couchstore_save_documents(Db* db,
+                                             Doc* const docs[],
+                                             DocInfo* infos[],
+                                             unsigned numDocs,
+                                             couchstore_save_options options) {
+    return couchstore_save_documents_and_callback(
+            db, docs, infos, numDocs, options, nullptr, nullptr);
+}
+
 LIBCOUCHSTORE_API
 couchstore_error_t couchstore_save_document(Db *db, const Doc *doc,
                                             DocInfo *info, couchstore_save_options options)
 {
-    return couchstore_save_documents(db, (Doc**)&doc, (DocInfo**)&info, 1, options);
+    return couchstore_save_documents_and_callback(
+            db, (Doc**)&doc, (DocInfo**)&info, 1, options, nullptr, nullptr);
 }

@@ -19,6 +19,7 @@
 #include <limits>
 #include <random>
 #include <thread>
+#include <unordered_map>
 
 using ::testing::_;
 
@@ -1342,6 +1343,287 @@ TEST_F(CouchstoreTest, MB_29816) {
         EXPECT_EQ(1, callbackCounter);
     }
     db = nullptr;
+}
+
+// Test fixture for the add or replace callback exposed by save_docs
+class SaveCallbackTest : public CouchstoreTest {
+public:
+    SaveCallbackTest() {
+    }
+
+    void SetUp() override {
+        ASSERT_TRUE(open());
+    }
+
+    ::testing::AssertionResult open() {
+        auto status = couchstore_open_db(
+                filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db);
+        if (status != COUCHSTORE_SUCCESS) {
+            return ::testing::AssertionFailure()
+                   << "couchstore_open_db failed status:" << status;
+        }
+        return ::testing::AssertionSuccess();
+    }
+
+    ::testing::AssertionResult close() {
+        auto status = couchstore_close_file(db);
+        if (status != COUCHSTORE_SUCCESS) {
+            return ::testing::AssertionFailure()
+                   << "couchstore_close_file failed status:" << status;
+        }
+        status = couchstore_free_db(db);
+        if (status != COUCHSTORE_SUCCESS) {
+            return ::testing::AssertionFailure()
+                   << "couchstore_free_db failed status:" << status;
+        }
+        db = nullptr;
+        return ::testing::AssertionSuccess();
+    }
+
+    ::testing::AssertionResult reopen() {
+        if (db) {
+            auto status = close();
+            if (status != ::testing::AssertionSuccess()) {
+                return status;
+            }
+        }
+        return open();
+    }
+
+    ::testing::AssertionResult save(Documents& documents,
+                                    couchstore_save_options options = 0) {
+        auto status =
+                couchstore_save_documents_and_callback(db,
+                                                       documents.getDocs(),
+                                                       documents.getDocInfos(),
+                                                       documents.getDocsCount(),
+                                                       options,
+                                                       &update_callback,
+                                                       this);
+
+        if (status != COUCHSTORE_SUCCESS) {
+            return ::testing::AssertionFailure()
+                   << "couchstore_save_documents_and_callback failed status:"
+                   << status;
+        }
+        return ::testing::AssertionSuccess();
+    }
+
+    ::testing::AssertionResult checkAddedSeqnos(Documents& documents) {
+        for (int ii = 0; ii < documents.getDocsCount(); ii++) {
+            auto* info = documents.getDocInfo(ii);
+            if (addedKeys.count({info->id.buf, info->id.size}) == 0) {
+                return ::testing::AssertionFailure()
+                       << "Cannot find "
+                       << std::string(info->id.buf, info->id.size);
+            }
+            if (info->db_seq != addedKeys[{info->id.buf, info->id.size}]) {
+                return ::testing::AssertionFailure()
+                       << "seqno mismatch for index:" << ii << " "
+                       << info->db_seq
+                       << " != " << addedKeys[{info->id.buf, info->id.size}];
+            }
+        }
+        return ::testing::AssertionSuccess();
+    }
+
+    static void update_callback(const DocInfo* docInfo,
+                                couchstore_updated_how update,
+                                void* ctx) {
+        SaveCallbackTest* addedAndReplaced =
+                reinterpret_cast<SaveCallbackTest*>(ctx);
+        switch (update) {
+        case COUCHSTORE_ADDED: {
+            addedAndReplaced->addedKeys[{docInfo->id.buf, docInfo->id.size}] =
+                    docInfo->db_seq;
+            break;
+        }
+        case COUCHSTORE_REPLACED: {
+            addedAndReplaced
+                    ->replacedKeys[{docInfo->id.buf, docInfo->id.size}] =
+                    docInfo->db_seq;
+            break;
+        }
+        default: { ASSERT_TRUE(false); }
+        }
+    }
+
+protected:
+    std::unordered_map<std::string, uint64_t> addedKeys;
+    std::unordered_map<std::string, uint64_t> replacedKeys;
+};
+
+TEST_F(SaveCallbackTest, basic) {
+    DbInfo info;
+
+    const uint32_t docsInTest = 4;
+    Documents documents(docsInTest);
+    documents.setDoc(0, "doc1", "{\"test_doc_index\":1}");
+    documents.setDoc(1, "doc2", "{\"test_doc_index\":2}");
+    documents.setDoc(2, "doc3", "{\"test_doc_index\":3}");
+    documents.setDoc(3, "doc4", "{\"test_doc_index\":4}");
+
+    ASSERT_TRUE(save(documents));
+
+    EXPECT_EQ(4, addedKeys.size());
+    EXPECT_TRUE(checkAddedSeqnos(documents));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    ASSERT_TRUE(reopen());
+
+    ASSERT_TRUE(save(documents));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    EXPECT_EQ(4, replacedKeys.size());
+
+    /* Check that sequence numbers got filled in */
+    for (uint64_t ii = 0; ii < docsInTest; ++ii) {
+        EXPECT_EQ(docsInTest + ii + 1, documents.getDocInfo(ii)->db_seq);
+    }
+
+    ASSERT_TRUE(reopen());
+
+    /* Read back */
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_changes_since(
+                      db, 0, 0, &Documents::checkCallback, &documents));
+
+    EXPECT_EQ(docsInTest, uint32_t(documents.getCallbacks()));
+    EXPECT_EQ(0, documents.getDeleted());
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_db_info(db, &info));
+
+    EXPECT_EQ(docsInTest * 2, info.last_sequence);
+    EXPECT_EQ(docsInTest, info.doc_count);
+    EXPECT_EQ(0ul, info.deleted_count);
+    EXPECT_EQ(8192ll, info.header_position);
+}
+
+TEST_F(SaveCallbackTest, basic2) {
+    const uint32_t docsInTest = 4;
+    Documents documents1(docsInTest);
+    documents1.setDoc(0, "doc1", "{\"test_doc_index\":1}");
+    documents1.setDoc(1, "doc2", "{\"test_doc_index\":2}");
+    documents1.setDoc(2, "doc3", "{\"test_doc_index\":3}");
+    documents1.setDoc(3, "doc4", "{\"test_doc_index\":4}");
+
+    // the internal callback is at different > or < compare points, so pass keys
+    // =, > and < than what's in the file
+    Documents documents2(docsInTest);
+    documents2.setDoc(0, "doc1", "{\"test_doc_index\":1}"); // == doc1
+    documents2.setDoc(1, "adoc2", "{\"test_doc_index\":2}"); // < doc*
+    documents2.setDoc(2, "edoc3", "{\"test_doc_index\":3}"); // > doc*
+    documents2.setDoc(3, "bdoc4", "{\"test_doc_index\":4}"); // < doc*
+
+    ASSERT_TRUE(save(documents1));
+
+    EXPECT_EQ(docsInTest, addedKeys.size());
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    ASSERT_TRUE(reopen());
+
+    ASSERT_TRUE(save(documents2));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    EXPECT_EQ(7, addedKeys.size());
+    EXPECT_EQ(1, replacedKeys.size());
+}
+
+TEST_F(SaveCallbackTest, basic_seqno) {
+    const uint32_t docsInTest = 4;
+    Documents documents(docsInTest);
+    for (uint32_t ii = 0; ii < docsInTest; ii++) {
+        documents.setDoc(ii, "doc" + std::to_string(ii), "value");
+        documents.getDocInfo(ii)->db_seq = ii * 20;
+    }
+
+    // Save and preserve seqnos
+    ASSERT_TRUE(save(documents, COUCHSTORE_SEQUENCE_AS_IS));
+    EXPECT_EQ(docsInTest, addedKeys.size());
+    EXPECT_TRUE(checkAddedSeqnos(documents));
+    EXPECT_EQ(0, replacedKeys.size());
+}
+
+// Add two "blocks" of documents that have no overlap, we should see only adds
+TEST_F(SaveCallbackTest, large1) {
+    const uint32_t docsInTest = 2000;
+    Documents documents1(docsInTest);
+    documents1.generateDocs();
+    Documents documents2(docsInTest);
+    documents2.generateDocs("others");
+
+    ASSERT_TRUE(save(documents1));
+
+    EXPECT_EQ(docsInTest, addedKeys.size());
+    EXPECT_TRUE(checkAddedSeqnos(documents1));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    ASSERT_TRUE(reopen());
+
+    ASSERT_TRUE(save(documents2));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    EXPECT_EQ(docsInTest * 2, addedKeys.size());
+    EXPECT_EQ(0, replacedKeys.size());
+}
+
+// Add two blocks of documents with 100% overlap, so we expect adds and replaces
+TEST_F(SaveCallbackTest, large2) {
+    const uint32_t docsInTest = 2000;
+    Documents documents1(docsInTest);
+    documents1.generateRandomDocs(2, {}, {});
+
+    ASSERT_TRUE(save(documents1));
+
+    EXPECT_EQ(docsInTest, addedKeys.size());
+    EXPECT_TRUE(checkAddedSeqnos(documents1));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    ASSERT_TRUE(reopen());
+
+    // Change the insert order
+    documents1.shuffle();
+
+    ASSERT_TRUE(save(documents1));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    EXPECT_EQ(docsInTest, replacedKeys.size());
+}
+
+// Add two "blocks" of documents that have no overlap, we should see only adds
+// But use the generateRandomDocs to help hit many of the >,< and = code paths
+TEST_F(SaveCallbackTest, large3) {
+    const uint32_t docsInTest = 5000;
+    Documents documents1(docsInTest);
+    documents1.generateRandomDocs(1, {}, "d1");
+
+    // Generate a new random space of keys which with the suffix, won't clash
+    Documents documents2(docsInTest);
+    documents2.generateRandomDocs(2, {}, "d2");
+
+    ASSERT_TRUE(save(documents1));
+
+    EXPECT_EQ(docsInTest, addedKeys.size());
+    EXPECT_TRUE(checkAddedSeqnos(documents1));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    ASSERT_TRUE(reopen());
+
+    ASSERT_TRUE(save(documents2));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    EXPECT_EQ(docsInTest * 2, addedKeys.size());
+    EXPECT_EQ(0, replacedKeys.size());
 }
 
 INSTANTIATE_TEST_CASE_P(DocTest,

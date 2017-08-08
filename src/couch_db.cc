@@ -582,10 +582,9 @@ couchstore_error_t by_seq_read_docinfo(DocInfo **pInfo,
     return COUCHSTORE_SUCCESS;
 }
 
-static couchstore_error_t by_id_read_docinfo(DocInfo **pInfo,
-                                             const sized_buf *k,
-                                             const sized_buf *v)
-{
+couchstore_error_t by_id_read_docinfo(DocInfo** pInfo,
+                                      const sized_buf* k,
+                                      const sized_buf* v) {
     const raw_id_index_value *raw = (const raw_id_index_value*)v->buf;
     ssize_t revMetaSize = v->size - sizeof(*raw);
     if (revMetaSize < 0) {
@@ -1301,6 +1300,7 @@ couchstore_error_t couchstore_save_local_document(Db *db, LocalDoc *lDoc)
 {
     couchstore_error_t errcode;
     couchfile_modify_action ldupdate;
+    couchfile_modify_request rq;
     node_pointer *nroot = NULL;
     error_unless(!db->dropped, COUCHSTORE_ERROR_FILE_CLOSED);
 
@@ -1313,7 +1313,6 @@ couchstore_error_t couchstore_save_local_document(Db *db, LocalDoc *lDoc)
     ldupdate.key = &lDoc->id;
     ldupdate.value.data = &lDoc->json;
 
-    couchfile_modify_request rq;
     rq.cmp.compare = ebin_cmp;
     rq.num_actions = 1;
     rq.actions = &ldupdate;

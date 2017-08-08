@@ -290,6 +290,56 @@ extern "C" {
                                                  DocInfo *infos[],
                                                  unsigned numDocs,
                                                  couchstore_save_options options);
+
+    typedef enum {
+        COUCHSTORE_ADDED, // The key was added, i.e. new to the database.
+        COUCHSTORE_REPLACED // The key replaced a key of the same name.
+    } couchstore_updated_how;
+
+    /**
+     * callback type for couchstore_save_documents_and_callback.
+     * For each input key into couchstore_save_documents_and_callback the
+     * callback is invoked with how the by-id index was updated (and the
+     * DocInfo of key).
+     * When how is COUCHSTORE_ADDED DocInfo is for the new document
+     * When how is COUCHSTORE_REPLACED DocInfo is for the old document
+     */
+    typedef void (*save_callback_fn)(const DocInfo* info,
+                                     couchstore_updated_how how,
+                                     void* ctx);
+
+    /**
+     * Save array of docs to db and optionally get called back about how the key
+     * enters the database.
+     *
+     * To delete documents, set docs to NULL: the docs referenced by
+     * the docinfos will be deleted. To intermix deletes and inserts
+     * in a bulk update, pass docinfos with the deleted flag set.
+     *
+     * On return, the db_seq fields of the DocInfos will be filled in with the
+     * documents' (or deletions') sequence numbers.
+     *
+     * @param db the database to save documents in
+     * @param docs an array of document pointers
+     * @param infos an array of docinfo pointers
+     * @param numDocs the number documents to save
+     * @param options see description of COMPRESS_DOC_BODIES below
+     * @param save_cb an optional callback, every key processed will trigger a
+     *        callback containing the key its updated_how value and the
+     *        save_cb_ctx.
+     * @param save_cb_ctx optional void* context for the save_cb
+     * @return COUCHSTORE_SUCCESS upon success
+     */
+    LIBCOUCHSTORE_API
+    couchstore_error_t couchstore_save_documents_and_callback(
+            Db* db,
+            Doc* const docs[],
+            DocInfo* infos[],
+            unsigned numDocs,
+            couchstore_save_options options,
+            save_callback_fn save_cb,
+            void* save_cb_ctx);
+
     /**
      * Commit all pending changes and flush buffers to persistent storage.
      *

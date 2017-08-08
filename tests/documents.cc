@@ -46,9 +46,27 @@ void Documents::shuffle() {
     std::shuffle(docInfos.begin(), docInfos.end(), twister2);
 }
 
-void Documents::generateDocs() {
+void Documents::generateDocs(std::string keyPrefix) {
     for (size_t ii = 0; ii < documents.size(); ii++) {
-        std::string key = "doc" + std::to_string(ii);
+        std::string key = keyPrefix + std::to_string(ii);
+        std::string data = key + "-data";
+        setDoc(ii, key, data);
+    }
+}
+
+void Documents::generateRandomDocs(int seed,
+                                   std::string keyPrefix,
+                                   std::string keySuffix) {
+    std::mt19937 twister1(seed);
+    const std::string characters =
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    std::uniform_int_distribution<int> distribution(0, characters.size() - 1);
+    for (size_t ii = 0; ii < documents.size(); ii++) {
+        std::string randKey;
+        std::generate_n(std::back_inserter(randKey), 10, [&]() {
+            return characters[distribution(twister1)];
+        });
+        std::string key = keyPrefix + randKey + std::to_string(ii) + keySuffix;
         std::string data = key + "-data";
         setDoc(ii, key, data);
     }
