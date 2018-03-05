@@ -306,12 +306,31 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
             std::string xattrs;
             sized_buf body = doc->data;
 
+            // If datatype is snappy (and not marked compressed) we must inflate
+            cb::compression::Buffer inflated;
+            if (mcbp::datatype::is_snappy(datatype) &&
+                !(docinfo->content_meta & COUCH_DOC_IS_COMPRESSED)) {
+                // Inflate the entire document so we can work with it
+                if (!cb::compression::inflate(
+                            cb::compression::Algorithm::Snappy,
+                            {doc->data.buf, doc->data.size},
+                            inflated)) {
+                    if (dumpJson) {
+                        printf("\"body\":null}\n");
+                    } else {
+                        printf("     could not inflate document body\n");
+                    }
+                    return 0;
+                }
+
+                body = _sized_buf{inflated.data(), inflated.size()};
+            }
+
             if (mcbp::datatype::is_xattr(datatype)) {
-                auto offset = cb::xattr::get_body_offset({doc->data.buf,
-                                                          doc->data.size});
-                cb::xattr::Blob blob({doc->data.buf, offset});
+                cb::xattr::Blob blob({body.buf, body.size}, false);
                 xattrs = to_string(blob.to_json(),false);
-                body = _sized_buf{doc->data.buf + offset, doc->data.size - offset};
+                body = _sized_buf{doc->data.buf + blob.size(),
+                                  doc->data.size - blob.size()};
             }
 
             if (dumpJson) {
