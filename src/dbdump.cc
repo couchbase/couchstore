@@ -309,9 +309,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
             if (mcbp::datatype::is_xattr(datatype)) {
                 auto offset = cb::xattr::get_body_offset({doc->data.buf,
                                                           doc->data.size});
-                cb::byte_buffer byte_buffer{reinterpret_cast<uint8_t*>(doc->data.buf),
-                                            offset};
-                cb::xattr::Blob blob(byte_buffer);
+                cb::xattr::Blob blob({doc->data.buf, offset});
                 xattrs = to_string(blob.to_json(),false);
                 body = _sized_buf{doc->data.buf + offset, doc->data.size - offset};
             }
