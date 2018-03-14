@@ -47,7 +47,8 @@
  * An abstract base class that defines the interface of the file
  * I/O primitives used by CouchStore. Passed to couchstore_open_db_ex().
  */
-class FileOpsInterface {
+class LIBCOUCHSTORE_API
+FileOpsInterface {
 public:
     /**
      * An interface to query statistical information about a specific file

@@ -12,6 +12,7 @@ INCLUDE(CheckLibraryExists)
 INCLUDE(CheckSymbolExists)
 INCLUDE(CheckTypeSize)
 INCLUDE(CTest)
+INCLUDE(GenerateExportHeader)
 
 INCLUDE_DIRECTORIES(BEFORE ${CMAKE_INSTALL_PREFIX}/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -96,6 +97,12 @@ SET(COUCHSTORE_GTEST_INCLUDES ${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/in
 ADD_LIBRARY(couchstore SHARED ${COUCHSTORE_SOURCES})
 SET_TARGET_PROPERTIES(couchstore PROPERTIES COMPILE_FLAGS "-DLIBCOUCHSTORE_INTERNAL=1 -DLIBMAPREDUCE_INTERNAL=1")
 TARGET_LINK_LIBRARIES(couchstore ${COUCHSTORE_LIBRARIES})
+GENERATE_EXPORT_HEADER(couchstore
+                       EXPORT_MACRO_NAME LIBCOUCHSTORE_API
+                       EXPORT_FILE_NAME ${CMAKE_CURRENT_BINARY_DIR}/include/libcouchstore/visibility.h
+                       NO_EXPORT_MACRO_NAME STATIC
+                       STATIC_DEFINE LIBCOUCHSTORE_NO_VISIBILITY)
+TARGET_INCLUDE_DIRECTORIES(couchstore PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couch_dbdump
                src/dbdump.cc
@@ -105,6 +112,9 @@ ADD_EXECUTABLE(couch_dbdump
 
 ADD_DEPENDENCIES(couch_dbdump xattr)
 SET_TARGET_PROPERTIES(couch_dbdump PROPERTIES COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
+TARGET_INCLUDE_DIRECTORIES(couch_dbdump
+        PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_LINK_LIBRARIES(couch_dbdump ${COUCHSTORE_LIBRARIES} xattr)
 
 ADD_EXECUTABLE(couch_dbck src/dbck.cc)
@@ -269,6 +279,9 @@ ADD_EXECUTABLE(couchstore_testapp
                ${COUCHSTORE_SOURCES})
 SET_TARGET_PROPERTIES(couchstore_testapp PROPERTIES
         COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
+TARGET_INCLUDE_DIRECTORIES(couchstore_testapp
+        PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_LINK_LIBRARIES(couchstore_testapp ${COUCHSTORE_LIBRARIES})
 
 ADD_EXECUTABLE(couchstore_gtest
@@ -292,7 +305,9 @@ ADD_EXECUTABLE(couchstore_internal_gtest
         )
 SET_TARGET_PROPERTIES(couchstore_internal_gtest PROPERTIES
         COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
-TARGET_INCLUDE_DIRECTORIES(couchstore_internal_gtest PRIVATE ${COUCHSTORE_GTEST_INCLUDES})
+TARGET_INCLUDE_DIRECTORIES(couchstore_internal_gtest
+        PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_LINK_LIBRARIES(couchstore_internal_gtest
         ${COUCHSTORE_GTEST_LIBRARIES}
         ${COUCHSTORE_LIBRARIES})
@@ -309,7 +324,8 @@ SET_TARGET_PROPERTIES(couchstore_wrapped_fileops_test_framework PROPERTIES
         COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
 TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test_framework
         PRIVATE
-        ${COUCHSTORE_GTEST_INCLUDES})
+        ${COUCHSTORE_GTEST_INCLUDES}
+        ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couchstore_wrapped_fileops_test
                src/iobuffer.cc
@@ -318,13 +334,17 @@ ADD_EXECUTABLE(couchstore_wrapped_fileops_test
                )
 SET_TARGET_PROPERTIES(couchstore_wrapped_fileops_test PROPERTIES
         COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
+TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test
+        PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test ${COUCHSTORE_GTEST_LIBRARIES} platform)
 
 ADD_LIBRARY(couchstore_test_fileops OBJECT
         tests/test_fileops.cc)
 TARGET_INCLUDE_DIRECTORIES(couchstore_test_fileops
         PRIVATE
-        ${COUCHSTORE_GTEST_INCLUDES})
+        ${COUCHSTORE_GTEST_INCLUDES}
+        ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_TEST(couchstore-file-deduper-test couchstore_file-deduper-test)
 ADD_TEST(couchstore-file-merge-test couchstore_file-merger-test)
