@@ -1,5 +1,7 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #include "config.h"
+
+#include <cstddef>
 #include <fcntl.h>
 #include <platform/cb_malloc.h>
 #include <string.h>
@@ -539,7 +541,7 @@ LIBCOUCHSTORE_API
 void couchstore_free_document(Doc *doc)
 {
     if (doc) {
-        char *offset = (char *) (&((fatbuf *) NULL)->buf);
+        size_t offset = offsetof(fatbuf, buf);
         fatbuf_free((fatbuf *) ((char *)doc - (char *)offset));
     }
 }
@@ -1340,7 +1342,7 @@ LIBCOUCHSTORE_API
 void couchstore_free_local_document(LocalDoc *lDoc)
 {
     if (lDoc) {
-        char *offset = (char *) (&((fatbuf *) NULL)->buf);
+        size_t offset = offsetof(fatbuf, buf);
         fatbuf_free((fatbuf *) ((char *)lDoc - (char *)offset));
     }
 }
