@@ -47,8 +47,8 @@ struct file_buffer : public boost::intrusive::list_base_hook<> {
           // as there can be an actual buffer corresponding
           // to offset 0.
           offset(static_cast<cs_off_t>(-1)),
-          dirty(0) {
-        bytes.resize(_capacity);
+          dirty(0),
+          bytes(new uint8_t[_capacity]) {
     }
 
     uint8_t* getRawPtr() {
@@ -68,7 +68,7 @@ struct file_buffer : public boost::intrusive::list_base_hook<> {
     // Flag indicating whether or not this buffer contains dirty data.
     uint8_t dirty;
     // Data array.
-    std::vector<uint8_t> bytes;
+    std::unique_ptr<uint8_t[]> bytes;
 };
 
 using UniqueFileBufferPtr = std::unique_ptr<file_buffer>;

@@ -158,7 +158,7 @@ couchstore_error_t db_write_header(Db *db)
     size_t seqrootsize, idrootsize, localrootsize;
     writebuf.size = calculate_header_size(db, seqrootsize,
                                           idrootsize, localrootsize);
-    writebuf.buf = (char *) cb_calloc(1, writebuf.size);
+    writebuf.buf = (char *) cb_malloc(writebuf.size);
     raw_file_header* header = (raw_file_header*)writebuf.buf;
     header->version = encode_raw08(db->header.disk_version);
     encode_raw48(db->header.update_seq, &header->update_seq);
