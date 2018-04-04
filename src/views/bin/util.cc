@@ -23,30 +23,41 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "../mapreduce/mapreduce.h"
+
+static void do_exit(int ret, int uses_v8)
+{
+    /* Notify and delete conditional variables,
+    and join waiting threads when v8 is used */
+    if(uses_v8) {
+        deinit_terminator_thread(true /*fatal_exit*/);
+    }
+    _exit(ret);
+}
 
 static void exit_thread_helper(void *args)
 {
     char buf[4];
     int len = fread(buf, 1, 4, stdin);
 
-    (void) args;
+    int uses_v8 = *reinterpret_cast<int*>(args);
 
     /* If the other end closed the pipe */
     if (len == 0) {
-        _exit(1);
+        do_exit(1, uses_v8);
     } else if (len == 4 && !strncmp(buf, "exit", 4)) {
-        _exit(1);
+        do_exit(1, uses_v8);
     } else {
         fprintf(stderr, "Error occured waiting for exit message (%d)\n", len);
-        _exit(2);
+        do_exit(2, uses_v8);
     }
 }
 
 /* Start a watcher thread to gracefully die on exit message */
-int start_exit_listener(cb_thread_t *id)
+int start_exit_listener(cb_thread_t *id, int uses_v8)
 {
-
-    int ret = cb_create_thread(id, exit_thread_helper, NULL, 1);
+    void *args = reinterpret_cast<void*>(&uses_v8);
+    int ret = cb_create_thread(id, exit_thread_helper, args, 1);
     if (ret < 0) {
         /* For differentiating from couchstore_error_t */
         return -ret;

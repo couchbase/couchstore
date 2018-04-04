@@ -111,10 +111,12 @@ extern "C" {
     void init_terminator_thread();
 
     /**
-     * Destroys terminator thread at the end of the process.
+     * Destroys terminator thread at the end of the process. Setting
+     * fatal_exit to true prevents the accidental initialization of
+     * terminator_thread in case of exit due to an Erlang signal.
      **/
     LIBCOUCHSTORE_API
-    void deinit_terminator_thread();
+    void deinit_terminator_thread(bool fatal_exit);
 
     /**
      * If return value other than MAPREDUCE_SUCCESS, error_msg might be

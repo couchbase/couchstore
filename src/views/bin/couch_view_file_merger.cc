@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
         goto finished;
     }
 
-    status = start_exit_listener(&exit_thread);
+    status = start_exit_listener(&exit_thread, 0 /*uses_v8*/);
     if (status) {
         fprintf(stderr, "Error starting stdin exit listener thread\n");
         goto finished;

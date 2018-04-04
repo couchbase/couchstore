@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
         goto out;
     }
 
-    ret = start_exit_listener(&exit_thread);
+    ret = start_exit_listener(&exit_thread, 1 /*uses_v8*/);
     if (ret) {
         fprintf(stderr, "Error starting stdin exit listener thread\n");
         goto out;

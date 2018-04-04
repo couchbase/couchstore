@@ -31,31 +31,15 @@
 #include "mapreduce_internal.h"
 
 static const char *MEM_ALLOC_ERROR_MSG = "memory allocation failure";
+static bool terminator_active = false;
 
 static std::thread terminator_thread;
-static std::condition_variable cv;
-static std::mutex  cvMutex;
+static std::unique_ptr<std::condition_variable> cv;
+static std::mutex  cvMutex, registryMutex, initMutex;
 static std::atomic<int> terminator_timeout;
 static std::atomic<bool> shutdown_terminator;
 
 static std::unordered_set<mapreduce_ctx_t *> ctx_registry;
-
-class RegistryMutex {
-public:
-    RegistryMutex() {}
-    ~RegistryMutex() {}
-    void lock() {
-        mutex.lock();
-    }
-    void unlock() {
-        mutex.unlock();
-    }
-private:
-    std::mutex mutex;
-};
-
-static RegistryMutex registryMutex;
-
 
 static mapreduce_error_t start_context(const char *functions[],
                                        int num_functions,
@@ -334,7 +318,7 @@ void mapreduce_set_timeout(unsigned int seconds)
 {
     std::lock_guard<std::mutex> lk(cvMutex);
     terminator_timeout = seconds;
-    cv.notify_one();
+    cv->notify_one();
 }
 
 
@@ -405,9 +389,17 @@ static void copy_error_msg(const std::string &msg, char **to)
 LIBCOUCHSTORE_API
 void init_terminator_thread()
 {
+    std::lock_guard<std::mutex> initGuard(initMutex);
     shutdown_terminator = false;
     // Default 5 seconds for mapreduce tasks
     terminator_timeout = 5;
+    try {
+        cv = std::unique_ptr<std::condition_variable>(new std::condition_variable());
+    }
+    catch (std::bad_alloc) {
+        std::cerr << "Error creating conditional variable: " << std::endl;
+        exit(1);
+    }
     try {
         terminator_thread = std::thread(terminator_loop);
     }
@@ -415,16 +407,23 @@ void init_terminator_thread()
         std::cerr << "Error creating terminator thread: " << std::endl;
         exit(1);
     }
+    terminator_active = true;
 }
 
 LIBCOUCHSTORE_API
-void deinit_terminator_thread()
+void deinit_terminator_thread(bool fatal_exit=false)
 {
-    // There is no conditional wait on this shared variable. Hence no mutex.
-    shutdown_terminator = true;
-    // Wake the thread up to shutdown
-    cv.notify_one();
-    terminator_thread.join();
+    initMutex.lock();
+    if(terminator_active) {
+        // There is no conditional wait on this shared variable. Hence no mutex.
+        shutdown_terminator = true;
+        // Wake the thread up to shutdown
+        cv->notify_one();
+        terminator_thread.join();
+        //delete cv;
+        terminator_active = false;
+    }
+    if(!fatal_exit) initMutex.unlock();
 }
 
 
@@ -478,6 +477,6 @@ static void terminator_loop()
 
         registryMutex.unlock();
         std::unique_lock<std::mutex> lk(cvMutex);
-        cv.wait_for(lk, std::chrono::seconds(terminator_timeout));
+        cv->wait_for(lk, std::chrono::seconds(terminator_timeout));
     }
 }

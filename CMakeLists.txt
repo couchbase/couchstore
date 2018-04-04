@@ -126,19 +126,19 @@ TARGET_LINK_LIBRARIES(couch_dbinfo couchstore platform)
 ADD_EXECUTABLE(couch_compact src/compactor.cc)
 TARGET_LINK_LIBRARIES(couch_compact couchstore)
 
-ADD_EXECUTABLE(couch_view_file_merger src/views/bin/couch_view_file_merger.cc src/views/bin/util.c)
+ADD_EXECUTABLE(couch_view_file_merger src/views/bin/couch_view_file_merger.cc src/views/bin/util.cc)
 TARGET_LINK_LIBRARIES(couch_view_file_merger couchstore)
 
-ADD_EXECUTABLE(couch_view_index_builder src/views/bin/couch_view_index_builder.cc src/views/bin/util.c)
+ADD_EXECUTABLE(couch_view_index_builder src/views/bin/couch_view_index_builder.cc src/views/bin/util.cc)
 TARGET_LINK_LIBRARIES(couch_view_index_builder couchstore)
 
-ADD_EXECUTABLE(couch_view_group_cleanup src/views/bin/couch_view_group_cleanup.cc src/views/bin/util.c)
+ADD_EXECUTABLE(couch_view_group_cleanup src/views/bin/couch_view_group_cleanup.cc src/views/bin/util.cc)
 TARGET_LINK_LIBRARIES(couch_view_group_cleanup couchstore)
 
-ADD_EXECUTABLE(couch_view_index_updater src/views/bin/couch_view_index_updater.cc src/views/bin/util.c)
+ADD_EXECUTABLE(couch_view_index_updater src/views/bin/couch_view_index_updater.cc src/views/bin/util.cc)
 TARGET_LINK_LIBRARIES(couch_view_index_updater couchstore)
 
-ADD_EXECUTABLE(couch_view_group_compactor src/views/bin/couch_view_group_compactor.cc src/views/bin/util.c)
+ADD_EXECUTABLE(couch_view_group_compactor src/views/bin/couch_view_group_compactor.cc src/views/bin/util.cc)
 TARGET_LINK_LIBRARIES(couch_view_group_compactor couchstore)
 
 ADD_EXECUTABLE(couch_create src/couch_create.cc src/crc32.cc)

@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
         goto out;
     }
 
-    ret = (couchstore_error_t)start_exit_listener(&exit_thread);
+    ret = (couchstore_error_t)start_exit_listener(&exit_thread, 1 /*uses_v8*/);
     if (ret) {
         fprintf(stderr, "Error starting stdin exit listener thread\n");
         goto out;

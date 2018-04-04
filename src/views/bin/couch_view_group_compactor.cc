@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
     stats.update_fun = stats_updater;
     stats.freq = MAX(total_changes / 100, 1);
 
-    ret = (couchstore_error_t)start_exit_listener(&exit_thread);
+    ret = (couchstore_error_t)start_exit_listener(&exit_thread, 1 /*uses_v8*/);
     if (ret) {
         fprintf(stderr, "Error starting stdin exit listener thread\n");
         goto out;
@@ -175,4 +175,3 @@ out:
     ret_int = (ret_int < 0) ? (100 + ret_int) : ret_int;
     _exit(ret_int);
 }
-
