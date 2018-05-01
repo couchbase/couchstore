@@ -18,8 +18,8 @@ struct compare_context {
 };
 
 static void usage() {
-    fprintf(stderr, "USAGE: dbdiff [-q] file1 file2\n");
-    fprintf(stderr, "   -q\tquiet\n");
+    printf("USAGE: dbdiff [-q] file1 file2\n");
+    printf("   -q\tquiet\n");
     exit(EXIT_FAILURE);
 }
 
@@ -34,100 +34,89 @@ static int is_printable_key(sized_buf key) {
     return 1;
 }
 
-static void print_key(sized_buf key) {
+static void print_key(sized_buf key, FILE* out = stdout) {
     if (is_printable_key(key)) {
-        fwrite(key.buf, 1, key.size, stderr);
+        fwrite(key.buf, 1, key.size, out);
     } else {
         size_t ii;
         for (ii = 0; ii < key.size; ++ii) {
-            fprintf(stderr, "0x%02x", int(key.buf[ii]));
+            fprintf(out, "0x%02x", int(key.buf[ii]));
         }
     }
 }
 
 static void print_missing(sized_buf key, const char* fname) {
     if (!quiet) {
-        fprintf(stderr, "Document \"");
+        printf("Document \"");
         print_key(key);
-        fprintf(stderr, "\" is missing from \"%s\"\n", fname);
+        printf("\" is missing from \"%s\"\n", fname);
     }
 }
 
 static void compare_docinfo(compare_context* ctx, DocInfo* a, DocInfo* b) {
     if (a->db_seq != b->db_seq) {
         if (!quiet) {
-            fprintf(stderr, "Document db_seq differs for \"");
+            printf("Document db_seq differs for \"");
             print_key(a->id);
-            fprintf(stderr,
-                    "\": %" PRIu64 " - %" PRIu64 "\n",
-                    a->db_seq,
-                    b->db_seq);
+            printf("\": %" PRIu64 " - %" PRIu64 "\n", a->db_seq, b->db_seq);
             ctx->diff = 1;
         }
     }
 
     if (a->rev_seq != b->rev_seq) {
         if (!quiet) {
-            fprintf(stderr, "Document rev_seq differs for \"");
+            printf("Document rev_seq differs for \"");
             print_key(a->id);
-            fprintf(stderr,
-                    "\": %" PRIu64 " - %" PRIu64 "\n",
-                    a->rev_seq,
-                    b->rev_seq);
+            printf("\": %" PRIu64 " - %" PRIu64 "\n", a->rev_seq, b->rev_seq);
             ctx->diff = 1;
         }
     }
 
     if (a->rev_meta.size != b->rev_meta.size) {
         if (!quiet) {
-            fprintf(stderr, "Document rev_meta size differs for \"");
+            printf("Document rev_meta size differs for \"");
             print_key(a->id);
-            fprintf(stderr,
-                    "\": %" PRIu64 " - %" PRIu64 "\n",
-                    (uint64_t)a->rev_meta.size,
-                    (uint64_t)b->rev_meta.size);
-            fprintf(stderr, "\"\n");
+            printf("\": %" PRIu64 " - %" PRIu64 "\n",
+                   (uint64_t)a->rev_meta.size,
+                   (uint64_t)b->rev_meta.size);
+            printf("\"\n");
             ctx->diff = 1;
         }
     } else if (memcmp(a->rev_meta.buf, b->rev_meta.buf, a->rev_meta.size) !=
                0) {
         if (!quiet) {
-            fprintf(stderr, "Document rev_meta differs for \"");
+            printf("Document rev_meta differs for \"");
             print_key(a->id);
-            fprintf(stderr, "\"\n");
+            printf("\"\n");
             ctx->diff = 1;
         }
     }
 
     if (a->deleted != b->deleted) {
         if (!quiet) {
-            fprintf(stderr, "Document deleted status differs for \"");
+            printf("Document deleted status differs for \"");
             print_key(a->id);
-            fprintf(stderr, "\": %u - %u\n", a->deleted, b->deleted);
+            printf("\": %u - %u\n", a->deleted, b->deleted);
             ctx->diff = 1;
         }
     }
 
     if (a->content_meta != b->content_meta) {
         if (!quiet) {
-            fprintf(stderr, "Document content_meta differs for \"");
+            printf("Document content_meta differs for \"");
             print_key(a->id);
-            fprintf(stderr,
-                    "\": %02x - %02x\n",
-                    a->content_meta,
-                    b->content_meta);
+            printf("\": %02x - %02x\n", a->content_meta, b->content_meta);
             ctx->diff = 1;
         }
     }
 
     if (a->size != b->size) {
         if (!quiet) {
-            fprintf(stderr, "Document size differs for \"");
+            printf("Document size differs for \"");
             print_key(a->id);
-            fprintf(stderr,
-                    "\": %" PRIu64 " - %" PRIu64 "\n",
-                    (uint64_t)a->size,
-                    (uint64_t)b->size);
+            printf("\": %" PRIu64 " - %" PRIu64 "\n",
+                   (uint64_t)a->size,
+                   (uint64_t)b->size);
             ctx->diff = 1;
         }
     }
@@ -155,16 +144,16 @@ static void compare_documents(compare_context* ctx,
         if (d1->data.size != d2->data.size) {
             ctx->diff = 1;
             if (!quiet) {
-                fprintf(stderr, "Document \"");
+                printf("Document \"");
                 print_key(this_doc_info->id);
-                fprintf(stderr, "\" differs in size!\n");
+                printf("\" differs in size!\n");
             }
         } else if (memcmp(d1->data.buf, d2->data.buf, d1->data.size) != 0) {
             ctx->diff = 1;
             if (!quiet) {
-                fprintf(stderr, "Document \"");
+                printf("Document \"");
                 print_key(this_doc_info->id);
-                fprintf(stderr, "\" content differs!\n");
+                printf("\" content differs!\n");
             }
         }
         couchstore_free_document(d1);
@@ -221,7 +210,7 @@ static int check_existing(Db* db, DocInfo* docinfo, void* c) {
         print_missing(docinfo->id, ctx->other_info.filename);
     } else {
         fprintf(stderr, "Error trying to read \"");
-        print_key(docinfo->id);
+        print_key(docinfo->id, stderr);
         fprintf(stderr,
                 "\" from \"%s\": %s\n",
                 ctx->other_info.filename,
