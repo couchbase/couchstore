@@ -195,14 +195,22 @@ static int deep_compare(Db *db, DocInfo *docinfo, void *c) {
 static int check_existing(Db *db, DocInfo *docinfo, void *c) {
     struct compare_context *ctx = c;
     couchstore_error_t err;
-    Doc *doc;
+    DocInfo *other_info;
 
-    err = couchstore_open_document(ctx->other,
-                                   docinfo->id.buf,
-                                   docinfo->id.size,
-                                   &doc, 0);
+    // This function will be called for all docs, including those which are
+    // deleted (tombstones). As such, we need to first lookup the docinfo in
+    // the 'other' file, only reporting as missing if their delete flags differ.
+    err = couchstore_docinfo_by_id(ctx->other, docinfo->id.buf,
+                                   docinfo->id.size, &other_info);
+
     if (err == COUCHSTORE_SUCCESS) {
-        couchstore_free_document(doc);
+        if (other_info->deleted != docinfo->deleted) {
+            ctx->diff = 1;
+            print_missing((void*)docinfo->id.buf,
+                          docinfo->id.size,
+                          ctx->other_info.filename);
+        }
+        couchstore_free_docinfo(other_info);
     } else if (err == COUCHSTORE_ERROR_DOC_NOT_FOUND) {
         ctx->diff = 1;
         print_missing((void*)docinfo->id.buf,
