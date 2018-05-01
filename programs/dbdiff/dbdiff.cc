@@ -1,6 +1,8 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #include "config.h"
 
+#include "bitfield.h"
+
 #include <libcouchstore/couch_db.h>
 
 #include <getopt.h>
@@ -53,6 +55,13 @@ static void print_missing(sized_buf key, const char* fname) {
     }
 }
 
+// Encoding of Couchbase per-revision metadata
+struct CouchbaseRevMeta {
+    raw_64 cas;
+    raw_32 expiry;
+    raw_32 flags;
+};
+
 static void compare_docinfo(compare_context* ctx, DocInfo* a, DocInfo* b) {
     if (a->db_seq != b->db_seq) {
         ctx->diff = 1;
@@ -72,6 +81,10 @@ static void compare_docinfo(compare_context* ctx, DocInfo* a, DocInfo* b) {
         }
     }
 
+    // Assume datatype is raw; unless we decode otherwise later.
+    uint8_t a_datatype = 0;
+    uint8_t b_datatype = 0;
+
     if (a->rev_meta.size != b->rev_meta.size) {
         ctx->diff = 1;
         if (!quiet) {
@@ -82,8 +95,83 @@ static void compare_docinfo(compare_context* ctx, DocInfo* a, DocInfo* b) {
                    (uint64_t)b->rev_meta.size);
             printf("\"\n");
         }
-    } else if (memcmp(a->rev_meta.buf, b->rev_meta.buf, a->rev_meta.size) !=
-               0) {
+    } else if (a->rev_meta.size >= sizeof(CouchbaseRevMeta)) {
+        // Decode as CouchbaseRevMeta, compare each field.
+        const auto* a_meta = reinterpret_cast<const CouchbaseRevMeta *>(a->rev_meta.buf);
+        const uint64_t a_cas = decode_raw64(a_meta->cas);
+        const uint32_t a_expiry = decode_raw32(a_meta->expiry);
+        const uint32_t a_flags = decode_raw32(a_meta->flags);
+
+        const auto* b_meta = reinterpret_cast<const CouchbaseRevMeta *>(b->rev_meta.buf);
+        const uint64_t b_cas = decode_raw64(b_meta->cas);
+        const uint32_t b_expiry = decode_raw32(b_meta->expiry);
+        const uint32_t b_flags = decode_raw32(b_meta->flags);
+
+        if (a_cas != b_cas) {
+            ctx->diff = 1;
+            if (!quiet) {
+                printf("Document CAS differs for \"");
+                print_key(a->id);
+                printf("\": %" PRIu64 " - %" PRIu64 "\n", a_cas, b_cas);
+            }
+        }
+
+        if (a_expiry != b_expiry) {
+            ctx->diff = 1;
+            if (!quiet) {
+                printf("Document expiry differs for \"");
+                print_key(a->id);
+                printf("\": %" PRIu32 " - %" PRIu32 "\n", a_expiry, b_expiry);
+            }
+        }
+
+        // Flags are not replicated for deleted documements; so ignore any
+        // differences if deleted.
+        if (a_flags != b_flags && !a->deleted) {
+            ctx->diff = 1;
+            if (!quiet) {
+                printf("Document flags differ for \"");
+                print_key(a->id);
+                printf("\": 0x%" PRIx32 " - 0x%" PRIx32 "\n", a_flags, b_flags);
+            }
+        }
+
+        if ((a->rev_meta.size > sizeof(CouchbaseRevMeta)) &&
+            (a->rev_meta.size <= sizeof(CouchbaseRevMeta) + 2)) {
+            // 18 bytes of rev_meta indicates CouchbaseRevMeta along with
+            // flex_meta_code (1B) and datatype (1B)
+            const uint8_t a_flex_code = *((uint8_t *) (a->rev_meta.buf +
+                                                       sizeof(CouchbaseRevMeta)));
+            a_datatype = *((uint8_t *) (a->rev_meta.buf +
+                                        sizeof(CouchbaseRevMeta) +
+                                        sizeof(uint8_t)));
+
+            const uint8_t b_flex_code = *((uint8_t *) (b->rev_meta.buf +
+                                                       sizeof(CouchbaseRevMeta)));
+            b_datatype = *((uint8_t *) (b->rev_meta.buf +
+                                        sizeof(CouchbaseRevMeta) +
+                                        sizeof(uint8_t)));
+
+            if (a_flex_code != b_flex_code) {
+                ctx->diff = 1;
+                if (!quiet) {
+                    printf("Document flex_code differ for \"");
+                    print_key(a->id);
+                    printf("\": %" PRIx8 " - %" PRIx8 "\n", a_flex_code, b_flex_code);
+                }
+            }
+
+            if (a_datatype != b_datatype) {
+                ctx->diff = 1;
+                if (!quiet) {
+                    printf("Document datatype differ for \"");
+                    print_key(a->id);
+                    printf("\": %" PRIx8 " - %" PRIx8 "\n", a_datatype, b_datatype);
+                }
+            }
+        }
+
+    } else if (memcmp(a->rev_meta.buf, b->rev_meta.buf, a->rev_meta.size) != 0) {
         ctx->diff = 1;
         if (!quiet) {
             printf("Document rev_meta differs for \"");
