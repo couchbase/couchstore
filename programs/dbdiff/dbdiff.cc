@@ -4,11 +4,13 @@
 #include "bitfield.h"
 
 #include <libcouchstore/couch_db.h>
+#include <platform/compress.h>
 
 #include <getopt.h>
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 static int quiet = 0;
 struct compare_context {
@@ -62,7 +64,10 @@ struct CouchbaseRevMeta {
     raw_32 flags;
 };
 
-static void compare_docinfo(compare_context* ctx, DocInfo* a, DocInfo* b) {
+static void compare_docinfo(compare_context* ctx,
+                            const DocInfo* a,
+                            const DocInfo* b,
+                            bool& compressed) {
     if (a->db_seq != b->db_seq) {
         ctx->diff = 1;
         if (!quiet) {
@@ -198,7 +203,12 @@ static void compare_docinfo(compare_context* ctx, DocInfo* a, DocInfo* b) {
         }
     }
 
-    if (a->size != b->size) {
+    // If the documents are compressed; then comparing the raw size is
+    // misleading as any difference could be due to how it was compressed.
+    // Instead compare uncompressed length later, in compare_documents (when we
+    // have the document value to decompress).
+    compressed = (a_datatype & 0x2) == 0;
+    if (a->size != b->size && !compressed) {
         ctx->diff = 1;
         if (!quiet) {
             printf("Document size differs for \"");
@@ -212,7 +222,8 @@ static void compare_docinfo(compare_context* ctx, DocInfo* a, DocInfo* b) {
 
 static void compare_documents(compare_context* ctx,
                               DocInfo* this_doc_info,
-                              DocInfo* other_doc_info) {
+                              DocInfo* other_doc_info,
+                              bool compressed) {
     couchstore_error_t e1, e2;
     Doc *d1, *d2;
 
@@ -229,14 +240,44 @@ static void compare_documents(compare_context* ctx,
                                   0);
 
     if (e1 == COUCHSTORE_SUCCESS && e2 == COUCHSTORE_SUCCESS) {
-        if (d1->data.size != d2->data.size) {
+        cb::compression::Buffer d1_uncompressed;
+        cb::compression::Buffer d2_uncompressed;
+        sized_buf d1_val = d1->data;
+        sized_buf d2_val = d2->data;
+
+        // If the documents are compressed; compare uncompressed data / size.
+        if (compressed) {
+            if (!cb::compression::inflate(cb::compression::Algorithm::Snappy,
+                                          {d1->data.buf, d1->data.size},
+                                          d1_uncompressed)) {
+                fprintf(stderr,
+                        "Failed to uncompress Snappy-compressed document \"");
+                print_key(d1->id, stderr);
+                fprintf(stderr, "\"\n");
+                exit(EXIT_FAILURE);
+            }
+            d1_val = {d1_uncompressed.data(), d1_uncompressed.size()};
+
+            if (!cb::compression::inflate(cb::compression::Algorithm::Snappy,
+                                          {d2->data.buf, d2->data.size},
+                                          d2_uncompressed)) {
+                fprintf(stderr,
+                        "Failed to uncompress Snappy-compressed document \"");
+                print_key(d1->id, stderr);
+                fprintf(stderr, "\"\n");
+                exit(EXIT_FAILURE);
+            }
+            d2_val = {d2_uncompressed.data(), d2_uncompressed.size()};
+        }
+
+        if (d1_val.size != d2_val.size) {
             ctx->diff = 1;
             if (!quiet) {
                 printf("Document \"");
                 print_key(this_doc_info->id);
                 printf("\" differs in size!\n");
             }
-        } else if (memcmp(d1->data.buf, d2->data.buf, d1->data.size) != 0) {
+        } else if (memcmp(d1_val.buf, d2_val.buf, d1_val.size) != 0) {
             ctx->diff = 1;
             if (!quiet) {
                 printf("Document \"");
@@ -244,6 +285,7 @@ static void compare_documents(compare_context* ctx,
                 printf("\" content differs!\n");
             }
         }
+
         couchstore_free_document(d1);
         couchstore_free_document(d2);
     } else {
@@ -265,8 +307,9 @@ static int deep_compare(Db* db, DocInfo* docinfo, void* c) {
 
     if (err == COUCHSTORE_SUCCESS) {
         /* verify that the docinfos are the same.. */
-        compare_docinfo(ctx, docinfo, other_doc_info);
-        compare_documents(ctx, docinfo, other_doc_info);
+        bool compressed;
+        compare_docinfo(ctx, docinfo, other_doc_info, compressed);
+        compare_documents(ctx, docinfo, other_doc_info, compressed);
         couchstore_free_docinfo(other_doc_info);
     } else {
         ctx->diff = 1;
