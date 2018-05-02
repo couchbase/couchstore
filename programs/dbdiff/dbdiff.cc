@@ -55,24 +55,25 @@ static void print_missing(sized_buf key, const char* fname) {
 
 static void compare_docinfo(compare_context* ctx, DocInfo* a, DocInfo* b) {
     if (a->db_seq != b->db_seq) {
+        ctx->diff = 1;
         if (!quiet) {
             printf("Document db_seq differs for \"");
             print_key(a->id);
             printf("\": %" PRIu64 " - %" PRIu64 "\n", a->db_seq, b->db_seq);
-            ctx->diff = 1;
         }
     }
 
     if (a->rev_seq != b->rev_seq) {
+        ctx->diff = 1;
         if (!quiet) {
             printf("Document rev_seq differs for \"");
             print_key(a->id);
             printf("\": %" PRIu64 " - %" PRIu64 "\n", a->rev_seq, b->rev_seq);
-            ctx->diff = 1;
         }
     }
 
     if (a->rev_meta.size != b->rev_meta.size) {
+        ctx->diff = 1;
         if (!quiet) {
             printf("Document rev_meta size differs for \"");
             print_key(a->id);
@@ -80,44 +81,43 @@ static void compare_docinfo(compare_context* ctx, DocInfo* a, DocInfo* b) {
                    (uint64_t)a->rev_meta.size,
                    (uint64_t)b->rev_meta.size);
             printf("\"\n");
-            ctx->diff = 1;
         }
     } else if (memcmp(a->rev_meta.buf, b->rev_meta.buf, a->rev_meta.size) !=
                0) {
+        ctx->diff = 1;
         if (!quiet) {
             printf("Document rev_meta differs for \"");
             print_key(a->id);
             printf("\"\n");
-            ctx->diff = 1;
         }
     }
 
     if (a->deleted != b->deleted) {
+        ctx->diff = 1;
         if (!quiet) {
             printf("Document deleted status differs for \"");
             print_key(a->id);
             printf("\": %u - %u\n", a->deleted, b->deleted);
-            ctx->diff = 1;
         }
     }
 
     if (a->content_meta != b->content_meta) {
+        ctx->diff = 1;
         if (!quiet) {
             printf("Document content_meta differs for \"");
             print_key(a->id);
             printf("\": %02x - %02x\n", a->content_meta, b->content_meta);
-            ctx->diff = 1;
         }
     }
 
     if (a->size != b->size) {
+        ctx->diff = 1;
         if (!quiet) {
             printf("Document size differs for \"");
             print_key(a->id);
             printf("\": %" PRIu64 " - %" PRIu64 "\n",
                    (uint64_t)a->size,
                    (uint64_t)b->size);
-            ctx->diff = 1;
         }
     }
 }
