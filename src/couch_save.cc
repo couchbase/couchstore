@@ -36,8 +36,10 @@ static size_t assemble_seq_index_value(DocInfo *docinfo, char *dst)
 
     memcpy(dst, docinfo->id.buf, docinfo->id.size);
     dst += docinfo->id.size;
-    memcpy(dst, docinfo->rev_meta.buf, docinfo->rev_meta.size);
-    dst += docinfo->rev_meta.size;
+    if (docinfo->rev_meta.size > 0) {
+        memcpy(dst, docinfo->rev_meta.buf, docinfo->rev_meta.size);
+        dst += docinfo->rev_meta.size;
+    }
     return dst - start;
 }
 
@@ -52,8 +54,10 @@ static size_t assemble_id_index_value(DocInfo *docinfo, char *dst)
     encode_raw48(docinfo->rev_seq, &raw->rev_seq);
     dst += sizeof(*raw);
 
-    memcpy(dst, docinfo->rev_meta.buf, docinfo->rev_meta.size);
-    dst += docinfo->rev_meta.size;
+    if (docinfo->rev_meta.size > 0) {
+        memcpy(dst, docinfo->rev_meta.buf, docinfo->rev_meta.size);
+        dst += docinfo->rev_meta.size;
+    }
     return dst - start;
 }
 
