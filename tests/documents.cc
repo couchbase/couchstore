@@ -228,7 +228,7 @@ void Documents::Document::init(const std::string& id, const std::string& data, c
     std::memcpy(documentId.data(), id.c_str(), id.length());
 
     documentData.resize(data.length());
-    std::memcpy(documentData.data(), data.data(), data.length());
+    std::copy(data.begin(), data.end(), documentData.begin());
 
     doc.id.buf = documentId.data();
     doc.id.size = documentId.size();
