@@ -90,10 +90,18 @@ static couchstore_error_t btree_lookup_inner(couchfile_lookup_request *rq,
     } else if (nodebuf[0] == 1) { //KV Node
         sized_buf cmp_key, val_buf;
         bool next_key = true;
-        while (bufpos < nodebuflen && current < end) {
-            if (next_key) {
+
+        // Try iterating whilst we have 'input' keys, i.e. keys we're looking up
+        while (current < end) {
+            // Only try and read the next-key if requested and we're still in
+            // the node length
+            if (next_key && bufpos < nodebuflen) {
                 bufpos += read_kv(nodebuf + bufpos, &cmp_key, &val_buf);
+            } else if (next_key) {
+                // else if next_key is true and we're out of buf space, break
+                break;
             }
+            // else continue to evaluate cmp_key against rq->keys[current]
 
             int cmp_val = lookup_compare(rq, &cmp_key, rq->keys[current]);
             if (cmp_val >= 0 && rq->fold && !rq->in_fold) {
