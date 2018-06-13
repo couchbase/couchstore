@@ -42,7 +42,6 @@
 #include <vector>
 #include "crc32.h"
 
-#include <platform/make_unique.h>
 #include "libcouchstore/couch_db.h"
 
 enum VBucketState { VB_ACTIVE, VB_REPLICA, VB_UNMANAGED };

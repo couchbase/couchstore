@@ -27,9 +27,9 @@
 #include <vector>
 
 #include <platform/cb_malloc.h>
-#include <platform/make_unique.h>
 #include <stdlib.h>
 #include <string.h>
+#include <memory>
 
 // Uncomment to enable debug logging of buffer operations.
 // #define LOG_BUFFER 1
