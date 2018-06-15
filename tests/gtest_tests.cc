@@ -1280,6 +1280,69 @@ TEST_F(CouchstoreTest, test_set_purge_seq) {
     db = nullptr;
 }
 
+static int readDocInfos(Db *db, DocInfo *docinfo, void *ctx) {
+    auto counter = reinterpret_cast<int*>(ctx);
+    (*counter)++;
+    return 0;
+}
+
+TEST_F(CouchstoreTest, MB_29816) {
+    {
+        const int ndocs = 1;
+        Documents documents(ndocs);
+
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_open_db(
+                          filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+
+
+        documents.setDoc(0, "00005", "value");
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_save_documents(db,
+                                            documents.getDocs(),
+                                            documents.getDocInfos(),
+                                            ndocs,
+                                            0));
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+    }
+    // Now create and update overlapping
+    {
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_open_db(
+                          filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+        const int ndocs = 2;
+        Documents documents(ndocs);
+
+        // The order here is what triggers the bug.
+        // In this input 00004 < 00005
+        // If we changed it so 00006 instead of 00004 the MB issue won't trigger
+        // Basically after sorting the inputs the inners of couchstore skips
+        // evaluating 00005 as the failure to find of 00004 helps to terminate
+        // a search loop when it should of kept going.
+        documents.setDoc(0, "00005", "value");
+        documents.setDoc(1, "00004", "value");
+        std::vector<sized_buf> sbuf;
+        for (int ii = 0; ii < ndocs; ++ii) {
+            sbuf.push_back(documents.getDoc(ii)->id);
+        }
+        int callbackCounter = 0;
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_docinfos_by_id(db,
+                                            sbuf.data(),
+                                            sbuf.size(),
+                                            0,
+                                            readDocInfos,
+                                            &callbackCounter));
+
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+        // Expect we got 1 callback for our key
+        EXPECT_EQ(1, callbackCounter);
+    }
+    db = nullptr;
+}
 
 INSTANTIATE_TEST_CASE_P(DocTest,
                         CouchstoreDoctest,
