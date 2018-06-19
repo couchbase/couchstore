@@ -58,7 +58,10 @@ typedef struct {
 void initContext(mapreduce_ctx_t *ctx,
                  const std::list<std::string> &function_sources);
 
-void destroyContext(mapreduce_ctx_t *ctx);
+// Disable UBSan vtpr check as V8 doesn't include RTTI information
+// therefore UBSan cannot lookup valid type information for
+// `ctx->bufAllocator` when it is deleted in this function.
+void NO_SANITIZE_VPTR destroyContext(mapreduce_ctx_t* ctx);
 
 void mapDoc(mapreduce_ctx_t *ctx,
             const mapreduce_json_t &doc,

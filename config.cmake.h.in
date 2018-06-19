@@ -61,3 +61,18 @@
 #pragma warning(disable: 4996)
 #define snprintf _snprintf
 #endif
+
+// Sanitizer annotations
+#if defined(__has_attribute)
+#  if __has_attribute(no_sanitize_undefined)
+     // GCC only supports the top-level "no_sanitize_undefined"; so have to
+     // turn off all UBSan checks just to disable vptr checks :(
+#    define NO_SANITIZE_VPTR __attribute__((no_sanitize_undefined))
+#  elif __has_attribute(no_sanitize)
+     // Can turn off the specific vptr sanitizer.
+#    define NO_SANITIZE_VPTR __attribute__((no_sanitize("vptr")))
+#  endif
+#endif
+#if !defined(NO_SANITIZE_VPTR)
+#  define NO_SANITIZE_VPTR
+#endif

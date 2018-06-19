@@ -89,8 +89,7 @@ extern "C" {
      * v8 resources. This needs to be called after disposing all
      * v8 thread contexts like v8 isolate and v8 context.
      **/
-    LIBCOUCHSTORE_API
-    void deinitV8();
+    LIBCOUCHSTORE_API NO_SANITIZE_VPTR void deinitV8();
 
     /**
      * All mapreduce initialization are done in this function.
