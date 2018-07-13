@@ -155,27 +155,27 @@ static void print_datatype_as_json(const std::string& datatype) {
     printf("],");
 }
 
-static const char* getNamespaceString(char ns) {
+static std::string getNamespaceString(uint32_t ns) {
     switch (ns) {
     case 0:
         return "default";
     case 1:
-        return "collections";
-    case 2:
         return "system";
     default:
-        return "unknown";
+        return "collection:" + std::to_string(ns);
     }
 }
 
 static void printDocId(const char* prefix, const sized_buf* sb) {
-    if (decodeNamespace && sb->size > 0) {
-        // Byte 0 is namespace
-        printf("%s(%s) %.*s\n",
+    if (decodeNamespace && sb->size >= sizeof(uint32_t)) {
+        uint32_t ns = *reinterpret_cast<uint32_t*>(sb->buf);
+        // Bytes 0-3 are the namespace
+        printf("%s(%s) %d %.*s\n",
                prefix,
-               getNamespaceString(sb->buf[0]),
-               (int)sb->size - 1,
-               sb->buf + 1);
+               getNamespaceString(ns).c_str(),
+               int(sb->size),
+               int(sb->size - sizeof(uint32_t)),
+               sb->buf + sizeof(uint32_t));
     } else {
         printf("%s%.*s\n", prefix, (int)sb->size, sb->buf);
     }
