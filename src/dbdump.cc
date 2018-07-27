@@ -158,22 +158,42 @@ static void print_datatype_as_json(const std::string& datatype) {
 static std::string getNamespaceString(uint32_t ns) {
     switch (ns) {
     case 0:
-        return "default";
+        return "collection: default";
     case 1:
-        return "system";
+        return "system-key:";
     default:
-        return "collection:" + std::to_string(ns);
+        std::stringstream ss;
+        ss << "collection:0x" << std::hex << ns;
+        return ss.str();
     }
 }
 
 static void printDocId(const char* prefix, const sized_buf* sb) {
     if (decodeNamespace && sb->size >= sizeof(uint32_t)) {
-        uint32_t ns = *reinterpret_cast<uint32_t*>(sb->buf);
+        // Load the collection-ID of the key
+        uint32_t cid = *reinterpret_cast<uint32_t*>(sb->buf);
+
+        // Load the key
+        std::string key((const char*)(sb->buf + sizeof(uint32_t)), int(sb->size));
+
+        auto name = getNamespaceString(cid);
+
+        // Some system-keys have extra data
+        std::string collectionsPrefix("_collections:");
+        if (cid == 1  && std::mismatch(collectionsPrefix.begin(),
+                          collectionsPrefix.end(),
+                          key.begin()).first == collectionsPrefix.end()) {
+            uint32_t affectedCid = *reinterpret_cast<uint32_t*>(sb->buf +
+                                                                sizeof(uint32_t) +
+                                                                collectionsPrefix.size());
+            std::stringstream ss;
+            ss << name << "mutated:0x" << std::hex << affectedCid;
+            name = ss.str();
+        }
         // Bytes 0-3 are the namespace
-        printf("%s(%s) %d %.*s\n",
+        printf("%s(%s) %.*s\n",
                prefix,
-               getNamespaceString(ns).c_str(),
-               int(sb->size),
+               name.c_str(),
                int(sb->size - sizeof(uint32_t)),
                sb->buf + sizeof(uint32_t));
     } else {
