@@ -1427,24 +1427,20 @@ public:
         return ::testing::AssertionSuccess();
     }
 
-    static void update_callback(const DocInfo* docInfo,
-                                couchstore_updated_how update,
+    static void update_callback(const DocInfo* oldInfo,
+                                const DocInfo* newInfo,
                                 void* ctx) {
         SaveCallbackTest* addedAndReplaced =
                 reinterpret_cast<SaveCallbackTest*>(ctx);
-        switch (update) {
-        case COUCHSTORE_ADDED: {
-            addedAndReplaced->addedKeys[{docInfo->id.buf, docInfo->id.size}] =
-                    docInfo->db_seq;
-            break;
-        }
-        case COUCHSTORE_REPLACED: {
+        ASSERT_NE(nullptr, newInfo);
+        if (oldInfo) {
+            EXPECT_GT(newInfo->db_seq, oldInfo->db_seq);
             addedAndReplaced
-                    ->replacedKeys[{docInfo->id.buf, docInfo->id.size}] =
-                    docInfo->db_seq;
-            break;
-        }
-        default: { ASSERT_TRUE(false); }
+                    ->replacedKeys[{newInfo->id.buf, newInfo->id.size}] =
+                    newInfo->db_seq;
+        } else {
+            addedAndReplaced->addedKeys[{newInfo->id.buf, newInfo->id.size}] =
+                newInfo->db_seq;
         }
     }
 

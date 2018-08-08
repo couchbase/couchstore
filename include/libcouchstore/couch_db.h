@@ -291,21 +291,15 @@ extern "C" {
                                                  unsigned numDocs,
                                                  couchstore_save_options options);
 
-    typedef enum {
-        COUCHSTORE_ADDED, // The key was added, i.e. new to the database.
-        COUCHSTORE_REPLACED // The key replaced a key of the same name.
-    } couchstore_updated_how;
-
     /**
      * callback type for couchstore_save_documents_and_callback.
      * For each input key into couchstore_save_documents_and_callback the
-     * callback is invoked with how the by-id index was updated (and the
-     * DocInfo of key).
-     * When how is COUCHSTORE_ADDED DocInfo is for the new document
-     * When how is COUCHSTORE_REPLACED DocInfo is for the old document
+     * callback is invoked with DocInfo for the new and maybe old.
+     * - If the document is being replaced than oldInfo is not null
+     * - If the document is being added than oldInfo is null
      */
-    typedef void (*save_callback_fn)(const DocInfo* info,
-                                     couchstore_updated_how how,
+    typedef void (*save_callback_fn)(const DocInfo* oldInfo,
+                                     const DocInfo* newInfo,
                                      void* ctx);
 
     /**

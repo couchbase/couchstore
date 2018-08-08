@@ -408,15 +408,22 @@ static couchstore_error_t maybe_purgekp(couchfile_modify_request *rq, node_point
 // private method for invoking the callback provided by
 //   - couchstore_save_documents_and_callback
 static void do_save_callback(couchfile_modify_request* rq,
-                             couchstore_updated_how how,
                              const sized_buf* key,
-                             const sized_buf* value) {
-    DocInfo* info = nullptr;
-    (*rq->docinfo_callback)(&info, key, value);
+                             const sized_buf* valueOld,
+                             const sized_buf* valueNew) {
+    DocInfo* infoNew = nullptr;
+    DocInfo* infoOld = nullptr;
 
-    (*rq->save_callback)(info, how, rq->save_callback_ctx);
+    (*rq->docinfo_callback)(&infoNew, key, valueNew);
 
-    couchstore_free_docinfo(info);
+    if (valueOld) {
+        (*rq->docinfo_callback)(&infoOld, key, valueOld);
+    }
+
+    (*rq->save_callback)(infoOld, infoNew, rq->save_callback_ctx);
+
+    couchstore_free_docinfo(infoNew);
+    couchstore_free_docinfo(infoOld);
 }
 
 static couchstore_error_t modify_node(couchfile_modify_request *rq,
@@ -465,8 +472,8 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                         mr_push_item(rq->actions[start].key, rq->actions[start].value.data, local_result);
                         if (rq->save_callback && rq->docinfo_callback) {
                             do_save_callback(rq,
-                                             COUCHSTORE_ADDED,
                                              rq->actions[start].key,
+                                             nullptr,
                                              rq->actions[start].value.data);
                         }
                         break;
@@ -492,9 +499,9 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                         mr_push_item(rq->actions[start].key, rq->actions[start].value.data, local_result);
                         if (rq->save_callback && rq->docinfo_callback) {
                             do_save_callback(rq,
-                                             COUCHSTORE_REPLACED,
                                              rq->actions[start].key,
-                                             &val_buf);
+                                             &val_buf,
+                                             rq->actions[start].value.data);
                         }
                         break;
 
@@ -530,8 +537,8 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                 mr_push_item(rq->actions[start].key, rq->actions[start].value.data, local_result);
                 if (rq->save_callback && rq->docinfo_callback) {
                     do_save_callback(rq,
-                                     COUCHSTORE_ADDED,
                                      rq->actions[start].key,
+                                     nullptr,
                                      rq->actions[start].value.data);
                 }
                 break;
