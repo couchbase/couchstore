@@ -1,6 +1,7 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #include "config.h"
 
+#include <mcbp/protocol/unsigned_leb128.h>
 #include <memcached/protocol_binary.h>
 #include <platform/cb_malloc.h>
 #include <string.h>
@@ -158,7 +159,7 @@ static void print_datatype_as_json(const std::string& datatype) {
 static std::string getNamespaceString(uint32_t ns) {
     switch (ns) {
     case 0:
-        return "collection: default";
+        return "collection:0x0:default";
     case 1:
         return "system-key:";
     default:
@@ -170,32 +171,33 @@ static std::string getNamespaceString(uint32_t ns) {
 
 static void printDocId(const char* prefix, const sized_buf* sb) {
     if (decodeNamespace && sb->size >= sizeof(uint32_t)) {
-        // Load the collection-ID of the key
-        uint32_t cid = *reinterpret_cast<uint32_t*>(sb->buf);
+        // Decode the collection-ID of the key
+        auto decoded =
+            cb::mcbp::decode_unsigned_leb128<uint32_t>
+                ({reinterpret_cast<uint8_t*>(sb->buf), sb->size});
 
         // Load the key
-        std::string key((const char*)(sb->buf + sizeof(uint32_t)), int(sb->size));
+        std::string key(reinterpret_cast<const char*>(decoded.second.data()),
+                        decoded.second.size());
 
-        auto name = getNamespaceString(cid);
+        auto name = getNamespaceString(decoded.first);
 
         // Some system-keys have extra data
         std::string collectionsPrefix("_collections:");
-        if (cid == 1  && std::mismatch(collectionsPrefix.begin(),
+        if (decoded.first == 1  && std::mismatch(collectionsPrefix.begin(),
                           collectionsPrefix.end(),
                           key.begin()).first == collectionsPrefix.end()) {
-            uint32_t affectedCid = *reinterpret_cast<uint32_t*>(sb->buf +
-                                                                sizeof(uint32_t) +
-                                                                collectionsPrefix.size());
+            uint32_t affectedCid =
+                *reinterpret_cast<const uint32_t*>(decoded.second.data() +
+                                                   collectionsPrefix.size());
             std::stringstream ss;
-            ss << name << "mutated:0x" << std::hex << affectedCid;
+            ss << name << "updated-collection:0x" << std::hex << affectedCid;
             name = ss.str();
         }
-        // Bytes 0-3 are the namespace
-        printf("%s(%s) %.*s\n",
+        printf("%s(%s) %s\n",
                prefix,
                name.c_str(),
-               int(sb->size - sizeof(uint32_t)),
-               sb->buf + sizeof(uint32_t));
+               key.c_str());
     } else {
         printf("%s%.*s\n", prefix, (int)sb->size, sb->buf);
     }
