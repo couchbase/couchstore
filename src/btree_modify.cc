@@ -98,6 +98,9 @@ couchfile_modify_result *new_btree_modres(arena *a, arena *transient_arena, tree
 {
     couchfile_modify_request* rq;
     rq = static_cast<couchfile_modify_request*>(arena_alloc(a, sizeof(couchfile_modify_request)));
+    if (!rq) {
+        return NULL;
+    }
     rq->cmp = *cmp;
     rq->file = file;
     rq->num_actions = 0;
@@ -757,6 +760,10 @@ node_pointer *modify_btree(couchfile_modify_request *rq,
                            couchstore_error_t *errcode)
 {
     arena* a = new_arena(0);
+    if (!a) {
+        *errcode = COUCHSTORE_ERROR_ALLOC_FAIL;
+        return NULL;
+    }
     node_pointer *ret_ptr = root;
     couchfile_modify_result *root_result = make_modres(a, rq);
     if (!root_result) {
