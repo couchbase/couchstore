@@ -167,7 +167,14 @@ extern "C" {
     couchstore_error_t precommit(Db *db);
     couchstore_error_t db_write_header(Db *db);
 
+#if defined __APPLE__
+    /*
+     * Apple's clang disables thread_local keyword support in older versions
+     */
+    extern __thread char internal_error_string[MAX_ERR_STR_LEN];
+#else
     extern thread_local char internal_error_string[MAX_ERR_STR_LEN];
+#endif
 
 #ifdef __cplusplus
 }
