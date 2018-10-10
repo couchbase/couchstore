@@ -21,7 +21,14 @@
 #define ROOT_BASE_SIZE 12
 #define HEADER_BASE_SIZE 25
 
+#if __APPLE__
+/*
+ * Apple's clang disables thread_local keyword support
+ */
+__thread char internal_error_string[MAX_ERR_STR_LEN];
+#else
 thread_local char internal_error_string[MAX_ERR_STR_LEN];
+#endif
 
 // Initializes one of the db's root node pointers from data in the file header
 static couchstore_error_t read_db_root(Db *db, node_pointer **root,
