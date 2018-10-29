@@ -646,6 +646,103 @@ TEST_F(FileOpsErrorInjectionTest, dbopen_filegoto_eof_fail) {
 }
 
 /**
+ * Test to check whether or not B+tree corrupted node is well tolerated.
+ */
+TEST_F(CouchstoreInternalTest, corrupted_btree_node2)
+{
+    remove(filePath.c_str());
+
+    const uint32_t docsInTest = 100;
+    std::string key_str, value_str;
+    Documents documents(docsInTest);
+    uint32_t size = htonl(0 | 0x80000000);
+    uint32_t crc32 = htonl(0);
+    char info[4 + 4];
+    char errbuf[250];
+
+    // Write the header's block header
+    memcpy(&info[0], &size, 4);
+    memcpy(&info[4], &crc32, 4);
+
+    for (uint32_t ii = 0; ii < docsInTest; ii++) {
+        key_str = "doc" + std::to_string(ii);
+        value_str = "test_doc_body:" + std::to_string(ii);
+        documents.setDoc(ii, key_str, value_str);
+    }
+
+    // Save docs.
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_save_documents(db, documents.getDocs(),
+                                        documents.getDocInfos(),
+                                        docsInTest, 0));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+
+    // Check docs.
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
+    documents.resetCounters();
+    std::vector<sized_buf> buf(docsInTest);
+    for (uint32_t ii = 0; ii < docsInTest; ++ii) {
+        buf[ii] = documents.getDoc(ii)->id;
+    }
+    corrupted_btree_node_cb_param param;
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        &buf[0],
+                                        docsInTest,
+                                        0,
+                                        corrupted_btree_node_cb,
+                                        &param));
+    ASSERT_EQ(docsInTest, param.num_called);
+
+    couchstore_error_info_t errinfo;
+    // Inject corruption into one of B+tree nodes length by making it 0.
+
+    db->file.ops->pwrite(&errinfo, db->file.handle,
+                         &info, sizeof(info), param.last_doc_bp+24);
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
+    param.reset();
+    // Should fail.
+    ASSERT_NE(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        &buf[0],
+                                        docsInTest,
+                                        0,
+                                        corrupted_btree_node_cb,
+                                        &param));
+    // Without TOLERATE flag: should not retrieve any docs.
+    ASSERT_EQ(static_cast<size_t>(0), param.num_called);
+
+    param.reset();
+    // Should fail.
+    ASSERT_NE(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        &buf[0],
+                                        docsInTest,
+                                        COUCHSTORE_TOLERATE_CORRUPTION,
+                                        corrupted_btree_node_cb,
+                                        &param));
+
+    // With TOLERATE flag: should retrieve some docs,
+    // the number should be: '0 < # docs < docsInTest'.
+    ASSERT_LT(static_cast<size_t>(0), param.num_called);
+    ASSERT_GT(docsInTest, param.num_called);
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_last_internal_error(db, errbuf, 250));
+    ASSERT_EQ(0,strcmp("'Couchstore::pread_compressed() Invalid compressed buffer length:0 pos:2424'", errbuf));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+
+    db = nullptr;
+}
+/**
  * This is a parameterised test which injects errors on specific
  * calls to the file ops object.
  *

@@ -5,6 +5,7 @@
 
 #include <platform/cb_malloc.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 #ifdef DEBUG
 #include <stdio.h>
@@ -126,4 +127,16 @@ cs_off_t align_to_next_block(cs_off_t offset)
         return offset + COUCH_BLOCK_SIZE - (offset % COUCH_BLOCK_SIZE);
     }
     return offset;
+}
+
+couchstore_error_t log_last_internal_error(const char *format, ...)
+{
+
+    va_list args;
+
+    va_start(args, format);
+    vsnprintf(internal_error_string, MAX_ERR_STR_LEN, format, args);
+    va_end(args);
+
+    return COUCHSTORE_SUCCESS;
 }

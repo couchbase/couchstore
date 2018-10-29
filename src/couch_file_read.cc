@@ -137,8 +137,12 @@ static int pread_bin_internal(tree_file *file,
 
     info.chunk_len = ntohl(info.chunk_len) & ~0x80000000;
     if (max_header_size) {
-        if (info.chunk_len < 4 || info.chunk_len > max_header_size)
+        if (info.chunk_len < 4 || info.chunk_len > max_header_size  ) {
+            log_last_internal_error("Couchstore::pread_bin_internal() "
+                     "Invalid header length:%d max_header_size:%d pos:%" PRId64,
+                     info.chunk_len,  max_header_size, pos);
             return COUCHSTORE_ERROR_CORRUPT;
+        }
         info.chunk_len -= 4;    //Header len includes CRC len.
     }
     info.crc32 = ntohl(info.crc32);
@@ -150,6 +154,9 @@ static int pread_bin_internal(tree_file *file,
     err = read_skipping_prefixes(file, &pos, info.chunk_len, buf);
 
     if (!err && !perform_integrity_check(buf, info.chunk_len, info.crc32, file->crc_mode)) {
+        log_last_internal_error("Couchstore::pread_bin_internal() "
+                                "Invalid header length:%d crc:%d pos:%" PRId64,
+                                info.chunk_len, info.crc32, pos);
         err = COUCHSTORE_ERROR_CHECKSUM_FAIL;
     }
 
@@ -194,6 +201,8 @@ int pread_compressed(tree_file *file, cs_off_t pos, char **ret_ptr)
                                       {compressed_buf, size_t(len)},
                                       buffer)) {
             cb_free(compressed_buf);
+            log_last_internal_error("Couchstore::pread_compressed() "
+                     "Invalid compressed buffer length:%d pos:%" PRId64, len, pos);
             return COUCHSTORE_ERROR_CORRUPT;
         }
     } catch (const std::bad_alloc&) {

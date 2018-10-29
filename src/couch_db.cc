@@ -4,10 +4,10 @@
 #include <cstddef>
 #include <fcntl.h>
 #include <platform/cb_malloc.h>
-#include <string.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <stdio.h>
+#include <string>
 
 #include "internal.h"
 #include "node_types.h"
@@ -20,6 +20,8 @@
 
 #define ROOT_BASE_SIZE 12
 #define HEADER_BASE_SIZE 25
+
+thread_local char internal_error_string[MAX_ERR_STR_LEN];
 
 // Initializes one of the db's root node pointers from data in the file header
 static couchstore_error_t read_db_root(Db *db, node_pointer **root,
@@ -1380,6 +1382,23 @@ couchstore_error_t couchstore_last_os_error(const Db *db,
         buf[size - 1] = '\0';
     }
 
+    return COUCHSTORE_SUCCESS;
+}
+
+LIBCOUCHSTORE_API
+couchstore_error_t couchstore_last_internal_error(const Db *db,
+                                                  char* buf,
+                                                  size_t size) {
+    if (db == NULL || buf == nullptr || size == 0) {
+        return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+    }
+
+    int nw;
+
+    nw = snprintf(buf, size, "'%s'", internal_error_string);
+    if (nw < 0) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
     return COUCHSTORE_SUCCESS;
 }
 

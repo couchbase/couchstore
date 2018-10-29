@@ -863,8 +863,19 @@ extern "C" {
      * @param buf The buffer to store the message in
      * @param size The size of the buffer.
      */
-     LIBCOUCHSTORE_API
-     couchstore_error_t couchstore_last_os_error(const Db *db,
+    LIBCOUCHSTORE_API
+    couchstore_error_t couchstore_last_os_error(const Db *db,
+                                                 char* buf,
+                                                 size_t size);
+    /**
+     * Prints a description of the last internal error that Couchstore
+     * encountered on this thread into buf.
+     *
+     * @param buf The buffer to store the message in
+     * @param size The size of the buffer.
+     */
+    LIBCOUCHSTORE_API
+    couchstore_error_t couchstore_last_internal_error(const Db *db,
                                                  char* buf,
                                                  size_t size);
 
