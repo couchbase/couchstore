@@ -135,6 +135,8 @@ couchstore_error_t db_write_buf_compressed(tree_file *file,
         if (!cb::compression::deflate(Algorithm::Snappy,
                                       {buf->buf, buf->size},
                                       buffer)) {
+            log_last_internal_error("Couchstore::db_write_buf_compressed() "
+                                    "Compression failed buffer size:%zu", buf->size);
             return COUCHSTORE_ERROR_CORRUPT;
         }
     } catch (const std::bad_alloc&) {
