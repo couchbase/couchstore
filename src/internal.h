@@ -8,7 +8,6 @@
  * need access to them from outside the library, you should write a
  * function to give you what you need.
  */
-
 #include <libcouchstore/couch_db.h>
 #include "config.h"
 #include "crc32.h"
@@ -32,6 +31,8 @@
 #ifndef PATH_MAX
 #define PATH_MAX 1024
 #endif
+
+#define MAX_ERR_STR_LEN 250
 
 typedef struct {
     uint64_t purge_before_ts;
@@ -165,6 +166,8 @@ extern "C" {
 
     couchstore_error_t precommit(Db *db);
     couchstore_error_t db_write_header(Db *db);
+
+    extern thread_local char internal_error_string[MAX_ERR_STR_LEN];
 
 #ifdef __cplusplus
 }
