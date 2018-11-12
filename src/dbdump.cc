@@ -1,30 +1,35 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #include "config.h"
 
+#include "bitfield.h"
+#include "couch_btree.h"
+#include "flatbuffers/idl.h"
+#include "internal.h"
+#include "node_types.h"
+#include "tracking_file_ops.h"
+#include "util.h"
+#include "views/index_header.h"
+#include "views/util.h"
+#include "views/view_group.h"
+#include <collections/vbucket_serialised_manifest_entry_generated.h>
+#include <inttypes.h>
+#include <libcouchstore/couch_db.h>
 #include <mcbp/protocol/unsigned_leb128.h>
 #include <memcached/protocol_binary.h>
+#include <nlohmann/json.hpp>
 #include <platform/cb_malloc.h>
-#include <string.h>
+#include <platform/sized_buffer.h>
+#include <snappy-c.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <inttypes.h>
-#include <libcouchstore/couch_db.h>
-#include <snappy-c.h>
-#include <platform/sized_buffer.h>
-#include <xattr/utils.h>
 #include <xattr/blob.h>
-#include "couch_btree.h"
-#include "util.h"
-#include "bitfield.h"
-#include "internal.h"
-#include "node_types.h"
-#include "views/util.h"
-#include "views/index_header.h"
-#include "views/view_group.h"
-#include "tracking_file_ops.h"
+#include <xattr/utils.h>
+
+#include <iostream>
 
 #define MAX_HEADER_SIZE (64 * 1024)
 
@@ -43,7 +48,7 @@ static bool oneKey = false;
 static bool dumpBody = true;
 static bool decodeVbucket = true;
 static bool decodeIndex = false;
-static bool decodeNamespace = false;
+static bool decodeNamespace = true;
 static bool iterateHeaders = false;
 static sized_buf dumpKey;
 
@@ -52,6 +57,8 @@ typedef struct {
     raw_32 expiry;
     raw_32 flags;
 } CouchbaseRevMeta;
+
+extern const std::string vbucket_serialised_manifest_entry_raw_schema;
 
 static int view_btree_cmp(const sized_buf *key1, const sized_buf *key2)
 {
@@ -161,7 +168,7 @@ static std::string getNamespaceString(uint32_t ns) {
     case 0:
         return "collection:0x0:default";
     case 1:
-        return "system-key:";
+        return "system-event-key:";
     default:
         std::stringstream ss;
         ss << "collection:0x" << std::hex << ns;
@@ -182,17 +189,44 @@ static void printDocId(const char* prefix, const sized_buf* sb) {
 
         auto name = getNamespaceString(decoded.first);
 
-        // Some system-keys have extra data
-        std::string collectionsPrefix("_collections:");
-        if (decoded.first == 1  && std::mismatch(collectionsPrefix.begin(),
-                          collectionsPrefix.end(),
-                          key.begin()).first == collectionsPrefix.end()) {
-            uint32_t affectedCid =
-                *reinterpret_cast<const uint32_t*>(decoded.second.data() +
-                                                   collectionsPrefix.size());
-            std::stringstream ss;
-            ss << name << "updated-collection:0x" << std::hex << affectedCid;
-            name = ss.str();
+        // Some keys in the system event namespace have a format we can decode:
+        // \1_collection:<affected collection-id leb128>
+        // \1_scope:<affected scope-id leb128>
+        std::string collectionsPrefix("_collection:");
+        std::string scopePrefix("_scope:");
+
+        if (decoded.first == 1) {
+            // System event namespace
+            if (std::mismatch(collectionsPrefix.begin(),
+                              collectionsPrefix.end(),
+                              key.begin())
+                        .first == collectionsPrefix.end()) {
+                uint32_t affectedCid =
+                        cb::mcbp::decode_unsigned_leb128<uint32_t>(
+                                {reinterpret_cast<const uint8_t*>(
+                                         decoded.second.data() +
+                                         collectionsPrefix.size()),
+                                 decoded.second.size() -
+                                         collectionsPrefix.size()})
+                                .first;
+                std::stringstream ss;
+                ss << name << "collection:0x" << std::hex << affectedCid;
+                name = ss.str();
+            } else if (std::mismatch(scopePrefix.begin(),
+                                     scopePrefix.end(),
+                                     key.begin())
+                               .first == scopePrefix.end()) {
+                uint32_t affectedSid =
+                        cb::mcbp::decode_unsigned_leb128<uint32_t>(
+                                {reinterpret_cast<const uint8_t*>(
+                                         decoded.second.data() +
+                                         scopePrefix.size()),
+                                 decoded.second.size() - scopePrefix.size()})
+                                .first;
+                std::stringstream ss;
+                ss << name << "scope:0x" << std::hex << affectedSid;
+                name = ss.str();
+            }
         }
         printf("%s(%s) %s\n",
                prefix,
@@ -474,6 +508,65 @@ static int noop_visit(Db* db,
     return 0;
 }
 
+static couchstore_error_t read_collection_flatbuffer_manifest(
+        const sized_buf* v, std::string& out) {
+    flatbuffers::Verifier verify(reinterpret_cast<uint8_t*>(v->buf), v->size);
+    if (!Collections::VB::VerifySerialisedManifestBuffer(verify)) {
+        std::cerr << "WARNING: _local/collections_manifest contains invalid "
+                     "flatbuffers data.";
+        return COUCHSTORE_ERROR_CORRUPT;
+    }
+
+    // Use flatbuffers::Parser to generate JSON output of the binary blob
+    flatbuffers::IDLOptions idlOptions;
+
+    // Configure IDL
+    // strict_json:true adds quotes to keys
+    // indent_step < 0: no indent and no newlines, external tools can format
+    idlOptions.strict_json = true;
+    idlOptions.indent_step = -1;
+    flatbuffers::Parser parser(idlOptions);
+    parser.Parse(vbucket_serialised_manifest_entry_raw_schema.c_str());
+    std::string jsongen;
+    GenerateText(parser, v->buf, &out);
+    return COUCHSTORE_SUCCESS;
+}
+
+static couchstore_error_t read_collection_leb128_metadata(const sized_buf* v,
+                                                          std::string& out) {
+    uint64_t count = 0;
+    uint64_t seqno = 0;
+
+    auto decoded1 = cb::mcbp::decode_unsigned_leb128<uint64_t>(
+            {reinterpret_cast<uint8_t*>(v->buf), v->size});
+    count = decoded1.first;
+
+    if (decoded1.second.size()) {
+        seqno = cb::mcbp::decode_unsigned_leb128<uint64_t>(decoded1.second)
+                        .first;
+    }
+
+    std::stringstream ss;
+    ss << R"({"item_count":)" << count << R"(, "high_seqno":)" << seqno << "}";
+    out = ss.str();
+
+    return COUCHSTORE_SUCCESS;
+}
+
+static couchstore_error_t maybe_decode_local_doc(const sized_buf* id,
+                                                 const sized_buf* v,
+                                                 std::string& decodedData) {
+    // Check for known non-JSON meta-data documents
+    if (strncmp(id->buf, "_local/collections_manifest", id->size) == 0) {
+        return read_collection_flatbuffer_manifest(v, decodedData);
+    } else if (id->buf[0] == '|') {
+        return read_collection_leb128_metadata(v, decodedData);
+    }
+
+    // Nothing todo
+    return COUCHSTORE_SUCCESS;
+}
+
 static couchstore_error_t local_doc_print(couchfile_lookup_request *rq,
                                           const sized_buf *k,
                                           const sized_buf *v)
@@ -483,25 +576,68 @@ static couchstore_error_t local_doc_print(couchfile_lookup_request *rq,
         return COUCHSTORE_ERROR_DOC_NOT_FOUND;
     }
     (*count)++;
-    sized_buf *id = (sized_buf *) k;
-    if (dumpJson) {
-        printf("{\"id\":\"");
-        printjquote(id);
-        printf("\",");
-    } else {
-        printf("Key: ");
-        printsb(id);
+    sized_buf* id = (sized_buf*)k;
+    sized_buf value = {v->buf, v->size};
+
+    printf("Key: ");
+    printsb(id);
+
+    std::string decodedData;
+    auto rv = maybe_decode_local_doc(k, v, decodedData);
+
+    if (rv != COUCHSTORE_SUCCESS) {
+        return rv;
     }
 
-    if (dumpJson) {
-        printf("\"value\":\"");
-        printjquote(v);
-        printf("\"}\n");
-    } else {
-        printf("Value: ");
-        printsb(v);
-        printf("\n");
+    if (!decodedData.empty()) {
+        value.buf = const_cast<char*>(decodedData.data());
+        value.size = decodedData.size();
     }
+
+    printf("Value: ");
+    printsb(&value);
+    printf("\n");
+
+    return COUCHSTORE_SUCCESS;
+}
+
+static couchstore_error_t local_doc_print_json(couchfile_lookup_request* rq,
+                                               const sized_buf* k,
+                                               const sized_buf* v) {
+    int* count = (int*)rq->callback_ctx;
+    if (!v) {
+        return COUCHSTORE_ERROR_DOC_NOT_FOUND;
+    }
+    (*count)++;
+    sized_buf value = {v->buf, v->size};
+
+    std::string decodedData;
+    auto rv = maybe_decode_local_doc(k, v, decodedData);
+
+    if (rv != COUCHSTORE_SUCCESS) {
+        return rv;
+    }
+
+    if (!decodedData.empty()) {
+        value.buf = const_cast<char*>(decodedData.data());
+        value.size = decodedData.size();
+    }
+
+    nlohmann::json parsed;
+     parsed["id"] = std::string(k->buf, k->size);
+    try {
+        parsed["value"] = nlohmann::json::parse(value.buf, value.buf + value.size);
+    } catch (const nlohmann::json::exception& e) {
+        std::cerr << "WARNING: Failed nlohmann::json::parse of id:";
+        std::cerr.write(k->buf, k->size);
+        std::cerr << " with value:";
+        std::cerr.write(value.buf, value.size);
+        std::cerr << std::endl;
+        return COUCHSTORE_ERROR_CORRUPT;
+    }
+
+
+    std::cout << parsed.dump() << std::endl;
 
     return COUCHSTORE_SUCCESS;
 }
@@ -608,7 +744,12 @@ next_header:
         }
         break;
     case DumpLocals:
-        errcode = couchstore_print_local_docs(db, local_doc_print, &count);
+        if (dumpJson) {
+            errcode = couchstore_print_local_docs(
+                    db, local_doc_print_json, &count);
+        } else {
+            errcode = couchstore_print_local_docs(db, local_doc_print, &count);
+        }
         break;
 
     case DumpFileMap:
@@ -824,7 +965,7 @@ static void usage(void) {
     printf("    --byid       sort output by document ID\n");
     printf("    --byseq      sort output by document sequence number (default)\n");
     printf("    --json       dump data as JSON objects (one per line)\n");
-    printf("    --namespace  decode namespaces\n");
+    printf("    --no-namespace  don't decode namespaces\n");
     printf("    --iterate-headers  Iterate through all headers\n");
     printf("\nAlternate modes:\n");
     printf("    --tree       show file b-tree structure instead of data\n");
@@ -860,8 +1001,8 @@ int main(int argc, char **argv)
             dumpHex = true;
         } else if (strcmp(argv[ii], "--no-body") == 0) {
             dumpBody = false;
-        } else if (strcmp(argv[ii], "--namespace") == 0) {
-            decodeNamespace = true;
+        } else if (strcmp(argv[ii], "--no-namespace") == 0) {
+            decodeNamespace = false;
         } else if (strcmp(argv[ii], "--key") == 0) {
             if (argc < (ii + 1)) {
                 usage();

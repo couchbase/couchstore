@@ -110,12 +110,17 @@ ADD_EXECUTABLE(couch_dbdump
                ${COUCHSTORE_SOURCES}
                ${KVEngineAPI_BINARY_DIR}/xattr/visibility.h)
 
-ADD_DEPENDENCIES(couch_dbdump xattr)
 SET_TARGET_PROPERTIES(couch_dbdump PROPERTIES COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
 TARGET_INCLUDE_DIRECTORIES(couch_dbdump
-        PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/include)
-TARGET_LINK_LIBRARIES(couch_dbdump ${COUCHSTORE_LIBRARIES} xattr)
+                           PRIVATE
+                           ${CMAKE_CURRENT_BINARY_DIR}/include
+                           ${FLATBUFFERS_INCLUDE_DIR})
+
+TARGET_LINK_LIBRARIES(couch_dbdump
+                      ${COUCHSTORE_LIBRARIES}
+                      xattr
+                      ${FLATBUFFERS_LIBRARIES}
+                      ep-engine_collections)
 
 ADD_EXECUTABLE(couch_dbck src/dbck.cc)
 TARGET_LINK_LIBRARIES(couch_dbck couchstore platform)
