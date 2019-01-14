@@ -384,7 +384,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
 
             if (mcbp::datatype::is_xattr(datatype)) {
                 cb::xattr::Blob blob({body.buf, body.size}, false);
-                xattrs = to_string(blob.to_json(),false);
+                xattrs = blob.to_json().dump();
                 body = _sized_buf{doc->data.buf + blob.size(),
                                   doc->data.size - blob.size()};
             }
