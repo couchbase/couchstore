@@ -42,10 +42,10 @@ def chunks(l, n):
 
 def main():
     if len(sys.argv) != 3:
-        print "Usage: example1 <doc count> <file>"
+        print("Usage: example1 <doc count> <file>")
         exit(1)
     db = CouchStore(sys.argv[2], 'c')
-    for batch in chunks(range(0, int(sys.argv[1])), BATCH_SIZE):
+    for batch in chunks(list(range(0, int(sys.argv[1]))), BATCH_SIZE):
         insert_multi(db,
                      ["key_" + str(x) for x in batch],
                      [str(x) for x in batch])

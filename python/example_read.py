@@ -17,7 +17,7 @@ def main():
 
     db = CouchStore(args.file, 'r', unbuffered=args.unbuffered)
     for key in args.keys:
-        print db.get(key)
+        print(db.get(key))
     db.close()
 
 

@@ -1,47 +1,38 @@
 # Python interface to CouchStore library
 
 import errno
-import inspect
 import os
 import sys
 import traceback
 
+import ctypes
+
+
+# Load the couchstore library. For PyInstaller compatibility, we
+# must pass explicit bare library names to ctypes.CDLL(), not a
+# variable name, so we can't do this in a loop.
+_lib = None
 try:
-    import ctypes
-except ImportError:
-    cb_path = '/opt/couchbase/lib/python'
-    while cb_path in sys.path:
-        sys.path.remove(cb_path)
-    try:
-        import ctypes
-    except ImportError:
-        sys.exit('error: could not import ctypes module')
-    else:
-        sys.path.insert(0, cb_path)
+    _lib = ctypes.CDLL("libcouchstore.so")
+except OSError as err:
+    pass
 
-# Load the couchstore library and customize return types:
-_lib_dir = [
-    # cbbackup / cbrestore
-    os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))[:-6],
-    # couchstore python tests - uses the LD_LIBRARY_PATH set
-    # via CMakeLists.txt to explicitly identify the path on OSX
-    os.environ.get('LD_LIBRARY_PATH', '.')
-    ]
-osx_path = [os.path.join(path, 'libcouchstore.dylib') for path in _lib_dir]
-
-for lib in ['libcouchstore.so',      # Linux
-            'couchstore.dll',        # Windows
-            'libcouchstore-1.dll'    # Windows (pre-CMake)
-            ] + osx_path:            # Mac OS
+if _lib is None:
     try:
-        _lib = ctypes.CDLL(lib)
-        break
-    except OSError, err:
-        continue
-else:
+        _lib = ctypes.CDLL("couchstore.dll")
+    except OSError as err:
+        pass
+
+if _lib is None:
+    try:
+        _lib = ctypes.CDLL("libcouchstore.dylib")
+    except OSError as err:
+        pass
+
+if _lib is None:
     raise ImportError("Failed to locate suitable couchstore shared library")
 
-
+# Customize return types
 _lib.couchstore_strerror.restype = ctypes.c_char_p
 
 
@@ -68,7 +59,7 @@ def _check(err):
 
 
 def _toString(key):
-    if not isinstance(key, basestring):
+    if not isinstance(key, str):
         raise TypeError(key)
     return str(key)
 
@@ -82,12 +73,15 @@ class SizedBuf(ctypes.Structure):
         if string is not None:
             string = _toString(string)
             length = len(string)
-            buf = ctypes.create_string_buffer(string, length)
+            buf = ctypes.create_string_buffer(string.encode(), length)
             ctypes.Structure.__init__(self, buf, length)
         else:
             ctypes.Structure.__init__(self, None, 0)
 
     def __str__(self):
+        return ctypes.string_at(self.buf, self.size).decode()
+
+    def getBytes(self):
         return ctypes.string_at(self.buf, self.size)
 
 
@@ -146,7 +140,7 @@ class DocumentInfo(object):
         self.store = store
         self.sequence = info.db_seq
         self.revSequence = info.rev_seq
-        self.revMeta = str(info.rev_meta)
+        self.revMeta = info.rev_meta
         self.deleted = (info.deleted != 0)
         self.contentType = info.content_meta & 0x0F
         self.compressed = (info.content_meta & 0x80) != 0
@@ -159,7 +153,10 @@ class DocumentInfo(object):
         if hasattr(self, "sequence"):
             struct.db_seq = self.sequence
         if hasattr(self, "revMeta"):
-            struct.rev_meta = SizedBuf(self.revMeta)
+            if isinstance(self.revMeta, SizedBuf):
+                struct.rev_meta = self.revMeta
+            else:
+                struct.rev_meta = SizedBuf(self.revMeta)
         struct.rev_seq = self.revSequence
         struct.deleted = self.deleted
         struct.content_meta = self.contentType & 0x0F
@@ -211,7 +208,7 @@ class LocalDocs(object):
         id = _toString(key)
         docptr = ctypes.pointer(LocalDocStruct())
         err = _lib.couchstore_open_local_document(self.couchstore,
-                                                  id,
+                                                  ctypes.c_char_p(id.encode()),
                                                   ctypes.c_size_t(len(id)),
                                                   ctypes.byref(docptr))
         if err == -5 or (err == 0 and docptr.contents.deleted):
@@ -255,7 +252,7 @@ class CouchStore(object):
             flags |= 8 ## UNBUFFERED
 
         db = ctypes.c_void_p()
-        _check(_lib.couchstore_open_db(path,
+        _check(_lib.couchstore_open_db(ctypes.c_char_p(path.encode()),
                                        ctypes.c_uint64(flags),
                                        ctypes.byref(db)))
         self._as_parameter_ = db
@@ -323,7 +320,7 @@ class CouchStore(object):
         n = len(ids)
         docStructs = (ctypes.POINTER(DocStruct) * n)()
         infoStructs = (ctypes.POINTER(DocInfoStruct) * n)()
-        for i in xrange(0, n):
+        for i in range(0, n):
             id = ids[i]
             if isinstance(id, DocumentInfo):
                 info = id._asStruct()
@@ -421,6 +418,7 @@ class CouchStore(object):
         def callback(dbPtr, docInfoPtr, context):
             fn(DocumentInfo._fromStruct(docInfoPtr.contents, self))
             return 0
+
         _check(_lib.couchstore_changes_since(self,
                                              ctypes.c_uint64(since),
                                              ctypes.c_uint64(0),

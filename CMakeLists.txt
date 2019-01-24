@@ -184,10 +184,6 @@ INSTALL(TARGETS couch_dbdump
                 couch_view_group_compactor
         RUNTIME DESTINATION bin)
 
-INSTALL(FILES
-        python/couchstore.py
-        DESTINATION lib/python)
-
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake.h.in
                ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 

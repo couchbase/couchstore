@@ -80,10 +80,10 @@ class CouchStoreTest (unittest.TestCase):
         self.store[info] = "the regular non-meta data"
 
         gotInfo = self.store.getInfo("meta")
-        self.assertEquals(gotInfo.id, "meta")
-        self.assertEquals(gotInfo.revSequence, info.revSequence)
-        self.assertEquals(gotInfo.revMeta, info.revMeta)
-        self.assertEquals(gotInfo.contentType, info.contentType)
+        self.assertEqual(gotInfo.id, "meta")
+        self.assertEqual(gotInfo.revSequence, info.revSequence)
+        self.assertEqual(gotInfo.revMeta, info.revMeta)
+        self.assertEqual(gotInfo.contentType, info.contentType)
         self.assertFalse(gotInfo.compressed)
 
     def testMetadataSave(self):
@@ -98,10 +98,10 @@ class CouchStoreTest (unittest.TestCase):
         self.store = CouchStore("/tmp/test.couch", 'r')
 
         gotInfo = self.store.getInfo("meta")
-        self.assertEquals(gotInfo.id, "meta")
-        self.assertEquals(gotInfo.revSequence, info.revSequence)
-        self.assertEquals(gotInfo.revMeta, info.revMeta)
-        self.assertEquals(gotInfo.contentType, info.contentType)
+        self.assertEqual(gotInfo.id, "meta")
+        self.assertEqual(gotInfo.revSequence, info.revSequence)
+        self.assertEqual(gotInfo.revMeta, info.revMeta)
+        self.assertEqual(gotInfo.contentType, info.contentType)
         self.assertFalse(gotInfo.compressed)
 
     def testCompression(self):
@@ -118,28 +118,28 @@ class CouchStoreTest (unittest.TestCase):
         return "Hi there! I'm value #%d!" % (i + 1)
 
     def addDocs(self, n):
-        for i in xrange(n):
+        for i in range(n):
             self.store.save(self.expectedKey(i), self.expectedValue(i))
 
     def addBulkDocs(self, n):
-        ids = [self.expectedKey(i) for i in xrange(n)]
-        datas = [self.expectedValue(i) for i in xrange(n)]
+        ids = [self.expectedKey(i) for i in range(n)]
+        datas = [self.expectedValue(i) for i in range(n)]
         self.store.saveMultiple(ids, datas)
 
     def testMultipleDocs(self):
         self.addDocs(1000)
-        for i in xrange(1000):
+        for i in range(1000):
             self.assertEqual(self.store[self.expectedKey(i)], self.expectedValue(i))
 
         info = self.store.getDbInfo()
-        self.assertEquals(info.filename, "/tmp/test.couch")
-        self.assertEquals(info.last_sequence, 1000)
-        self.assertEquals(info.doc_count, 1000)
-        self.assertEquals(info.deleted_count, 0)
+        self.assertEqual(info.filename, "/tmp/test.couch")
+        self.assertEqual(info.last_sequence, 1000)
+        self.assertEqual(info.doc_count, 1000)
+        self.assertEqual(info.deleted_count, 0)
 
     def testBulkDocs(self):
         self.addBulkDocs(1000)
-        for i in xrange(1000):
+        for i in range(1000):
             self.assertEqual(self.store[self.expectedKey(i)], self.expectedValue(i))
 
     def testDelete(self):
@@ -151,15 +151,15 @@ class CouchStoreTest (unittest.TestCase):
         self.assertEqual(info.id, "key")
 
         info = self.store.getDbInfo()
-        self.assertEquals(info.last_sequence, 2)
-        self.assertEquals(info.doc_count, 0)
-        self.assertEquals(info.deleted_count, 1)
+        self.assertEqual(info.last_sequence, 2)
+        self.assertEqual(info.doc_count, 0)
+        self.assertEqual(info.deleted_count, 1)
 
     def testChangesSince(self):
         self.addDocs(50)
         changes = self.store.changesSince(0)
         self.assertEqual(len(changes), 50)
-        for i in xrange(50):
+        for i in range(50):
             self.assertEqual(changes[i].id, self.expectedKey(i))
 
     def testForAllDocs(self):
@@ -167,7 +167,7 @@ class CouchStoreTest (unittest.TestCase):
         docCount = [0]
 
         def checkDoc(docInfo):
-            self.assertEquals(docInfo.id, self.expectedKey(docCount[0]))
+            self.assertEqual(docInfo.id, self.expectedKey(docCount[0]))
             docCount[0] += 1
 
         self.store.forEachDoc(None, None, checkDoc)
@@ -179,8 +179,8 @@ class CouchStoreTest (unittest.TestCase):
         def checkDoc(docInfo):
             expected = "DocumentInfo('%s', %d bytes)" % (docInfo.id,
                                                          docInfo.physSize)
-            self.assertEquals(str(docInfo), expected)
-            self.assertEquals(repr(docInfo), expected)
+            self.assertEqual(str(docInfo), expected)
+            self.assertEqual(repr(docInfo), expected)
 
         self.store.forEachDoc(None, None, checkDoc)
 
@@ -189,7 +189,7 @@ class CouchStoreTest (unittest.TestCase):
         docCount = [0]
 
         def checkDoc(docInfo):
-            self.assertEquals(docInfo.id, self.expectedKey(docCount[0]))
+            self.assertEqual(docInfo.id, self.expectedKey(docCount[0]))
             docCount[0] += 1
 
         self.store.forEachDoc(None, self.expectedKey(10), checkDoc)
