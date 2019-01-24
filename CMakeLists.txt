@@ -118,6 +118,7 @@ TARGET_INCLUDE_DIRECTORIES(couch_dbdump
 
 TARGET_LINK_LIBRARIES(couch_dbdump
                       ${COUCHSTORE_LIBRARIES}
+                      mcbp
                       xattr
                       ${FLATBUFFERS_LIBRARIES}
                       ep-engine_collections)
