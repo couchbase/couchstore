@@ -71,10 +71,15 @@ class SizedBuf(ctypes.Structure):
 
     def __init__(self, string):
         if string is not None:
-            string = _toString(string)
-            length = len(string)
-            buf = ctypes.create_string_buffer(string.encode(), length)
-            ctypes.Structure.__init__(self, buf, length)
+            if isinstance(string, bytes):
+                length= len(string)
+                buf = ctypes.create_string_buffer(string, length)
+                ctypes.Structure.__init__(self, buf, length)
+            else:
+                string = _toString(string)
+                length = len(string)
+                buf = ctypes.create_string_buffer(string.encode(), length)
+                ctypes.Structure.__init__(self, buf, length)
         else:
             ctypes.Structure.__init__(self, None, 0)
 
