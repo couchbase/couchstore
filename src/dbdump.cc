@@ -70,6 +70,39 @@ struct CouchbaseRevMetaV2 {
     uint8_t confResMode;
 };
 
+// Additional Couchbase V3 metadata - SyncReplication state
+struct CouchbaseRevMetaV3 {
+    uint8_t operation;
+    uint8_t level;
+
+    const char* getOperationName() const {
+        switch (operation) {
+        case 0:
+            return "pending";
+        case 1:
+            return "commit";
+        case 2:
+            return "abort";
+        default:
+            return "<INVALID>";
+        }
+    }
+    const char* getLevelName() const {
+        switch (level) {
+        case 0:
+            return "none";
+        case 1:
+            return "majority";
+        case 2:
+            return "majorityAndPersistOnMaster";
+        case 3:
+            return "persistToMajority";
+        default:
+            return "<INVALID>";
+        }
+    }
+};
+
 extern const std::string vbucket_serialised_manifest_entry_raw_schema;
 extern const std::string collections_kvstore_schema;
 
@@ -375,6 +408,29 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
             printf(",\"conflict_resolution_mode\":%d", conf_res_mode);
         } else {
             printf(", conflict_resolution_mode: %d", conf_res_mode);
+        }
+    }
+
+    if (docinfo->rev_meta.size == sizeof(CouchbaseRevMeta) +
+                                          sizeof(CouchbaseRevMetaV1) +
+                                          sizeof(CouchbaseRevMetaV3)) {
+        // 21 bytes of rev_meta indicates CouchbaseRevMetaV3 - adds
+        // Synchronous Replication state.
+        const auto* metaV3 =
+                (const CouchbaseRevMetaV3*)(docinfo->rev_meta.buf +
+                                            sizeof(CouchbaseRevMeta) +
+                                            sizeof(CouchbaseRevMetaV1));
+
+        if (dumpJson) {
+            printf(",\"sync_write\":\"%s\"", metaV3->getOperationName());
+            if (metaV3->operation == 0 /*Pending*/) {
+                printf(",\"level\":\"%s\"", metaV3->getLevelName());
+            }
+        } else {
+            printf(", sync_write: %s", metaV3->getOperationName());
+            if (metaV3->operation == 0 /*Pending*/) {
+                printf(" [level: %s]", metaV3->getLevelName());
+            }
         }
     }
 
