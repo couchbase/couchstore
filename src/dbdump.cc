@@ -169,6 +169,8 @@ static std::string getNamespaceString(uint32_t ns) {
         return "collection:0x0:default";
     case 1:
         return "system-event-key:";
+    case 2:
+        return "prepare:";
     default:
         std::stringstream ss;
         ss << "collection:0x" << std::hex << ns;
@@ -188,6 +190,16 @@ static void printDocId(const char* prefix, const sized_buf* sb) {
                         decoded.second.size());
 
         auto name = getNamespaceString(decoded.first);
+
+        if (decoded.first == 2) {
+            // Synchronous Replication 'Prepare' namespace prefix.
+            // Decode again.
+            decoded =
+                    cb::mcbp::decode_unsigned_leb128<uint32_t>(decoded.second);
+            key = std::string(reinterpret_cast<const char*>(decoded.second.data()),
+                            decoded.second.size());
+            name = name + getNamespaceString(decoded.first);
+        }
 
         // Some keys in the system event namespace have a format we can decode:
         // \1_collection:<affected collection-id leb128>
