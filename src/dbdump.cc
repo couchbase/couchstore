@@ -58,6 +58,17 @@ typedef struct {
     raw_32 flags;
 } CouchbaseRevMeta;
 
+// Additional Couchbase V1 metadata:
+struct CouchbaseRevMetaV1 {
+    uint8_t flex_code;
+    uint8_t datatype;
+};
+
+// Additional Couchbase V2 metadata:
+struct CouchbaseRevMetaV2 {
+    uint8_t confResMode;
+};
+
 extern const std::string vbucket_serialised_manifest_entry_raw_schema;
 
 static int view_btree_cmp(const sized_buf *key1, const sized_buf *key2)
@@ -160,7 +171,7 @@ static void print_datatype_as_json(const std::string& datatype) {
     }
     auto token = datatype.substr(start);
     printf("\"%s\"", token.c_str());
-    printf("],");
+    printf("]");
 }
 
 static std::string getNamespaceString(uint32_t ns) {
@@ -256,6 +267,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
     uint64_t cas;
     uint32_t expiry, flags;
     protocol_binary_datatype_t datatype = PROTOCOL_BINARY_RAW_BYTES;
+    bool ttl_delete = false;
     couchstore_error_t docerr;
     (*count)++;
 
@@ -289,76 +301,91 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         printf("     content_meta: %d\n", docinfo->content_meta);
         printf("     size (on disk): %" PRIu64 "\n", (uint64_t)docinfo->size);
     }
+
     if (docinfo->rev_meta.size >= sizeof(CouchbaseRevMeta)) {
         const CouchbaseRevMeta* meta = (const CouchbaseRevMeta*)docinfo->rev_meta.buf;
         cas = decode_raw64(meta->cas);
         expiry = decode_raw32(meta->expiry);
         flags = decode_raw32(meta->flags);
-        if (docinfo->rev_meta.size > sizeof(CouchbaseRevMeta)) {
-            // 18 bytes of rev_meta indicates CouchbaseRevMeta along with
-            // flex_meta_code (1B) and datatype (1B)
-            if (docinfo->rev_meta.size < sizeof(CouchbaseRevMeta) + 2) {
-                printf("     Error parsing the document: Possible corruption\n");
-                return 1;
-            }
-            const auto flex_code = *((uint8_t*)(docinfo->rev_meta.buf +
-                                                sizeof(CouchbaseRevMeta)));
-            if (flex_code < 0x01) {
-                printf("     Error: Flex code mismatch (bad code: %d)\n",
-                       flex_code);
-                return 1;
-            }
-            datatype = *((uint8_t *)(docinfo->rev_meta.buf + sizeof(CouchbaseRevMeta) +
-                        sizeof(uint8_t)));
-            const auto datatype_string = mcbp::datatype::to_string(datatype);
-
-            if (dumpJson) {
-                printf("\"cas\":\"%" PRIu64 "\",\"expiry\":%" PRIu32
-                       ",\"flags\":%" PRIu32 ",\"datatype\":%d,",
-                       cas, expiry, flags, datatype);
-                print_datatype_as_json(datatype_string);
-            } else {
-                printf("     cas: %" PRIu64 ", expiry: %" PRIu32
-                       ", flags: %" PRIu32 ", datatype: 0x%02x (%s)",
-                       cas, expiry, flags, datatype,
-                       datatype_string.c_str());
-            }
-
-            if (docinfo->rev_meta.size > sizeof(CouchbaseRevMeta) + 2) {
-                // 19 bytes of rev_meta indicates CouchbaseRevMeta along with
-                // flex_meta_code (1B) and datatype (1B), along with the conflict
-                // resolution flag (1B).
-                auto conf_res_mode = *((uint8_t *)(docinfo->rev_meta.buf +
-                                  sizeof(CouchbaseRevMeta) + sizeof(uint8_t) +
-                                  sizeof(uint8_t)));
-
-                if (dumpJson) {
-                    printf("\"conflict_resolution_mode\":%d,", conf_res_mode);
-                } else {
-                    printf(", conflict_resolution_mode: %d\n", conf_res_mode);
-                }
-            } else {
-                if (!dumpJson) {
-                    printf("\n");
-                }
-            }
+        if (dumpJson) {
+            printf("\"cas\":\"%" PRIu64 "\",\"expiry\":%" PRIu32
+                   ",\"flags\":%" PRIu32,
+                   cas,
+                   expiry,
+                   flags);
         } else {
-            if (dumpJson) {
-                printf("\"cas\":\"%" PRIu64 "\",\"expiry\":%" PRIu32
-                       ",\"flags\":%" PRIu32 ",",
-                        cas, expiry, flags);
-            } else {
-                printf("     cas: %" PRIu64 ", expiry: %" PRIu32 ", flags: %"
-                       PRIu32 "\n",
-                        cas, expiry, flags);
-            }
+            printf("     cas: %" PRIu64 ", expiry: %" PRIu32
+                   ", flags: %" PRIu32,
+                   cas,
+                   expiry,
+                   flags);
         }
     }
-    if (docinfo->deleted) {
+
+    if (docinfo->rev_meta.size >=
+        sizeof(CouchbaseRevMeta) + sizeof(CouchbaseRevMetaV1)) {
+        // 18 bytes of rev_meta indicates CouchbaseRevMetaV1 - adds
+        // flex_meta_code (1B) and datatype (1B)
+        if (docinfo->rev_meta.size <
+            sizeof(CouchbaseRevMeta) + sizeof(CouchbaseRevMetaV1)) {
+            printf("     Error parsing the document: Possible corruption\n");
+            return 1;
+        }
+        const auto* metaV1 =
+                (const CouchbaseRevMetaV1*)(docinfo->rev_meta.buf +
+                                            sizeof(CouchbaseRevMeta));
+
+        if (metaV1->flex_code < 0x01) {
+            printf("     Error: Flex code mismatch (bad code: %d)\n",
+                   metaV1->flex_code);
+            return 1;
+        }
+        ttl_delete = ((metaV1->flex_code << 7) & 0x1) == 1;
+
+        datatype = metaV1->datatype;
+        const auto datatype_string = mcbp::datatype::to_string(datatype);
+
         if (dumpJson) {
-            printf("\"deleted\":true,");
+            printf(",\"datatype\":%d,", datatype);
+            print_datatype_as_json(datatype_string);
         } else {
-            printf("     doc deleted\n");
+            printf(", datatype: 0x%02x (%s)",
+                   datatype,
+                   datatype_string.c_str());
+        }
+    }
+
+    if (docinfo->rev_meta.size == sizeof(CouchbaseRevMeta) +
+                                          sizeof(CouchbaseRevMetaV1) +
+                                          sizeof(CouchbaseRevMetaV2)) {
+        // 19 bytes of rev_meta indicates CouchbaseRevMetaV2 - adds
+        // resolution flag (1B).
+        // Note: This is no longer written since Watson; but could still
+        // exist in old files.
+        const auto* metaV2 =
+                (const CouchbaseRevMetaV2*)(docinfo->rev_meta.buf +
+                                            sizeof(CouchbaseRevMeta) +
+                                            sizeof(CouchbaseRevMetaV1));
+
+        const auto conf_res_mode = metaV2->confResMode;
+
+        if (dumpJson) {
+            printf(",\"conflict_resolution_mode\":%d", conf_res_mode);
+        } else {
+            printf(", conflict_resolution_mode: %d", conf_res_mode);
+        }
+    }
+
+    if (!dumpJson) {
+        printf("\n");
+    }
+
+    if (docinfo->deleted) {
+        const char* deleteSource = ttl_delete ? "TTL" : "explicit";
+        if (dumpJson) {
+            printf(",\"deleted\":\"%s\"", deleteSource);
+        } else {
+            printf("     doc deleted (%s)\n", deleteSource);
         }
     }
 
@@ -366,7 +393,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         docerr = couchstore_open_doc_with_docinfo(db, docinfo, &doc, DECOMPRESS_DOC_BODIES);
         if (docerr != COUCHSTORE_SUCCESS) {
             if (dumpJson) {
-                printf("\"body\":null}\n");
+                printf(",\"body\":null}\n");
             } else {
                 printf("     could not read document body: %s\n", couchstore_strerror(docerr));
             }
@@ -384,7 +411,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
                             {doc->data.buf, doc->data.size},
                             inflated)) {
                     if (dumpJson) {
-                        printf("\"body\":null}\n");
+                        printf(",\"body\":null}\n");
                     } else {
                         printf("     could not inflate document body\n");
                     }
@@ -402,7 +429,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
             }
 
             if (dumpJson) {
-                printf("\"size\":%" PRIu64 ",", (uint64_t)doc->data.size);
+                printf(",\"size\":%" PRIu64 ",", (uint64_t)doc->data.size);
                 if (docinfo->content_meta & COUCH_DOC_IS_COMPRESSED) {
                     printf("\"snappy\":true,\"display\":\"inflated\",");
                 }
