@@ -11,7 +11,7 @@
 #include "views/index_header.h"
 #include "views/util.h"
 #include "views/view_group.h"
-#include <collections/vbucket_serialised_manifest_entry_generated.h>
+#include <collections/kvstore_generated.h>
 #include <inttypes.h>
 #include <libcouchstore/couch_db.h>
 #include <mcbp/protocol/unsigned_leb128.h>
@@ -70,6 +70,7 @@ struct CouchbaseRevMetaV2 {
 };
 
 extern const std::string vbucket_serialised_manifest_entry_raw_schema;
+extern const std::string collections_kvstore_schema;
 
 static int view_btree_cmp(const sized_buf *key1, const sized_buf *key2)
 {
@@ -547,12 +548,20 @@ static int noop_visit(Db* db,
     return 0;
 }
 
-static couchstore_error_t read_collection_flatbuffer_manifest(
-        const sized_buf* v, std::string& out) {
-    flatbuffers::Verifier verify(reinterpret_cast<uint8_t*>(v->buf), v->size);
-    if (!Collections::VB::VerifySerialisedManifestBuffer(verify)) {
-        std::cerr << "WARNING: _local/collections_manifest contains invalid "
-                     "flatbuffers data.";
+
+template<class RootType>
+static couchstore_error_t read_collection_flatbuffer_collections(
+        const std::string& name,
+        const std::string& rootType,
+        const sized_buf* v,
+        std::string& out) {
+    flatbuffers::Verifier verifier(reinterpret_cast<uint8_t*>(v->buf), v->size);
+    if (!verifier.VerifyBuffer<RootType>(nullptr)) {
+        std::cerr << "WARNING: \"" << name
+                  << "\" root:" << rootType << ", contains invalid "
+                     "flatbuffers data of size:"
+                  << v->size << std::endl;
+        ;
         return COUCHSTORE_ERROR_CORRUPT;
     }
 
@@ -565,7 +574,8 @@ static couchstore_error_t read_collection_flatbuffer_manifest(
     idlOptions.strict_json = true;
     idlOptions.indent_step = -1;
     flatbuffers::Parser parser(idlOptions);
-    parser.Parse(vbucket_serialised_manifest_entry_raw_schema.c_str());
+    parser.Parse(collections_kvstore_schema.c_str());
+    parser.SetRootType(rootType.c_str());
     std::string jsongen;
     GenerateText(parser, v->buf, &out);
     return COUCHSTORE_SUCCESS;
@@ -596,8 +606,18 @@ static couchstore_error_t maybe_decode_local_doc(const sized_buf* id,
                                                  const sized_buf* v,
                                                  std::string& decodedData) {
     // Check for known non-JSON meta-data documents
-    if (strncmp(id->buf, "_local/collections_manifest", id->size) == 0) {
-        return read_collection_flatbuffer_manifest(v, decodedData);
+    if (strncmp(id->buf, "_local/collections/open", id->size) == 0) {
+        return read_collection_flatbuffer_collections<Collections::KVStore::OpenCollections>(
+                id->buf, "OpenCollections", v, decodedData);
+    } else if (strncmp(id->buf, "_local/collections/dropped", id->size) == 0) {
+        return read_collection_flatbuffer_collections<Collections::KVStore::DroppedCollections>(
+                id->buf, "DroppedCollections", v, decodedData);
+    } else if (strncmp(id->buf, "_local/scope/open", id->size) == 0) {
+        return read_collection_flatbuffer_collections<Collections::KVStore::Scopes>(
+                id->buf, "Scopes", v, decodedData);
+    } else if (strncmp(id->buf, "_local/collections/manifest", id->size) == 0) {
+        return read_collection_flatbuffer_collections<Collections::KVStore::CommittedManifest>(
+                id->buf, "CommittedManifest", v, decodedData);
     } else if (id->buf[0] == '|') {
         return read_collection_leb128_metadata(v, decodedData);
     }
