@@ -18,15 +18,18 @@
  * the License.
  **/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <platform/cb_malloc.h>
-#include <platform/cbassert.h>
-#include <strings.h>
 #include "file_sorter.h"
 #include "file_name_utils.h"
 #include "quicksort.h"
+#include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
+
+#include <strings.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <thread>
+#include <vector>
 
 #define NSORT_RECORDS_INIT 500000
 #define NSORT_RECORD_INCR  100000
@@ -63,18 +66,49 @@ typedef struct {
     size_t     n;
 } sort_job_t;
 
-typedef struct {
-    size_t              nworkers;
-    size_t              free_workers;
-    cb_cond_t           cond;
-    cb_mutex_t          mutex;
-    int                 finished;
-    file_sorter_error_t error;
-    sort_job_t          *job;
-    file_sort_ctx_t     *ctx;
-    cb_thread_t         *threads;
-} parallel_sorter_t;
+struct parallel_sorter_t;
+static void free_sort_job(sort_job_t* job, parallel_sorter_t* sorter);
+static void sort_worker(void* args);
 
+struct parallel_sorter_t {
+    parallel_sorter_t(size_t workers, file_sort_ctx_t* ctx)
+        : nworkers(workers), free_workers(workers), ctx(ctx) {
+        cb_mutex_initialize(&mutex);
+        cb_cond_initialize(&cond);
+
+        for (size_t ii = 0; ii < workers; ++ii) {
+            threads.emplace_back(
+                    std::make_unique<std::thread>(sort_worker, this));
+        }
+    }
+    ~parallel_sorter_t() {
+        free_sort_job(job, this);
+        if (!threads.empty()) {
+            cb_mutex_enter(&mutex);
+            finished = 1;
+            cb_mutex_exit(&mutex);
+            cb_cond_broadcast(&cond);
+
+            for (auto &t : threads) {
+                if (t) {
+                    t->join();
+                }
+            }
+        }
+        cb_mutex_destroy(&mutex);
+        cb_cond_destroy(&cond);
+    }
+
+    size_t nworkers;
+    size_t free_workers;
+    cb_cond_t cond;
+    cb_mutex_t mutex;
+    int finished = 0;
+    file_sorter_error_t error = FILE_SORTER_SUCCESS;
+    sort_job_t* job = nullptr;
+    file_sort_ctx_t* ctx;
+    std::vector<std::unique_ptr<std::thread>> threads;
+};
 
 static file_sorter_error_t do_sort_file(file_sort_ctx_t *ctx);
 
@@ -104,14 +138,8 @@ static file_sorter_error_t iterate_records_file(file_sort_ctx_t *ctx,
 
 static sort_job_t *create_sort_job(void **recs, size_t n, tmp_file_t *t);
 
-static void free_sort_job(sort_job_t *job, parallel_sorter_t *sorter);
-
 static parallel_sorter_t *create_parallel_sorter(size_t workers,
                                                  file_sort_ctx_t *ctx);
-
-static void free_parallel_sorter(parallel_sorter_t *s);
-
-static void sort_worker(void *args);
 
 static file_sorter_error_t parallel_sorter_add_job(parallel_sorter_t *s,
                                                   void **records,
@@ -233,67 +261,15 @@ static void free_sort_job(sort_job_t *job, parallel_sorter_t *sorter)
     }
 }
 
-
 static parallel_sorter_t *create_parallel_sorter(size_t workers,
                                                  file_sort_ctx_t *ctx)
 {
-    size_t i, j;
-    parallel_sorter_t *s = (parallel_sorter_t *) cb_calloc(1, sizeof(parallel_sorter_t));
-    if (!s) {
-        return NULL;
-    }
-
-    s->nworkers = workers;
-    s->free_workers = workers;
-    cb_mutex_initialize(&s->mutex);
-    cb_cond_initialize(&s->cond);
-    s->finished = 0;
-    s->error = FILE_SORTER_SUCCESS;
-    s->job = NULL;
-    s->ctx = ctx;
-
-    s->threads = (cb_thread_t *) cb_calloc(workers, sizeof(cb_thread_t));
-    if (!s->threads) {
-        goto failure;
-    }
-
-    for (i = 0; i < workers; i++) {
-        if (cb_create_thread(&s->threads[i], &sort_worker, (void *) s, 0) < 0) {
-            cb_mutex_enter(&s->mutex);
-            s->finished = 1;
-            cb_mutex_exit(&s->mutex);
-            cb_cond_broadcast(&s->cond);
-
-            for (j = 0; j < i; j++) {
-                cb_join_thread(s->threads[j]);
-            }
-
-            goto failure;
-        }
-    }
-
-    return s;
-
-failure:
-    cb_mutex_destroy(&s->mutex);
-    cb_cond_destroy(&s->cond);
-    cb_free(s->threads);
-    cb_free(s);
-    return NULL;
-}
-
-
-static void free_parallel_sorter(parallel_sorter_t *s)
-{
-    if (s) {
-        cb_mutex_destroy(&s->mutex);
-        cb_cond_destroy(&s->cond);
-        free_sort_job(s->job, s);
-        cb_free(s->threads);
-        cb_free(s);
+    try {
+        return new parallel_sorter_t(workers, ctx);
+    } catch (const std::bad_alloc&) {
+        return nullptr;
     }
 }
-
 
 static void sort_worker(void *args)
 {
@@ -427,20 +403,18 @@ static file_sorter_error_t parallel_sorter_wait(parallel_sorter_t *s, size_t n)
 // Notify all workers that we have no more jobs and wait for them to join
 static file_sorter_error_t parallel_sorter_finish(parallel_sorter_t *s)
 {
-    file_sorter_error_t ret;
-    size_t i;
-
     cb_mutex_enter(&s->mutex);
     s->finished = 1;
     cb_mutex_exit(&s->mutex);
     cb_cond_broadcast(&s->cond);
 
-    for (i = 0; i < s->nworkers; i++) {
-        ret = (file_sorter_error_t) cb_join_thread(s->threads[i]);
-        if (ret != 0) {
-            return ret;
+    for (auto& t : s->threads) {
+        if (t) {
+            t->join();
+            t.reset();
         }
     }
+    s->threads.clear();
 
     return FILE_SORTER_SUCCESS;
 }
@@ -548,6 +522,7 @@ static file_sorter_error_t do_sort_file(file_sort_ctx_t *ctx)
 
     if (ctx->active_tmp_files == 0 && buffer_size == 0) {
         /* empty source file */
+        delete sorter;
         return FILE_SORTER_SUCCESS;
     }
 
@@ -600,8 +575,8 @@ static file_sorter_error_t do_sort_file(file_sort_ctx_t *ctx)
     ret = FILE_SORTER_SUCCESS;
 
  failure:
-    free_parallel_sorter(sorter);
-    return ret;
+     delete sorter;
+     return ret;
 }
 
 
