@@ -25,9 +25,11 @@
 #include <platform/cbassert.h>
 
 #include <strings.h>
+#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -73,9 +75,6 @@ static void sort_worker(void* args);
 struct parallel_sorter_t {
     parallel_sorter_t(size_t workers, file_sort_ctx_t* ctx)
         : nworkers(workers), free_workers(workers), ctx(ctx) {
-        cb_mutex_initialize(&mutex);
-        cb_cond_initialize(&cond);
-
         for (size_t ii = 0; ii < workers; ++ii) {
             threads.emplace_back(
                     std::make_unique<std::thread>(sort_worker, this));
@@ -84,25 +83,23 @@ struct parallel_sorter_t {
     ~parallel_sorter_t() {
         free_sort_job(job, this);
         if (!threads.empty()) {
-            cb_mutex_enter(&mutex);
-            finished = 1;
-            cb_mutex_exit(&mutex);
-            cb_cond_broadcast(&cond);
-
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                finished = 1;
+            }
+            cond.notify_all();
             for (auto &t : threads) {
                 if (t) {
                     t->join();
                 }
             }
         }
-        cb_mutex_destroy(&mutex);
-        cb_cond_destroy(&cond);
     }
 
     size_t nworkers;
     size_t free_workers;
-    cb_cond_t cond;
-    cb_mutex_t mutex;
+    std::condition_variable cond;
+    std::mutex mutex;
     int finished = 0;
     file_sorter_error_t error = FILE_SORTER_SUCCESS;
     sort_job_t* job = nullptr;
@@ -283,10 +280,9 @@ static void sort_worker(void *args)
      * Once a job is complete, notify all waiters
      * Loop it over until finished flag becomes true
      */
+    std::unique_lock<std::mutex> lock(s->mutex);
     while (1) {
-        cb_mutex_enter(&s->mutex);
         if (s->finished) {
-            cb_mutex_exit(&s->mutex);
             return;
         }
 
@@ -294,27 +290,24 @@ static void sort_worker(void *args)
             job = s->job;
             s->job = NULL;
             s->free_workers -= 1;
-            cb_mutex_exit(&s->mutex);
-            cb_cond_broadcast(&s->cond);
+            s->cond.notify_all();
 
+            // Execute the job without holding the lock
+            lock.unlock();
             ret = write_record_list(job->records, job->n, job->tmp_file, s->ctx);
             free_sort_job(job, s);
+            lock.lock();
+
             if (ret != FILE_SORTER_SUCCESS) {
-                cb_mutex_enter(&s->mutex);
-                s->finished = 1;
                 s->error = ret;
-                cb_mutex_exit(&s->mutex);
-                cb_cond_broadcast(&s->cond);
+                s->cond.notify_all();
                 return;
             }
 
-            cb_mutex_enter(&s->mutex);
             s->free_workers += 1;
-            cb_mutex_exit(&s->mutex);
-            cb_cond_broadcast(&s->cond);
+            s->cond.notify_all();
         } else {
-            cb_cond_wait(&s->cond, &s->mutex);
-            cb_mutex_exit(&s->mutex);
+            s->cond.wait(lock);
         }
     }
 }
@@ -349,23 +342,19 @@ static file_sorter_error_t parallel_sorter_add_job(parallel_sorter_t *s,
         return FILE_SORTER_ERROR_ALLOC;
     }
 
-    cb_mutex_enter(&s->mutex);
+    std::unique_lock<std::mutex> lock(s->mutex);
     if (s->finished) {
         free_sort_job(job, s);
         ret = s->error;
-        cb_mutex_exit(&s->mutex);
         return ret;
     }
 
     s->job = job;
-    cb_mutex_exit(&s->mutex);
-    cb_cond_signal(&s->cond);
+    s->cond.notify_all();
 
-    cb_mutex_enter(&s->mutex);
     while (s->job) {
-        cb_cond_wait(&s->cond, &s->mutex);
+        s->cond.wait(lock);
     }
-    cb_mutex_exit(&s->mutex);
 
     return FILE_SORTER_SUCCESS;
 }
@@ -382,20 +371,17 @@ static void free_n_records(parallel_sorter_t *s, void **records, size_t n) {
 // Wait until n or more workers become idle after processing current jobs
 static file_sorter_error_t parallel_sorter_wait(parallel_sorter_t *s, size_t n)
 {
+    std::unique_lock<std::mutex> lock(s->mutex);
     while (1) {
-        cb_mutex_enter(&s->mutex);
         if (s->finished) {
-            cb_mutex_exit(&s->mutex);
             return s->error;
         }
 
         if (s->free_workers >= n) {
-            cb_mutex_exit(&s->mutex);
             return FILE_SORTER_SUCCESS;
         }
 
-        cb_cond_wait(&s->cond, &s->mutex);
-        cb_mutex_exit(&s->mutex);
+        s->cond.wait(lock);
     }
 }
 
@@ -403,10 +389,11 @@ static file_sorter_error_t parallel_sorter_wait(parallel_sorter_t *s, size_t n)
 // Notify all workers that we have no more jobs and wait for them to join
 static file_sorter_error_t parallel_sorter_finish(parallel_sorter_t *s)
 {
-    cb_mutex_enter(&s->mutex);
-    s->finished = 1;
-    cb_mutex_exit(&s->mutex);
-    cb_cond_broadcast(&s->cond);
+    {
+        std::lock_guard<std::mutex> guard(s->mutex);
+        s->finished = 1;
+    }
+    s->cond.notify_all();
 
     for (auto& t : s->threads) {
         if (t) {
