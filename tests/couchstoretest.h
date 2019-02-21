@@ -20,8 +20,8 @@
 #include "test_fileops.h"
 #include "documents.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#include <folly/portability/GMock.h>
+#include <folly/portability/GTest.h>
 #include <libcouchstore/couch_db.h>
 #include <libcouchstore/couch_latency.h>
 

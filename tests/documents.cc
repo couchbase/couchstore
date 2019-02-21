@@ -17,10 +17,10 @@
 
 #include "documents.h"
 
+#include <folly/portability/GTest.h>
+#include <libcouchstore/couch_db.h>
 #include <algorithm>
 #include <cstring>
-#include <gtest/gtest.h>
-#include <libcouchstore/couch_db.h>
 #include <random>
 
 static std::string to_string(sized_buf buf) {

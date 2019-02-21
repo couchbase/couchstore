@@ -12,7 +12,7 @@
 #include "node_types.h"
 #include "reduces.h"
 
-#include <gtest/gtest.h>
+#include <folly/portability/GTest.h>
 #include <libcouchstore/couch_db.h>
 #include <platform/cbassert.h>
 

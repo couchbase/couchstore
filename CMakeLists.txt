@@ -328,6 +328,7 @@ TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test_framework
         PRIVATE
         ${COUCHSTORE_GTEST_INCLUDES}
         ${CMAKE_CURRENT_BINARY_DIR}/include)
+TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test_framework platform)
 
 ADD_EXECUTABLE(couchstore_wrapped_fileops_test
                src/iobuffer.cc
@@ -347,6 +348,7 @@ TARGET_INCLUDE_DIRECTORIES(couchstore_test_fileops
         PRIVATE
         ${COUCHSTORE_GTEST_INCLUDES}
         ${CMAKE_CURRENT_BINARY_DIR}/include)
+TARGET_LINK_LIBRARIES(couchstore_test_fileops platform)
 
 ADD_TEST(couchstore-file-deduper-test couchstore_file-deduper-test)
 ADD_TEST(couchstore-file-merge-test couchstore_file-merger-test)

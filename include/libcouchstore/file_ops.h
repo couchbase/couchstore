@@ -20,16 +20,30 @@
 #include <sys/types.h>
 
 #ifdef WIN32
-/* Need DWORD and ssize_t */
+// We use this in some C places so undefine min and max because MSVC will pull
+// in Windows.h automatically for C objects.
+#ifdef min
+#undef min
+#endif
+
+#ifdef max
+#undef max
+#endif
+
+// Use WIN32_LEAN_AND_MEAN to avoid pulling in any socket or crpytography stuff.
 #ifndef WIN32_LEAN_AND_MEAN
 #define DO_UNDEF_WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <Windows.h>
+// Need DWORD from Windows.h
+#include <folly/portability/Windows.h>
 #ifdef DO_UNDEF_WIN32_LEAN_AND_MEAN
 #undef WIN32_LEAN_AND_MEAN
 #endif
-typedef long ssize_t;
+
+// We can't just grab folly's SysTypes.h because we use this header for C
+// objects.
+typedef SSIZE_T ssize_t;
 #endif
 
 #include "couch_common.h"

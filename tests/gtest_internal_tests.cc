@@ -22,7 +22,7 @@
  * just the external API.
  */
 
-#include <gtest/gtest.h>
+#include <folly/portability/GTest.h>
 
 #include "couchstoretest.h"
 #include "couchstoredoctest.h"

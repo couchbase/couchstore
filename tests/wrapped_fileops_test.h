@@ -22,8 +22,8 @@
 #include "test_fileops.h"
 #include "internal.h"
 
-#include "gtest/gtest.h"
-#include "gmock/gmock.h"
+#include <folly/portability/GMock.h>
+#include <folly/portability/GTest.h>
 
 /**
  * These tests are used to explicitly test that an Ops

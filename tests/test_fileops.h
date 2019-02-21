@@ -24,7 +24,7 @@
 #include <string>
 #include <vector>
 
-#include "gmock/gmock.h"
+#include <folly/portability/GMock.h>
 
 /**
  * This is a 'Mock' implementation of a FileOpsInterface. It usually
