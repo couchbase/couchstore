@@ -4,8 +4,9 @@
 #include "util.h"
 
 #include <platform/cb_malloc.h>
-#include <stdlib.h>
-#include <stdarg.h>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
 
 #ifdef DEBUG
 #include <stdio.h>

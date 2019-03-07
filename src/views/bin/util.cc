@@ -20,10 +20,14 @@
 
 #include "config.h"
 #include "util.h"
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
+
 #include "../mapreduce/mapreduce.h"
+
+#include <platform/dirutils.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <system_error>
 
 static void do_exit(int ret, int uses_v8)
 {
@@ -68,9 +72,11 @@ int start_exit_listener(cb_thread_t *id, int uses_v8)
 
 int set_binary_mode()
 {
-    if (platform_set_binary_mode(stdin) < 0 ||
-            platform_set_binary_mode(stdout) < 0 ||
-            platform_set_binary_mode(stderr) < 0) {
+    try {
+        cb::io::setBinaryMode(stdin);
+        cb::io::setBinaryMode(stdout);
+        cb::io::setBinaryMode(stderr);
+    } catch (const std::system_error&) {
         return -1;
     }
     return 0;
