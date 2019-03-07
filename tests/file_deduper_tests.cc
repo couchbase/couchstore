@@ -20,12 +20,14 @@
 
 #include "config.h"
 
+#include "../src/file_merger.h"
+#include "macros.h"
 #include <platform/cb_malloc.h>
+#include <platform/dirutils.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "macros.h"
-#include "../src/file_merger.h"
+#include <vector>
 
 #define N_FILES 4
 #define MAX_RECORDS_PER_FILE 10000
@@ -35,10 +37,9 @@ typedef struct {
     int fileno;
 } test_record_t;
 
-static int read_record(FILE *f, void **buffer, void *ctx)
-{
-    test_record_t *rec = (test_record_t *) cb_malloc(sizeof(test_record_t));
-    (void) ctx;
+static int read_record(FILE* f, void** buffer, void* ctx) {
+    test_record_t* rec = (test_record_t*)cb_malloc(sizeof(test_record_t));
+    (void)ctx;
 
     if (rec == NULL) {
         return FILE_MERGER_ERROR_ALLOC;
@@ -58,9 +59,8 @@ static int read_record(FILE *f, void **buffer, void *ctx)
     return sizeof(test_record_t);
 }
 
-static file_merger_error_t write_record(FILE *f, void *buffer, void *ctx)
-{
-    (void) ctx;
+static file_merger_error_t write_record(FILE* f, void* buffer, void* ctx) {
+    (void)ctx;
 
     if (fwrite(buffer, sizeof(test_record_t), 1, f) != 1) {
         return FILE_MERGER_ERROR_FILE_WRITE;
@@ -69,32 +69,31 @@ static file_merger_error_t write_record(FILE *f, void *buffer, void *ctx)
     return FILE_MERGER_SUCCESS;
 }
 
-static int compare_records(const void *rec1, const void *rec2, void *ctx)
-{
+static int compare_records(const void* rec1, const void* rec2, void* ctx) {
     int ret;
     test_record_t *a, *b;
-    (void) ctx;
+    (void)ctx;
 
-    a = (test_record_t *) rec1;
-    b = (test_record_t *) rec2;
+    a = (test_record_t*)rec1;
+    b = (test_record_t*)rec2;
 
     return a->key - b->key;
 
     return ret;
 }
 
-static void free_record(void *rec, void *ctx)
-{
-   (void) ctx;
+static void free_record(void* rec, void* ctx) {
+    (void)ctx;
 
-   cb_free(rec);
+    cb_free(rec);
 }
 
-static size_t dedup_records(file_merger_record_t **records, size_t n, void *ctx)
-{
+static size_t dedup_records(file_merger_record_t** records,
+                            size_t n,
+                            void* ctx) {
     size_t max = 0;
     size_t i;
-    (void) ctx;
+    (void)ctx;
 
     for (i = 1; i < n; i++) {
         if (records[max]->filenum < records[i]->filenum) {
@@ -105,19 +104,19 @@ static size_t dedup_records(file_merger_record_t **records, size_t n, void *ctx)
     return max;
 }
 
-static void check_deduped_file(const char *file_path, int *expected_set, int len)
-{
-    FILE *f;
-    test_record_t *rec;
+static void check_deduped_file(const char* file_path,
+                               int* expected_set,
+                               int len) {
+    FILE* f;
+    test_record_t* rec;
     int record_size = 1;
-    size_t i;
     unsigned long num_records = 0;
 
     f = fopen(file_path, "rb");
     cb_assert(f != NULL);
 
     while (record_size > 0) {
-        record_size = read_record(f, (void **) &rec, NULL);
+        record_size = read_record(f, (void**)&rec, NULL);
         cb_assert(record_size >= 0);
 
         if (record_size > 0) {
@@ -126,19 +125,19 @@ static void check_deduped_file(const char *file_path, int *expected_set, int len
             } else if (rec->key % 20 == 0) {
                 cb_assert(rec->fileno == 3);
             } else if (rec->key % 10 == 0) {
-               cb_assert(rec->fileno == 2);
+                cb_assert(rec->fileno == 2);
             } else {
                 cb_assert(rec->fileno == 1);
             }
 
             cb_assert(expected_set[rec->key]);
             num_records++;
-            free_record((void *) rec, NULL);
+            free_record((void*)rec, NULL);
         }
     }
 
     /* Verify count */
-    for (i = 0; i < len; i++) {
+    for (int i = 0; i < len; i++) {
         if (expected_set[i]) {
             num_records--;
         }
@@ -149,22 +148,12 @@ static void check_deduped_file(const char *file_path, int *expected_set, int len
     fclose(f);
 }
 
-
-int main(void)
-{
-    const char *source_files[N_FILES] = {
-        "deduper_sorted_file_1.tmp",
-        "deduper_sorted_file_2.tmp",
-        "deduper_sorted_file_3.tmp",
-        "deduper_sorted_file_4.tmp"
-    };
-    const char *pattern_const = "deduped_file_XXXXXX";
-    char *pattern = cb_strdup(pattern_const);
-    cb_assert(pattern);
-
-    char *dest_file = cb_mktemp(pattern);
-    cb_assert(dest_file);
-    cb_assert(dest_file == pattern);
+int main() {
+    const char* source_files[N_FILES] = {"deduper_sorted_file_1.tmp",
+                                         "deduper_sorted_file_2.tmp",
+                                         "deduper_sorted_file_3.tmp",
+                                         "deduper_sorted_file_4.tmp"};
+    const auto dest_file = cb::io::mktemp("deduped_file");
 
     unsigned i, j;
     file_merger_error_t ret;
@@ -172,13 +161,12 @@ int main(void)
     int key;
     int multiples[] = {5, 10, 20, 40};
     int max_arr_size = 40 * MAX_RECORDS_PER_FILE + 1;
-    int *expected_result = cb_calloc(40 * MAX_RECORDS_PER_FILE + 1, sizeof(int));
-    cb_assert(expected_result != NULL);
+    std::vector<int> expected_result(40 * MAX_RECORDS_PER_FILE + 1);
 
     fprintf(stderr, "\nRunning file deduper tests...\n");
 
     for (i = 0; i < N_FILES; ++i) {
-        FILE *f;
+        FILE* f;
 
         remove(source_files[i]);
         f = fopen(source_files[i], "ab");
@@ -195,22 +183,27 @@ int main(void)
         fclose(f);
     }
 
-    remove(dest_file);
-    ret = merge_files(source_files, N_FILES,
-                      dest_file,
-                      read_record, write_record, NULL, compare_records,
-                      dedup_records, free_record, 0, NULL);
+    cb::io::rmrf(dest_file);
+    ret = merge_files(source_files,
+                      N_FILES,
+                      dest_file.c_str(),
+                      read_record,
+                      write_record,
+                      NULL,
+                      compare_records,
+                      dedup_records,
+                      free_record,
+                      0,
+                      NULL);
 
     cb_assert(ret == FILE_MERGER_SUCCESS);
-    check_deduped_file(dest_file, expected_result, max_arr_size);
+    check_deduped_file(dest_file.c_str(), expected_result.data(), max_arr_size);
 
     for (i = 0; i < N_FILES; ++i) {
         remove(source_files[i]);
     }
-    remove(dest_file);
-    cb_free(pattern);
+    cb::io::rmrf(dest_file);
 
     fprintf(stderr, "Running file deduper tests passed\n\n");
-    cb_free(expected_result);
     return 0;
 }

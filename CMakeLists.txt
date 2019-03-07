@@ -228,16 +228,16 @@ MACRO (M_MAKE_LEGACY_TEST name)
     ADD_EXECUTABLE(${name} ${ARGN})
     SET_TARGET_PROPERTIES(${name} PROPERTIES
             COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
-    TARGET_LINK_LIBRARIES(${name} couchstore)
+    TARGET_LINK_LIBRARIES(${name} couchstore dirutils)
 ENDMACRO()
 
 M_MAKE_LEGACY_TEST(couchstore_file-deduper-test
         src/file_merger.cc
-        tests/file_deduper_tests.c)
+        tests/file_deduper_tests.cc)
 
 M_MAKE_LEGACY_TEST(couchstore_file-merger-test
         src/file_merger.cc
-        tests/file_merger_tests.c)
+        tests/file_merger_tests.cc)
 
 M_MAKE_LEGACY_TEST(couchstore_file-sorter-test
         src/file_merger.cc

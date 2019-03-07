@@ -20,20 +20,19 @@
 
 #include "config.h"
 
+#include "../src/file_merger.h"
+#include "macros.h"
 #include <platform/cb_malloc.h>
+#include <platform/dirutils.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "macros.h"
-#include "../src/file_merger.h"
 
 #define N_FILES 4
 #define MAX_RECORDS_PER_FILE 100
 
-
-static int read_record(FILE *f, void **buffer, void *ctx)
-{
-    int *rec = (int *) cb_malloc(sizeof(int));
-    (void) ctx;
+static int read_record(FILE* f, void** buffer, void* ctx) {
+    int* rec = (int*)cb_malloc(sizeof(int));
+    (void)ctx;
 
     if (rec == NULL) {
         return FILE_MERGER_ERROR_ALLOC;
@@ -53,9 +52,8 @@ static int read_record(FILE *f, void **buffer, void *ctx)
     return sizeof(int);
 }
 
-static file_merger_error_t write_record(FILE *f, void *buffer, void *ctx)
-{
-    (void) ctx;
+static file_merger_error_t write_record(FILE* f, void* buffer, void* ctx) {
+    (void)ctx;
 
     if (fwrite(buffer, sizeof(int), 1, f) != 1) {
         return FILE_MERGER_ERROR_FILE_WRITE;
@@ -64,23 +62,20 @@ static file_merger_error_t write_record(FILE *f, void *buffer, void *ctx)
     return FILE_MERGER_SUCCESS;
 }
 
-static int compare_records(const void *rec1, const void *rec2, void *ctx)
-{
-    (void) ctx;
+static int compare_records(const void* rec1, const void* rec2, void* ctx) {
+    (void)ctx;
 
-    return *((const int *) rec1) - *((const int *) rec2);
+    return *((const int*)rec1) - *((const int*)rec2);
 }
 
-static void free_record(void *rec, void *ctx)
-{
-   (void) ctx;
+static void free_record(void* rec, void* ctx) {
+    (void)ctx;
 
-   cb_free(rec);
+    cb_free(rec);
 }
 
-static unsigned long check_file_sorted(const char *file_path)
-{
-    FILE *f;
+static unsigned long check_file_sorted(const char* file_path) {
+    FILE* f;
     void *a = NULL, *b;
     int record_size;
     unsigned long num_records = 0;
@@ -110,33 +105,24 @@ static unsigned long check_file_sorted(const char *file_path)
     return num_records;
 }
 
-
-int main(void)
-{
-    const char *source_files[N_FILES] = {
-        "merger_sorted_file_1.tmp",
-        "merger_sorted_file_2.tmp",
-        "merger_sorted_file_3.tmp",
-        "merger_sorted_file_4.tmp"
-    };
-    const char *pattern_const = "merged_file_XXXXXX";
-    char *pattern = cb_strdup(pattern_const);
-    cb_assert(pattern);
-
-    char *dest_file = cb_mktemp(pattern);
-    cb_assert(dest_file);
-    cb_assert(dest_file == pattern);
+int main() {
+    const char* source_files[N_FILES] = {"merger_sorted_file_1.tmp",
+                                         "merger_sorted_file_2.tmp",
+                                         "merger_sorted_file_3.tmp",
+                                         "merger_sorted_file_4.tmp"};
+    const auto dest_file = cb::io::mktemp("merged_file");
 
     const int batches[N_FILES][MAX_RECORDS_PER_FILE] = {
-        {3, 5, 6, 14, 18, 19, 29, 30, 35, 38, 44, 45, 46, 51, 54, 57, 62, 65,
-         75, 76, 81, 83, 91, 92, 95, 104, 105, 107},
-        {1, 2, 4, 9, 17, 23, 25, 32, 33, 37, 41, 49, 55, 58, 61, 68, 70, 71, 72,
-         77, 80, 87, 89, 94, 98, 100, 111, 112, 113, 114, 115, 116, 117, 119},
-        {10, 12, 15, 20, 21, 22, 27, 34, 36, 39, 42, 47, 52, 53, 56, 63, 64, 74,
-         78, 79, 86, 88, 93, 99, 103, 106, 108, 109, 121, 122, 123},
-        {7, 8, 11, 13, 16, 24, 26, 28, 31, 40, 43, 48, 50, 59, 60, 66, 69, 73,
-         82, 84, 85, 90, 96, 97, 101, 102, 110, 118, 120}
-    };
+            {3,  5,  6,  14, 18, 19, 29, 30, 35, 38, 44, 45,  46,  51,
+             54, 57, 62, 65, 75, 76, 81, 83, 91, 92, 95, 104, 105, 107},
+            {1,  2,   4,   9,   17,  23,  25,  32,  33,  37, 41, 49,
+             55, 58,  61,  68,  70,  71,  72,  77,  80,  87, 89, 94,
+             98, 100, 111, 112, 113, 114, 115, 116, 117, 119},
+            {10, 12, 15,  20,  21,  22,  27,  34,  36, 39, 42,
+             47, 52, 53,  56,  63,  64,  74,  78,  79, 86, 88,
+             93, 99, 103, 106, 108, 109, 121, 122, 123},
+            {7,  8,  11, 13, 16, 24, 26, 28, 31, 40,  43,  48,  50,  59, 60,
+             66, 69, 73, 82, 84, 85, 90, 96, 97, 101, 102, 110, 118, 120}};
     unsigned i, j;
     unsigned num_records = 0;
     file_merger_error_t ret;
@@ -144,7 +130,7 @@ int main(void)
     fprintf(stderr, "\nRunning file merger tests...\n");
 
     for (i = 0; i < N_FILES; ++i) {
-        FILE *f;
+        FILE* f;
 
         remove(source_files[i]);
         f = fopen(source_files[i], "ab");
@@ -164,20 +150,26 @@ int main(void)
         fclose(f);
     }
 
-    remove(dest_file);
-    ret = merge_files(source_files, N_FILES,
-                      dest_file,
-                      read_record, write_record, NULL, compare_records,
-                      NULL, free_record, 0, NULL);
+    cb::io::rmrf(dest_file);
+    ret = merge_files(source_files,
+                      N_FILES,
+                      dest_file.c_str(),
+                      read_record,
+                      write_record,
+                      NULL,
+                      compare_records,
+                      NULL,
+                      free_record,
+                      0,
+                      NULL);
 
     cb_assert(ret == FILE_MERGER_SUCCESS);
-    cb_assert(check_file_sorted(dest_file) == num_records);
+    cb_assert(check_file_sorted(dest_file.c_str()) == num_records);
 
     for (i = 0; i < N_FILES; ++i) {
         remove(source_files[i]);
     }
-    remove(dest_file);
-    cb_free(pattern);
+    cb::io::rmrf(dest_file);
 
     fprintf(stderr, "Running file merger tests passed\n\n");
     return 0;
