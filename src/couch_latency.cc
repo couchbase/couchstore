@@ -17,8 +17,8 @@
 
 #include "couch_latency_internal.h"
 
-SingletonWrapper<Couchbase::RelaxedAtomic<CouchLatency*> >
-CouchLatency::instance(Couchbase::RelaxedAtomic<CouchLatency*>(nullptr));
+SingletonWrapper<cb::RelaxedAtomic<CouchLatency*> > CouchLatency::instance(
+        cb::RelaxedAtomic<CouchLatency*>(nullptr));
 
 CouchLatency* CouchLatency::init() {
     CouchLatency* tmp = instance.object.load();

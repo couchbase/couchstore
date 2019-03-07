@@ -61,10 +61,10 @@ struct CouchLatencyItem {
     // Histogram for latency values (in microseconds).
     CouchLatencyHisto latencies;
     // Sum of all latencies, to calculate average value.
-    Couchbase::RelaxedAtomic<CouchLatencyMicroSecRep> latencySum;
+    cb::RelaxedAtomic<CouchLatencyMicroSecRep> latencySum;
     // Flag that indicates whether or not this instance is
     // registered to the singleton CouchLatency instance.
-    Couchbase::RelaxedAtomic<bool> registered;
+    cb::RelaxedAtomic<bool> registered;
 };
 
 // A wrapper for singleton instance, including mutex for guard.
@@ -98,8 +98,7 @@ private:
     ~CouchLatency();
 
     // Global static CouchLatency instance.
-    static SingletonWrapper<Couchbase::RelaxedAtomic<CouchLatency*> >
-            instance;
+    static SingletonWrapper<cb::RelaxedAtomic<CouchLatency*> > instance;
 
     // Map of {Item name, CouchLatencyItem instance}.
     SingletonWrapper<std::unordered_map<std::string, CouchLatencyItem*> >
@@ -122,37 +121,33 @@ private:
 #define CL_func_name __func__
 #endif
 
-#define COLLECT_LATENCY()                                               \
-    /* Actual item. */                                                  \
-    static std::unique_ptr<CouchLatencyItem> CL_item;                   \
-    /* Atomic pointer to above instance. */                             \
-    static Couchbase::RelaxedAtomic<CouchLatencyItem*>                  \
-            CL_item_ptr(nullptr);                                       \
-    CouchLatency *CL_lat_collector = CouchLatency::getInstance();       \
-    if (CL_lat_collector) {                                             \
-        /* Register the item if                                         \
-         * 1) it is the first attempt, OR                               \
-         * 2) it was deregistered (or disabled) before. */              \
-        CouchLatencyItem *cur_item = CL_item_ptr.load();                \
-        if (!cur_item) {                                                \
-            /* Case 1) */                                               \
-            std::unique_ptr<CouchLatencyItem> tmp;                      \
-            tmp = std::make_unique<CouchLatencyItem>(CL_func_name);     \
-            CL_item_ptr = CL_lat_collector->addItem(tmp.get());         \
-            if (tmp.get() == CL_item_ptr) {                             \
-                /* Registration succeeded (only one thread can          \
-                 * do this). Move it to static variable. */             \
-                CL_item = std::move(tmp);                               \
-            } /* Otherwise: discard 'tmp' */                            \
-        } else if (!cur_item->isRegistered()) {                         \
-            /* Case 2) */                                               \
-            CL_item_ptr = CL_lat_collector->addItem(cur_item);          \
-        }                                                               \
-    } else if (CL_item_ptr.load()) {                                    \
-        /* Latency collector is disabled. */                            \
-        CL_item_ptr.store(nullptr);                                     \
-    }                                                                   \
+#define COLLECT_LATENCY()                                             \
+    /* Actual item. */                                                \
+    static std::unique_ptr<CouchLatencyItem> CL_item;                 \
+    /* Atomic pointer to above instance. */                           \
+    static cb::RelaxedAtomic<CouchLatencyItem*> CL_item_ptr(nullptr); \
+    CouchLatency* CL_lat_collector = CouchLatency::getInstance();     \
+    if (CL_lat_collector) {                                           \
+        /* Register the item if                                       \
+         * 1) it is the first attempt, OR                             \
+         * 2) it was deregistered (or disabled) before. */            \
+        CouchLatencyItem* cur_item = CL_item_ptr.load();              \
+        if (!cur_item) {                                              \
+            /* Case 1) */                                             \
+            std::unique_ptr<CouchLatencyItem> tmp;                    \
+            tmp = std::make_unique<CouchLatencyItem>(CL_func_name);   \
+            CL_item_ptr = CL_lat_collector->addItem(tmp.get());       \
+            if (tmp.get() == CL_item_ptr) {                           \
+                /* Registration succeeded (only one thread can        \
+                 * do this). Move it to static variable. */           \
+                CL_item = std::move(tmp);                             \
+            } /* Otherwise: discard 'tmp' */                          \
+        } else if (!cur_item->isRegistered()) {                       \
+            /* Case 2) */                                             \
+            CL_item_ptr = CL_lat_collector->addItem(cur_item);        \
+        }                                                             \
+    } else if (CL_item_ptr.load()) {                                  \
+        /* Latency collector is disabled. */                          \
+        CL_item_ptr.store(nullptr);                                   \
+    }                                                                 \
     CouchLatencyTimer CL_timer(CL_item_ptr);
-
-
-
