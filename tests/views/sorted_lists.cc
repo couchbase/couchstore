@@ -21,6 +21,7 @@
 #include "view_tests.h"
 
 #include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
 
 static int int_cmp_fun(const void *a, const void *b)
 {

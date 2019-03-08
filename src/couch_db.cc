@@ -20,6 +20,7 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
 #include <platform/platform_socket.h>
 #include <stdio.h>
 #include <stdlib.h>

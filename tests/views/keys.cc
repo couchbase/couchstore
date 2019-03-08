@@ -3,7 +3,7 @@
 #include "view_tests.h"
 
 #include <platform/cb_malloc.h>
-
+#include <platform/cbassert.h>
 
 static view_btree_key_t *test_view_btree_key_decoding(const char *key_bin, size_t len)
 {

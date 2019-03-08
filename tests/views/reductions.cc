@@ -1,7 +1,10 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 
-#include "view_tests.h"
+#include "config.h"
+
 #include "../src/couch_btree.h"
+#include "view_tests.h"
+#include <platform/cbassert.h>
 
 static view_btree_reduction_t *test_view_btree_reduction_decoding(const char *reduction_bin,
                                                                   size_t len)

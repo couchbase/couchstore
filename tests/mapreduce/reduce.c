@@ -20,6 +20,9 @@
 
 #include "src/views/mapreduce/mapreduce.h"
 #include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 

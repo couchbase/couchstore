@@ -21,6 +21,7 @@
 #include "spatial_tests.h"
 
 #include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
 
 /* Convert a binary number encoded as string to an uint32 */
 static uint32_t b2u(const char *binary)

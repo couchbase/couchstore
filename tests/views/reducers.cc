@@ -4,9 +4,10 @@
 #include "../src/couch_btree.h"
 #include "../src/views/mapreduce/mapreduce.h"
 
-#include <platform/cb_malloc.h>
-#include <string.h>
 #include <inttypes.h>
+#include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
+#include <string.h>
 
 #define BITMAP_SIZE 1024
 

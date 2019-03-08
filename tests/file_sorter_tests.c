@@ -20,12 +20,13 @@
 
 #include "config.h"
 
+#include "../src/file_sorter.h"
+#include "macros.h"
 #include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "macros.h"
-#include "../src/file_sorter.h"
 
 #define UNSORTED_FILE_PATH "unsorted_file.data"
 #define SORT_TMP_DIR       "."

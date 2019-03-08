@@ -14,14 +14,23 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-
-#ifndef LIBCOUCHSTORE_FILE_OPS_H
-#define LIBCOUCHSTORE_FILE_OPS_H
+#pragma once
 
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <platform/platform.h>
+#ifdef WIN32
+/* Need DWORD and ssize_t */
+#ifndef WIN32_LEAN_AND_MEAN
+#define DO_UNDEF_WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <Windows.h>
+#ifdef DO_UNDEF_WIN32_LEAN_AND_MEAN
+#undef WIN32_LEAN_AND_MEAN
+#endif
+typedef long ssize_t;
+#endif
 
 #include "couch_common.h"
 
@@ -236,7 +245,5 @@ private:
      * Opaque reference to a FileOpsInterface instance
      */
     typedef struct couch_file_ops_opaque* FileOpsInterface;
-
-#endif
 
 #endif

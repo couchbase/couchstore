@@ -1,10 +1,11 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #include "config.h"
-#include <platform/cb_malloc.h>
-#include <stdlib.h>
 #include "couch_btree.h"
-#include "util.h"
 #include "node_types.h"
+#include "util.h"
+#include <platform/cb_malloc.h>
+#include <platform/dynamic.h>
+#include <stdlib.h>
 
 /* Helper function to handle lookup specific special cases */
 static int lookup_compare(couchfile_lookup_request *rq,

@@ -19,8 +19,9 @@
  **/
 
 #include "src/views/mapreduce/mapreduce.h"
+#include <platform/cbassert.h>
+#include <stdio.h>
 #include <string.h>
-
 
 #define DOC_BODY "{" \
     "  \"values\": [10, -7, 20, 1]," \

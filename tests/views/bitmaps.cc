@@ -19,6 +19,7 @@
  **/
 
 #include "view_tests.h"
+#include <platform/cbassert.h>
 
 void test_bitmaps(void)
 {

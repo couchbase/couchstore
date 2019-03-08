@@ -19,6 +19,8 @@
  **/
 
 #include "src/views/mapreduce/mapreduce.h"
+#include <platform/cbassert.h>
+#include <stdio.h>
 #include <string.h>
 
 #if __STDC_VERSION__ >=199901L

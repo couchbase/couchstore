@@ -15,6 +15,8 @@
  *   limitations under the License.
  */
 
+#include "config.h"
+
 #include "tracking_file_ops.h"
 
 #include <inttypes.h>

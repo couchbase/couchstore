@@ -3,6 +3,7 @@
 #include "view_tests.h"
 
 #include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
 
 static view_btree_value_t *test_view_btree_value_decoding(const char *value_bin,
                                                           size_t len)

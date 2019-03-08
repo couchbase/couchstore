@@ -7,8 +7,9 @@
 #include "view_tests.h"
 
 #include <platform/cb_malloc.h>
-#include <string.h>
+#include <platform/cbassert.h>
 #include <stdio.h>
+#include <string.h>
 #include <unicode/uclean.h>
 
 static int collateStrs(const char* str1, const char* str2, CollateJSONMode mode)

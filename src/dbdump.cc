@@ -18,6 +18,7 @@
 #include <memcached/protocol_binary.h>
 #include <nlohmann/json.hpp>
 #include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
 #include <platform/sized_buffer.h>
 #include <snappy-c.h>
 #include <stdbool.h>

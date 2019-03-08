@@ -19,13 +19,14 @@
  **/
 
 #include "config.h"
-#include <libcouchstore/couch_db.h>
-#include <platform/cb_malloc.h>
-#include <stdlib.h>
-#include <string.h>
+#include "../../src/couch_btree.h"
 #include "../macros.h"
 #include "purge_tests.h"
-#include "../../src/couch_btree.h"
+#include <libcouchstore/couch_db.h>
+#include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
+#include <stdlib.h>
+#include <string.h>
 
 char testpurgefile[1024] = "purge.couch";
 typedef couchstore_error_t (*fetch_callback_fn)(couchfile_lookup_request *,

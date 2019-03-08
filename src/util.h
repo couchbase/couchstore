@@ -1,9 +1,10 @@
 #ifndef COUCHSTORE_UTIL_H
 #define COUCHSTORE_UTIL_H
 
-#include <string.h>
-#include <signal.h>
 #include <libcouchstore/couch_db.h>
+#include <platform/dynamic.h>
+#include <signal.h>
+#include <string.h>
 
 #include "internal.h"
 #include "fatbuf.h"

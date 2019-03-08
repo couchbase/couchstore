@@ -14,6 +14,7 @@
 
 #include <gtest/gtest.h>
 #include <libcouchstore/couch_db.h>
+#include <platform/cbassert.h>
 
 #include <cstdint>
 #include <limits>

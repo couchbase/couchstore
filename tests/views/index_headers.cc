@@ -21,6 +21,7 @@
 #include "view_tests.h"
 
 #include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
 
 static index_header_t *test_index_header_decoding_v1(const char *header_bin,
                                                      size_t header_bin_size)

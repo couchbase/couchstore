@@ -15,21 +15,20 @@
  *   limitations under the License.
  */
 #include "config.h"
-#include <assert.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <errno.h>
 
 #include "internal.h"
 
+#include <errno.h>
+#include <fcntl.h>
+#include <io.h>
+#include <platform/cbassert.h>
+#include <share.h>
+#include <sys/types.h>
+
 #undef LOG_IO
 #ifdef LOG_IO
-#include <stdio.h>
+#include <cstdio>
 #endif
-
-#include <io.h>
-#include <share.h>
-#include <assert.h>
 
 static DWORD save_windows_error(couchstore_error_info_t *errinfo) {
     DWORD err = GetLastError();

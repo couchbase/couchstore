@@ -26,7 +26,7 @@
 #include "config.h"
 #include "visibility.h"
 #include <libcouchstore/visibility.h>
-
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {

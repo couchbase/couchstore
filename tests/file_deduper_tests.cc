@@ -23,6 +23,7 @@
 #include "../src/file_merger.h"
 #include "macros.h"
 #include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
 #include <platform/dirutils.h>
 #include <stdio.h>
 #include <stdlib.h>

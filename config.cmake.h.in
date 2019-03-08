@@ -43,8 +43,6 @@
 #define fdatasync(FD) fsync(FD)
 #endif /* __APPLE__ */
 
-#include <platform/platform.h>
-
 #ifdef linux
 #undef ntohs
 #undef ntohl
@@ -59,7 +57,6 @@
  * C++ conformant name: _strdup."
 */
 #pragma warning(disable: 4996)
-#define snprintf _snprintf
 #endif
 
 // Sanitizer annotations

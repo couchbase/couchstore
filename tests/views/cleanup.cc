@@ -22,6 +22,7 @@
 #include "../src/couch_btree.h"
 
 #include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
 
 static void test_view_id_btree_cleanup()
 {
