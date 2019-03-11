@@ -57,6 +57,10 @@
  * C++ conformant name: _strdup."
 */
 #pragma warning(disable: 4996)
+
+/* we need ntohl with friends (included through arpa/inet.h for *nix */
+#include <Winsock2.h>
+
 #endif
 
 // Sanitizer annotations
