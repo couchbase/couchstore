@@ -23,6 +23,10 @@
 #include <libcouchstore/couch_db.h>
 #include <random>
 
+static std::string to_string(sized_buf buf) {
+    return std::string(buf.buf, buf.size);
+}
+
 Documents::Documents(int n_docs)
   : docs(n_docs),
     docInfos(n_docs),
@@ -155,10 +159,8 @@ int Documents::checkCallback(Db* db, DocInfo* info, void* ctx) {
     Doc* doc = ds->getDoc(ds->getPosition());
     DocInfo* docInfo = ds->getDocInfo(ds->getPosition());
 
-    EXPECT_EQ(0, std::memcmp(info->id.buf, docInfo->id.buf, info->id.size));
-    EXPECT_EQ(0, std::memcmp(info->rev_meta.buf, docInfo->rev_meta.buf, info->rev_meta.size));
-    EXPECT_EQ(info->id.size, docInfo->id.size);
-    EXPECT_EQ(info->rev_meta.size, info->rev_meta.size);
+    EXPECT_EQ(to_string(docInfo->id), to_string(info->id));
+    EXPECT_EQ(to_string(docInfo->rev_meta), to_string(info->rev_meta));
 
     Doc* openDoc = nullptr;
     couchstore_open_doc_with_docinfo(db,
@@ -168,10 +170,8 @@ int Documents::checkCallback(Db* db, DocInfo* info, void* ctx) {
     EXPECT_TRUE(openDoc != nullptr);
 
     if (openDoc && doc->data.size > 0) {
-        EXPECT_EQ(openDoc->id.size, doc->id.size);
-        EXPECT_EQ(openDoc->data.size, doc->data.size);
-        EXPECT_EQ(0, std::memcmp(doc->id.buf, openDoc->id.buf, openDoc->id.size));
-        EXPECT_EQ(0, std::memcmp(doc->data.buf, openDoc->data.buf, openDoc->data.size));
+        EXPECT_EQ(to_string(openDoc->id), to_string(doc->id));
+        EXPECT_EQ(to_string(openDoc->data), to_string(openDoc->data));
     }
 
     ds->incrementPosition();

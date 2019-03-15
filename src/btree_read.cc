@@ -113,6 +113,7 @@ static couchstore_error_t btree_lookup_inner(couchfile_lookup_request *rq,
                 rq->in_fold = 0;
                 rq->fold = 0;
                 current = end;
+                break;
             }
 
             if (cmp_val >= 0) {

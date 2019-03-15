@@ -16,6 +16,7 @@
 #include <libcouchstore/couch_db.h>
 #include <platform/cbassert.h>
 
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <random>
@@ -1344,6 +1345,93 @@ TEST_F(CouchstoreTest, MB_29816) {
         EXPECT_EQ(1, callbackCounter);
     }
     db = nullptr;
+}
+
+/// Test that a range scan doesn't scan past the ed of the given set of keys.
+TEST_F(CouchstoreTest, MB33373_RangeScan) {
+    // Setup - store 5 keys (0..4)
+    Documents documents(5);
+    documents.generateDocs("");
+
+    // store all of the documents
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(
+                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_save_documents(db,
+                                        documents.getDocs(),
+                                        documents.getDocInfos(),
+                                        documents.getDocsCount(),
+                                        0));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+    db = nullptr;
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+
+    // Test: attempt to read back the range 1..3. Should return 1, 2 & 3.
+    const std::array<sized_buf, 2> keys = {
+            {documents.getDoc(1)->id, documents.getDoc(3)->id}};
+    Documents expected(3);
+    expected.setDoc(0, "1", "1-data");
+    expected.setDoc(1, "2", "2-data");
+    expected.setDoc(2, "3", "3-data");
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        keys.data(),
+                                        keys.size(),
+                                        RANGES,
+                                        &Documents::checkCallback,
+                                        &expected));
+}
+
+/// Test that multiple range scans work correctly.
+TEST_F(CouchstoreTest, RangeScanMulti) {
+    // Setup - store 10 keys (0..9)
+    Documents documents(10);
+    documents.generateDocs("");
+
+    // store all of the documents
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(
+                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_save_documents(db,
+                                        documents.getDocs(),
+                                        documents.getDocInfos(),
+                                        documents.getDocsCount(),
+                                        0));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+    db = nullptr;
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+
+    // Test: attempt to read back the ranges 2..4 and 6..8.
+    // Should return 2, 3, 4, 6, 7, 8
+    const std::array<sized_buf, 4> keys = {{documents.getDoc(2)->id,
+                                            documents.getDoc(3)->id,
+                                            documents.getDoc(6)->id,
+                                            documents.getDoc(8)->id}};
+
+    Documents expected(6);
+    expected.setDoc(0, "2", "2-data");
+    expected.setDoc(1, "3", "3-data");
+    expected.setDoc(2, "4", "4-data");
+    expected.setDoc(3, "6", "6-data");
+    expected.setDoc(4, "7", "7-data");
+    expected.setDoc(5, "8", "8-data");
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        keys.data(),
+                                        keys.size(),
+                                        RANGES,
+                                        &Documents::checkCallback,
+                                        &expected));
 }
 
 // Test fixture for the add or replace callback exposed by save_docs
