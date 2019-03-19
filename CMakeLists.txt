@@ -20,7 +20,8 @@ INCLUDE_DIRECTORIES(BEFORE ${CMAKE_INSTALL_PREFIX}/include
                            ${CMAKE_CURRENT_BINARY_DIR}
                            ${CMAKE_CURRENT_SOURCE_DIR}
                            ${BOOST_INCLUDE_DIR}
-                           ${Platform_SOURCE_DIR}/include)
+                           ${Platform_SOURCE_DIR}/include
+                           ${phosphor_SOURCE_DIR}/include)
 
 INCLUDE_DIRECTORIES(AFTER ${gsl_lite_SOURCE_DIR}/include)
 
@@ -89,9 +90,9 @@ SET(COUCHSTORE_SOURCES src/arena.cc
                        src/views/compaction.cc
                        src/quicksort.c
                        ${COUCHSTORE_FILE_OPS})
-SET(COUCHSTORE_LIBRARIES ${V8_LIBRARIES} ${ICU_LIBRARIES} cbcompress platform)
+SET(COUCHSTORE_LIBRARIES ${V8_LIBRARIES} ${ICU_LIBRARIES} cbcompress platform phosphor)
 
-SET(COUCHSTORE_GTEST_LIBRARIES gtest gtest_main gmock)
+SET(COUCHSTORE_GTEST_LIBRARIES gtest gtest_main gmock phosphor)
 SET(COUCHSTORE_GTEST_INCLUDES ${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
 
 ADD_LIBRARY(couchstore SHARED ${COUCHSTORE_SOURCES})
@@ -290,6 +291,7 @@ ADD_EXECUTABLE(couchstore_gtest
                tests/gtest_tests.cc
                tests/test_fileops.cc
                src/node_types.cc
+               src/crc32.cc
                ${COUCHSTORE_FILE_OPS})
 SET_TARGET_PROPERTIES(couchstore_gtest PROPERTIES
                       COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
@@ -328,6 +330,7 @@ TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test_framework
         ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couchstore_wrapped_fileops_test
+               src/crc32.cc
                src/iobuffer.cc
                tests/wrapped_fileops_test.cc
                $<TARGET_OBJECTS:couchstore_wrapped_fileops_test_framework>

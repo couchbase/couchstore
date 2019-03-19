@@ -17,73 +17,97 @@ extern "C" {
      * Flags to pass as the flags parameter to couchstore_open_db
      */
     typedef uint64_t couchstore_open_flags;
-    enum {
-        /**
-         * Create a new empty .couch file if file doesn't exist.
-         */
-        COUCHSTORE_OPEN_FLAG_CREATE = 1,
-        /**
-         * Open the database in read only mode
-         */
-        COUCHSTORE_OPEN_FLAG_RDONLY = 2,
-        /**
-         * Require the database to use the legacy CRC.
-         * This forces the disk_version flag to be 11 and is only valid for new files
-         * and existing version 11 files.
-         * When excluded the correct CRC is automatically chosen for existing files.
-         * When excluded the latest file version is always used for new files.
-         */
-        COUCHSTORE_OPEN_WITH_LEGACY_CRC = 4,
-        /**
-         * Open the database file without using an IO buffer
-         *
-         * This prevents the FileOps that are used in from being
-         * wrapped by the buffered file operations. This will
-         * *usually* result in performance degradation and is
-         * primarily intended for testing purposes.
-         */
-        COUCHSTORE_OPEN_FLAG_UNBUFFERED = 8,
-        /**
-         * Customize IO buffer configurations.
-         *
-         * This specifies the capacity of a read buffer and its count.
-         * The first 4 bits are for the capacity, that will be calculated as:
-         *     1KB * 1 << (N-1)
-         * And the next 4 bits are for the count:
-         *     8 * 1 << (N-1)
-         * Note that all zeros represent the default setting.
-         */
-        COUCHSTORE_OPEN_WITH_CUSTOM_BUFFER = 0xff00,
-        /**
-         * Customize B+tree node size.
-         *
-         * This specifies the size of B+tree node.
-         * The first 4 bits represents the size of key-pointer
-         * (i.e., intermediate) nodes in KB, and the next 4 bits denotes
-         * the size of key-value (i.e., leaf) nodes in KB.
-         * Note that all zeros represent the default setting,
-         * 1279 (0x4ff) bytes.
-         */
-        COUCHSTORE_OPEN_WITH_CUSTOM_NODESIZE = 0xff0000,
 
-        /**
-         * Enable periodic sync().
-         *
-         * Automatically perform a sync() call after every N bytes written.
-         *
-         * When writing large amounts of data (e.g during compaction), read
-         * latency can be adversely affected if a single sync() is made at the
-         * end of writing all the data; as the IO subsystem has a large amount
-         * of outstanding writes to flush to disk. By issuing periodic syncs
-         * the affect on read latency can be signifcantly reduced.
-         *
-         * Encoded as a power-of-2 KB value, ranging from 1KB .. 1TB (5 bits):
-         *     1KB * << (N-1)
-         *
-         * A value of N=0 specifies that automatic fsync is disabled.
-         */
-        COUCHSTORE_OPEN_WITH_PERIODIC_SYNC = 0x1f000000,
-    };
+    /**
+     * Create a new empty .couch file if file doesn't exist.
+     */
+    const uint64_t COUCHSTORE_OPEN_FLAG_CREATE = 1;
+
+    /**
+     * Open the database in read only mode
+     */
+    const uint64_t COUCHSTORE_OPEN_FLAG_RDONLY = 2;
+
+    /**
+     * Require the database to use the legacy CRC.
+     * This forces the disk_version flag to be 11 and is only valid for new
+     * files and existing version 11 files. When excluded the correct CRC is
+     * automatically chosen for existing files. When excluded the latest
+     * file version is always used for new files.
+     */
+    const uint64_t COUCHSTORE_OPEN_WITH_LEGACY_CRC = 4;
+
+    /**
+     * Open the database file without using an IO buffer
+     *
+     * This prevents the FileOps that are used in from being
+     * wrapped by the buffered file operations. This will
+     * *usually* result in performance degradation and is
+     * primarily intended for testing purposes.
+     */
+    const uint64_t COUCHSTORE_OPEN_FLAG_UNBUFFERED = 8;
+
+    /**
+     * Customize IO buffer configurations.
+     *
+     * This specifies the capacity of a read buffer and its count.
+     * The first 4 bits are for the capacity; that will be calculated as:
+     *     1KB * 1 << (N-1)
+     * And the next 4 bits are for the count:
+     *     8 * 1 << (N-1)
+     * Note that all zeros represent the default setting.
+     */
+    const uint64_t COUCHSTORE_OPEN_WITH_CUSTOM_BUFFER = 0xff00;
+
+    /**
+     * Customize B+tree node size.
+     *
+     * This specifies the size of B+tree node.
+     * The first 4 bits represents the size of key-pointer
+     * (i.e., intermediate) nodes in KB, and the next 4 bits denotes
+     * the size of key-value (i.e., leaf) nodes in KB.
+     * Note that all zeros represent the default setting,
+     * 1279 (0x4ff) bytes.
+     */
+    const uint64_t COUCHSTORE_OPEN_WITH_CUSTOM_NODESIZE = 0xff0000;
+
+    /**
+     * Enable periodic sync().
+     *
+     * Automatically perform a sync() call after every N bytes written.
+     *
+     * When writing large amounts of data (e.g during compaction), read
+     * latency can be adversely affected if a single sync() is made at the
+     * end of writing all the data, as the IO subsystem has a large amount
+     * of outstanding writes to flush to disk. By issuing periodic syncs
+     * the affect on read latency can be signifcantly reduced.
+     *
+     * Encoded as a power-of-2 KB value, ranging from 1KB .. 1TB (5 bits):
+     *     1KB * << (N-1)
+     *
+     * A value of N=0 specifies that automatic fsync is disabled.
+     */
+    const uint64_t COUCHSTORE_OPEN_WITH_PERIODIC_SYNC = 0x1f000000;
+
+    /**
+     * Enable tracing and verification.
+     *
+     * Flags to turn on tracing and perform other validations to
+     * help detect corruption.
+     *
+     * The operations performed on a couchstore file can be traced using
+     * the phoshpor tracing library.
+     * Checks to validate data that was written was passed on correctly to
+     * OS. If needed, the internal iobuffer can be used in a protected mode
+     * and trigger a fault if accessed by other threads.
+     *
+     * TRACING          - 0x20000000 Enable tracing
+     * WRITE_VALIDATION - 0x40000000 validation of data writes
+     * MPROTECT         - 0x60000000 mprotect of internal iobuffer
+     */
+    const uint64_t COUCHSTORE_OPEN_WITH_TRACING = 0x20000000;
+    const uint64_t COUCHSTORE_OPEN_WITH_WRITE_VALIDATION = 0x40000000;
+    const uint64_t COUCHSTORE_OPEN_WITH_MPROTECT = 0x800000000;
 
     /**
      * Encode a periodic sync specified in bytes to the correct

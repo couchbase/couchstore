@@ -1,9 +1,12 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #include "config.h"
 
+#include <libcouchstore/couch_db.h>
+#include <phosphor/phosphor.h>
 #include <platform/cb_malloc.h>
-#include <stdio.h>
+#include <snappy.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <libcouchstore/couch_db.h>
@@ -11,12 +14,24 @@
 
 #include "internal.h"
 #include "crc32.h"
+#include "internal.h"
 #include "util.h"
 
 static ssize_t write_entire_buffer(tree_file *file, const void* buf,
                                    size_t nbytes, cs_off_t offset) {
     size_t left_to_write = nbytes;
     const char* src = reinterpret_cast<const char*>(buf);
+
+    /* calculate CRC for the piece written and trace it. */
+    if (file->options.tracing_enabled) {
+        uint32_t crc32 = get_checksum(reinterpret_cast<const uint8_t*>(buf), nbytes, CRC32C);
+        TRACE_INSTANT2("couchstore_write",
+                       "write_entire_buffer",
+                       "offset",
+                       offset,
+                       "nbytes&CRC",
+                       nbytes << 32 | crc32);
+    }
 
     while (left_to_write) {
         ssize_t written = file->ops->pwrite(&file->lastError, file->handle,
@@ -86,6 +101,10 @@ couchstore_error_t write_header(tree_file *file, sized_buf *buf, cs_off_t *pos)
 
     written = write_entire_buffer(file, &headerbuf, sizeof(headerbuf), write_pos);
     if (written < 0) {
+        if (file->options.tracing_enabled) {
+            TRACE_INSTANT1(
+                    "couchstore_write", "write_header", "written", write_pos);
+        }
         return (couchstore_error_t)written;
     }
     write_pos += written;
@@ -115,6 +134,15 @@ int db_write_buf(tree_file *file, const sized_buf *buf, cs_off_t *pos, size_t *d
     // Write the buffer's header:
     memcpy(&headerbuf[0], &size, 4);
     memcpy(&headerbuf[4], &crc32, 4);
+
+    if ((file->options.tracing_enabled) && (size == 0 && crc32 == 0)) {
+        TRACE_INSTANT2("couchstore_write",
+                       "Warning:db_write_buf",
+                       "size",
+                       size,
+                       "CRC",
+                       crc32);
+    }
 
     sized_buf sized_headerbuf = { headerbuf, 8 };
     written = raw_write(file, &sized_headerbuf, end_pos);

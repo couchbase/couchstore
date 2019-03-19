@@ -2,7 +2,9 @@
 #include "config.h"
 
 #include <fcntl.h>
+#include <phosphor/phosphor.h>
 #include <platform/cb_malloc.h>
+#include <snappy.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,9 +14,15 @@
 #include "iobuffer.h"
 #include "bitfield.h"
 #include "crc32.h"
+#include "internal.h"
+#include "iobuffer.h"
 #include "util.h"
 
 #include <gsl/gsl>
+
+void stop_trace() {
+    PHOSPHOR_INSTANCE.stop();
+}
 
 couchstore_error_t tree_file_open(tree_file* file,
                                   const char *filename,
@@ -39,6 +47,9 @@ couchstore_error_t tree_file_open(tree_file* file,
 
     if (file_options.buf_io_enabled) {
         buffered_file_ops_params params((openflags == O_RDONLY),
+                                        file_options.tracing_enabled,
+                                        file_options.write_validation_enabled,
+                                        file_options.mprotect_enabled,
                                         file_options.buf_io_read_unit_size,
                                         file_options.buf_io_read_buffers);
 
@@ -58,7 +69,15 @@ couchstore_error_t tree_file_open(tree_file* file,
         error_pass(file->ops->set_periodic_sync(
                 file->handle, file->options.periodic_sync_bytes));
     }
-
+    if (file->options.tracing_enabled) {
+        error_pass(file->ops->set_tracing_enabled(file->handle));
+    }
+    if (file->options.write_validation_enabled) {
+        error_pass(file->ops->set_write_validation_enabled(file->handle));
+    }
+    if (file->options.mprotect_enabled) {
+        error_pass(file->ops->set_mprotect_enabled(file->handle));
+    }
 cleanup:
     if (errcode != COUCHSTORE_SUCCESS) {
         cb_free((char *) file->path);
@@ -141,6 +160,7 @@ static int pread_bin_internal(tree_file *file,
             log_last_internal_error("Couchstore::pread_bin_internal() "
                      "Invalid header length:%d max_header_size:%d pos:%" PRId64,
                      info.chunk_len,  max_header_size, pos);
+            stop_trace();
             return COUCHSTORE_ERROR_CORRUPT;
         }
         info.chunk_len -= 4;    //Header len includes CRC len.
@@ -157,6 +177,7 @@ static int pread_bin_internal(tree_file *file,
         log_last_internal_error("Couchstore::pread_bin_internal() "
                                 "Invalid header length:%d crc:%d pos:%" PRId64,
                                 info.chunk_len, info.crc32, pos);
+        stop_trace();
         err = COUCHSTORE_ERROR_CHECKSUM_FAIL;
     }
 
@@ -203,6 +224,7 @@ int pread_compressed(tree_file *file, cs_off_t pos, char **ret_ptr)
             cb_free(compressed_buf);
             log_last_internal_error("Couchstore::pread_compressed() "
                      "Invalid compressed buffer length:%d pos:%" PRId64, len, pos);
+            stop_trace();
             return COUCHSTORE_ERROR_CORRUPT;
         }
     } catch (const std::bad_alloc&) {
