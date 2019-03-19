@@ -1280,6 +1280,57 @@ TEST_F(CouchstoreTest, test_set_purge_seq) {
     db = nullptr;
 }
 
+#ifndef WIN32
+TEST_F(CouchstoreTest, mprotect) {
+    DbInfo info;
+
+    const uint32_t docsInTest = 4;
+    Documents documents(docsInTest);
+    documents.setDoc(0, "doc1", "{\"test_doc_index\":1}");
+    documents.setDoc(1, "doc2", "{\"test_doc_index\":2}");
+    documents.setDoc(2, "doc3", "{\"test_doc_index\":3}");
+    documents.setDoc(3, "doc4", "{\"test_doc_index\":4}");
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(filePath.c_str(),
+                                 COUCHSTORE_OPEN_FLAG_CREATE |
+                                         COUCHSTORE_OPEN_WITH_MPROTECT,
+                                 &db));
+
+    for (uint32_t ii = 0; ii < docsInTest; ii++) {
+        ASSERT_EQ(
+                COUCHSTORE_SUCCESS,
+                couchstore_save_document(
+                        db, documents.getDoc(ii), documents.getDocInfo(ii), 0));
+    }
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+    db = nullptr;
+
+    /* Check that sequence numbers got filled in */
+    for (uint64_t ii = 0; ii < docsInTest; ++ii) {
+        EXPECT_EQ(ii + 1, documents.getDocInfo(ii)->db_seq);
+    }
+
+    /* Read back */
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_changes_since(
+                      db, 0, 0, &Documents::checkCallback, &documents));
+
+    EXPECT_EQ(docsInTest, uint32_t(documents.getCallbacks()));
+    EXPECT_EQ(0, documents.getDeleted());
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_db_info(db, &info));
+
+    EXPECT_EQ(docsInTest, info.last_sequence);
+    EXPECT_EQ(docsInTest, info.doc_count);
+    EXPECT_EQ(0ul, info.deleted_count);
+    EXPECT_EQ(4096ll, info.header_position);
+}
+#endif /* WIN32 */
 
 INSTANTIATE_TEST_CASE_P(DocTest,
                         CouchstoreDoctest,

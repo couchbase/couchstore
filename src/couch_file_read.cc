@@ -2,19 +2,21 @@
 #include "config.h"
 
 #include <fcntl.h>
+#include <phosphor/phosphor.h>
 #include <platform/cb_malloc.h>
+#include <snappy.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <snappy.h>
-
-#include "internal.h"
-#include "iobuffer.h"
 #include "bitfield.h"
 #include "crc32.h"
+#include "internal.h"
+#include "iobuffer.h"
 #include "util.h"
 
-
+void stop_trace() {
+    PHOSPHOR_INSTANCE.stop();
+}
 couchstore_error_t tree_file_open(tree_file* file,
                                   const char *filename,
                                   int openflags,
@@ -38,6 +40,9 @@ couchstore_error_t tree_file_open(tree_file* file,
 
     if (file_options.buf_io_enabled) {
         buffered_file_ops_params params((openflags == O_RDONLY),
+                                        file_options.tracing_enabled,
+                                        file_options.write_validation_enabled,
+                                        file_options.mprotect_enabled,
                                         file_options.buf_io_read_unit_size,
                                         file_options.buf_io_read_buffers);
 
@@ -57,7 +62,15 @@ couchstore_error_t tree_file_open(tree_file* file,
         error_pass(file->ops->set_periodic_sync(
                 file->handle, file->options.periodic_sync_bytes));
     }
-
+    if (file->options.tracing_enabled) {
+        error_pass(file->ops->set_tracing_enabled(file->handle));
+    }
+    if (file->options.write_validation_enabled) {
+        error_pass(file->ops->set_write_validation_enabled(file->handle));
+    }
+    if (file->options.mprotect_enabled) {
+        error_pass(file->ops->set_mprotect_enabled(file->handle));
+    }
 cleanup:
     if (errcode != COUCHSTORE_SUCCESS) {
         cb_free((char *) file->path);
@@ -136,9 +149,11 @@ static int pread_bin_internal(tree_file *file,
 
     info.chunk_len = ntohl(info.chunk_len) & ~0x80000000;
     if (max_header_size) {
-        if (info.chunk_len < 4 || info.chunk_len > max_header_size)
+        if (info.chunk_len < 4 || info.chunk_len > max_header_size) {
+            stop_trace();
             return COUCHSTORE_ERROR_CORRUPT;
-        info.chunk_len -= 4;    //Header len includes CRC len.
+        }
+        info.chunk_len -= 4; // Header len includes CRC len.
     }
     info.crc32 = ntohl(info.crc32);
 
@@ -149,6 +164,7 @@ static int pread_bin_internal(tree_file *file,
     err = read_skipping_prefixes(file, &pos, info.chunk_len, buf);
 
     if (!err && !perform_integrity_check(buf, info.chunk_len, info.crc32, file->crc_mode)) {
+        stop_trace();
         err = COUCHSTORE_ERROR_CHECKSUM_FAIL;
     }
 
@@ -187,6 +203,7 @@ int pread_compressed(tree_file *file, cs_off_t pos, char **ret_ptr)
     if (!snappy::GetUncompressedLength(compressed_buf, len, &uncompressed_len)) {
         //should be compressed but snappy doesn't see it as valid.
         cb_free(compressed_buf);
+        stop_trace();
         return COUCHSTORE_ERROR_CORRUPT;
     }
 
@@ -199,6 +216,7 @@ int pread_compressed(tree_file *file, cs_off_t pos, char **ret_ptr)
     if (!snappy::RawUncompress(compressed_buf, len, new_buf)) {
         cb_free(compressed_buf);
         cb_free(new_buf);
+        stop_trace();
         return COUCHSTORE_ERROR_CORRUPT;
     }
 

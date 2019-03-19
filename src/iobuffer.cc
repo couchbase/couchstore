@@ -26,10 +26,15 @@
 #include <unordered_map>
 #include <vector>
 
+#include <phosphor/phosphor.h>
 #include <platform/cb_malloc.h>
 #include <platform/make_unique.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
+#include <sys/mman.h>
+#endif
+#include "crc32.h"
 
 #define LOG_BUFFER 0 && defined(DEBUG)
 #if LOG_BUFFER
@@ -38,7 +43,11 @@
 
 struct buffered_file_handle;
 struct file_buffer : public boost::intrusive::list_base_hook<> {
-    file_buffer(buffered_file_handle* _owner, size_t _capacity)
+    file_buffer(buffered_file_handle* _owner,
+                size_t _capacity,
+                bool _tracing_enabled,
+                bool _write_validation_enabled,
+                bool _mprotect_enabled)
         : owner(_owner),
           capacity(_capacity),
           length(0),
@@ -46,12 +55,49 @@ struct file_buffer : public boost::intrusive::list_base_hook<> {
           // as there can be an actual buffer corresponding
           // to offset 0.
           offset(static_cast<cs_off_t>(-1)),
-          dirty(0) {
-        bytes.resize(_capacity);
+          dirty(0),
+          tracing_enabled(_tracing_enabled),
+          write_validation_enabled(_write_validation_enabled),
+#ifndef WIN32
+          mprotect_enabled(_mprotect_enabled)
+#else
+          /* For WIN32 mprotect is not supported and so
+           * mprotect_enabled will be always false
+           */
+          mprotect_enabled(false)
+#endif
+    {
+#ifndef WIN32
+        if (mprotect_enabled) {
+            /* Need to page align the ptr to data for mprotect,
+             * allocate more and align based on page size
+             */
+            int pagesize = sysconf(_SC_PAGE_SIZE);
+            bytes.resize(_capacity + pagesize - 1);
+            raw_aligned_ptr_to_data =
+                    (uint8_t*)(((intptr_t)(&bytes[0]) + (pagesize - 1)) &
+                               (~(pagesize - 1)));
+        } else
+#endif
+        {
+            bytes.resize(_capacity);
+        }
     }
 
+    ~file_buffer() {
+#ifndef WIN32
+        if (mprotect_enabled) {
+            mprotect(getRawPtr(), capacity, PROT_READ | PROT_WRITE);
+        }
+#endif
+    }
     uint8_t* getRawPtr() {
-        return &bytes[0];
+        if (mprotect_enabled) {
+            /* mprotect needs page aligned address */
+            return raw_aligned_ptr_to_data;
+        } else {
+            return &bytes[0];
+        }
     }
 
     // Hook for intrusive list.
@@ -66,6 +112,12 @@ struct file_buffer : public boost::intrusive::list_base_hook<> {
     cs_off_t offset;
     // Flag indicating whether or not this buffer contains dirty data.
     uint8_t dirty;
+    // Trace and verify flags
+    bool tracing_enabled;
+    bool write_validation_enabled;
+    bool mprotect_enabled;
+    // Aligned ptr to data for mprotect enabled case
+    uint8_t* raw_aligned_ptr_to_data;
     // Data array.
     std::vector<uint8_t> bytes;
 };
@@ -133,7 +185,11 @@ public:
             // We can still create another buffer.
             UniqueFileBufferPtr buffer_unique;
             buffer_unique = std::make_unique<file_buffer>(
-                    h, h->params.read_buffer_capacity);
+                    h,
+                    h->params.read_buffer_capacity,
+                    h->params.tracing_enabled,
+                    h->params.write_validation_enabled,
+                    h->params.mprotect_enabled);
             buffer = buffer_unique.get();
             ++nBuffers;
             readMap.insert( std::make_pair(buffer->offset,
@@ -198,7 +254,31 @@ static size_t write_to_buffer(file_buffer* buf,
     size_t offset_in_buffer = (size_t)(offset - buf->offset);
     size_t buffer_nbyte = std::min(buf->capacity - offset_in_buffer, nbyte);
 
-    memcpy(buf->getRawPtr() + offset_in_buffer, bytes, buffer_nbyte);
+    if (buf->tracing_enabled) {
+        uint32_t crc32 = get_checksum(
+                reinterpret_cast<uint8_t*>(const_cast<void*>(bytes)),
+                buffer_nbyte,
+                CRC32C);
+        TRACE_INSTANT2("couchstore_write",
+                       "write_to_buffer",
+                       "offset",
+                       offset,
+                       "nbytes&CRC",
+                       buffer_nbyte << 32 | crc32);
+    }
+
+    if (buf->mprotect_enabled) {
+#ifndef WIN32
+        mprotect(buf->getRawPtr(),
+                 WRITE_BUFFER_CAPACITY,
+                 PROT_READ | PROT_WRITE);
+        memcpy(buf->getRawPtr() + offset_in_buffer, bytes, buffer_nbyte);
+        mprotect(buf->getRawPtr(), WRITE_BUFFER_CAPACITY, PROT_READ);
+#endif
+    } else {
+        memcpy(buf->getRawPtr() + offset_in_buffer, bytes, buffer_nbyte);
+    }
+
     buf->dirty = 1;
     offset_in_buffer += buffer_nbyte;
     if (offset_in_buffer > buf->length)
@@ -221,8 +301,28 @@ static couchstore_error_t flush_buffer(couchstore_error_info_t *errinfo,
         fprintf(stderr, "BUFFER: %p flush %zd bytes at %zd --> %zd\n",
                 buf, buf->length, buf->offset, raw_written);
 #endif
-        if (raw_written <= 0)
+        if (buf->tracing_enabled) {
+            uint32_t crc32 =
+                    get_checksum(reinterpret_cast<uint8_t*>(buf->getRawPtr()),
+                                 buf->length,
+                                 CRC32);
+            TRACE_INSTANT2("couchstore_write",
+                           "flush_buffer",
+                           "offset",
+                           buf->offset,
+                           "nbytes&CRC",
+                           raw_written << 32 | crc32);
+        }
+
+        if (raw_written <= 0) {
+            if (buf->tracing_enabled) {
+                TRACE_INSTANT1("couchstore_write",
+                               "flush_buffer",
+                               "raw_written",
+                               raw_written);
+            }
             return (couchstore_error_t) raw_written;
+        }
         buf->length -= raw_written;
         buf->offset += raw_written;
         memmove(buf->getRawPtr(), buf->getRawPtr() + raw_written, buf->length);
@@ -288,26 +388,39 @@ static couchstore_error_t load_buffer_from(couchstore_error_info_t *errinfo,
 
 //////// PARAMS:
 
-buffered_file_ops_params::buffered_file_ops_params() :
-    readOnly(false),
-    read_buffer_capacity(READ_BUFFER_CAPACITY),
-    max_read_buffers(MAX_READ_BUFFERS)
-{ }
+buffered_file_ops_params::buffered_file_ops_params()
+    : readOnly(false),
+      tracing_enabled(false),
+      write_validation_enabled(false),
+      mprotect_enabled(false),
+      read_buffer_capacity(READ_BUFFER_CAPACITY),
+      max_read_buffers(MAX_READ_BUFFERS) {
+}
 
-buffered_file_ops_params::buffered_file_ops_params(const buffered_file_ops_params& src) :
-    readOnly(src.readOnly),
-    read_buffer_capacity(src.read_buffer_capacity),
-    max_read_buffers(src.max_read_buffers)
-{ }
+buffered_file_ops_params::buffered_file_ops_params(
+        const buffered_file_ops_params& src)
+    : readOnly(src.readOnly),
+      tracing_enabled(src.tracing_enabled),
+      write_validation_enabled(src.write_validation_enabled),
+      mprotect_enabled(src.mprotect_enabled),
+      read_buffer_capacity(src.read_buffer_capacity),
+      max_read_buffers(src.max_read_buffers) {
+}
 
-buffered_file_ops_params::buffered_file_ops_params(const bool _read_only,
-                                                   const uint32_t _read_buffer_capacity,
-                                                   const uint32_t _max_read_buffers) :
-    readOnly(_read_only),
-    read_buffer_capacity(_read_buffer_capacity),
-    max_read_buffers(_max_read_buffers)
-{ }
-
+buffered_file_ops_params::buffered_file_ops_params(
+        const bool _read_only,
+        bool _tracing_enabled,
+        bool _write_validation_enabled,
+        bool _mprotect_enabled,
+        const uint32_t _read_buffer_capacity,
+        const uint32_t _max_read_buffers)
+    : readOnly(_read_only),
+      tracing_enabled(_tracing_enabled),
+      write_validation_enabled(_write_validation_enabled),
+      mprotect_enabled(_mprotect_enabled),
+      read_buffer_capacity(_read_buffer_capacity),
+      max_read_buffers(_max_read_buffers) {
+}
 
 //////// FILE API:
 
@@ -336,7 +449,11 @@ couch_file_handle BufferedFileOps::constructor(couchstore_error_info_t* errinfo,
 
         try {
             h->write_buffer = std::make_unique<file_buffer>(
-                    h, h->params.readOnly ? 0 : WRITE_BUFFER_CAPACITY);
+                    h,
+                    h->params.readOnly ? 0 : WRITE_BUFFER_CAPACITY,
+                    h->params.tracing_enabled,
+                    h->params.write_validation_enabled,
+                    h->params.mprotect_enabled);
             h->read_buffer_mgr = new ReadBufferManager();
         } catch (const std::bad_alloc&) {
             destructor(reinterpret_cast<couch_file_handle>(h));
@@ -378,6 +495,27 @@ couchstore_error_t BufferedFileOps::set_periodic_sync(couch_file_handle handle,
     // writes.
     buffered_file_handle *h = (buffered_file_handle*)handle;
     return h->raw_ops->set_periodic_sync(h->raw_ops_handle, period_bytes);
+}
+
+couchstore_error_t BufferedFileOps::set_tracing_enabled(
+        couch_file_handle handle) {
+    // trigger setting tracing flags at the file level */
+    buffered_file_handle* h = (buffered_file_handle*)handle;
+    return h->raw_ops->set_tracing_enabled(h->raw_ops_handle);
+}
+
+couchstore_error_t BufferedFileOps::set_write_validation_enabled(
+        couch_file_handle handle) {
+    // trigger setting write validation flags at the file level */
+    buffered_file_handle* h = (buffered_file_handle*)handle;
+    return h->raw_ops->set_write_validation_enabled(h->raw_ops_handle);
+}
+
+couchstore_error_t BufferedFileOps::set_mprotect_enabled(
+        couch_file_handle handle) {
+    // trigger setting mprotect flags at the file level */
+    buffered_file_handle* h = (buffered_file_handle*)handle;
+    return h->raw_ops->set_mprotect_enabled(h->raw_ops_handle);
 }
 
 ssize_t BufferedFileOps::pread(couchstore_error_info_t* errinfo,

@@ -45,14 +45,17 @@ extern "C" {
 
     /* Configurations for an open file */
     struct tree_file_options {
-        tree_file_options() :
-            buf_io_enabled(true),
-            buf_io_read_unit_size(READ_BUFFER_CAPACITY),
-            buf_io_read_buffers(MAX_READ_BUFFERS),
-            kp_nodesize(0),
-            kv_nodesize(0),
-            periodic_sync_bytes(0)
-            { }
+        tree_file_options()
+            : buf_io_enabled(true),
+              buf_io_read_unit_size(READ_BUFFER_CAPACITY),
+              buf_io_read_buffers(MAX_READ_BUFFERS),
+              kp_nodesize(0),
+              kv_nodesize(0),
+              periodic_sync_bytes(0),
+              tracing_enabled(false),
+              write_validation_enabled(false),
+              mprotect_enabled(false) {
+        }
 
         // Flag indicating whether or not buffered IO is enabled.
         bool buf_io_enabled;
@@ -69,6 +72,10 @@ extern "C" {
         // Automatically issue an sync() operation after every N bytes written.
         // 0 means don't automatically sync.
         uint64_t periodic_sync_bytes;
+        /* tracing and validation options  */
+        bool tracing_enabled;
+        bool write_validation_enabled;
+        bool mprotect_enabled;
     };
 
      /* Structure representing an open file; "superclass" of Db */

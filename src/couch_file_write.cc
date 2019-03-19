@@ -1,16 +1,16 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #include "config.h"
 
+#include <libcouchstore/couch_db.h>
+#include <phosphor/phosphor.h>
 #include <platform/cb_malloc.h>
-#include <stdio.h>
+#include <snappy.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <snappy.h>
-#include <libcouchstore/couch_db.h>
-
-#include "internal.h"
 #include "crc32.h"
+#include "internal.h"
 #include "util.h"
 
 static ssize_t raw_write(tree_file *file, const sized_buf *buf, cs_off_t pos)
@@ -27,6 +27,10 @@ static ssize_t raw_write(tree_file *file, const sized_buf *buf, cs_off_t pos)
         }
 
         if (write_pos % COUCH_BLOCK_SIZE == 0) {
+            if (file->options.tracing_enabled) {
+                TRACE_INSTANT1(
+                        "couchstore_write", "block_start", "offset", write_pos);
+            }
             written = file->ops->pwrite(&file->lastError, file->handle,
                                         &blockprefix, 1, write_pos);
             if (written < 0) {
@@ -34,6 +38,19 @@ static ssize_t raw_write(tree_file *file, const sized_buf *buf, cs_off_t pos)
             }
             write_pos += 1;
             continue;
+        }
+        /* calculate CRC for the piece written and trace it. */
+        if (file->options.tracing_enabled) {
+            uint32_t crc32 =
+                    get_checksum(reinterpret_cast<uint8_t*>(buf->buf + buf_pos),
+                                 block_remain,
+                                 CRC32C);
+            TRACE_INSTANT2("couchstore_write",
+                           "raw_write",
+                           "offset",
+                           write_pos,
+                           "nbytes&CRC",
+                           block_remain << 32 | crc32);
         }
 
         written = file->ops->pwrite(&file->lastError, file->handle,
@@ -65,9 +82,23 @@ couchstore_error_t write_header(tree_file *file, sized_buf *buf, cs_off_t *pos)
     memcpy(&headerbuf[1], &size, 4);
     memcpy(&headerbuf[5], &crc32, 4);
 
+    if (file->options.tracing_enabled) {
+        uint32_t size_tmp = buf->size + 4;
+        uint32_t crc32_tmp = ntohl(crc32);
+        TRACE_INSTANT2("couchstore_write",
+                       "write_header",
+                       "offset",
+                       write_pos,
+                       "nbytes&CRC",
+                       size_t(size_tmp) << 32 | crc32_tmp);
+    }
     written = file->ops->pwrite(&file->lastError, file->handle,
                                 &headerbuf, sizeof(headerbuf), write_pos);
     if (written < 0) {
+        if (file->options.tracing_enabled) {
+            TRACE_INSTANT1(
+                    "couchstore_write", "write_header", "written", write_pos);
+        }
         return (couchstore_error_t)written;
     }
     write_pos += written;
@@ -97,6 +128,15 @@ int db_write_buf(tree_file *file, const sized_buf *buf, cs_off_t *pos, size_t *d
     // Write the buffer's header:
     memcpy(&headerbuf[0], &size, 4);
     memcpy(&headerbuf[4], &crc32, 4);
+
+    if ((file->options.tracing_enabled) && (size == 0 && crc32 == 0)) {
+        TRACE_INSTANT2("couchstore_write",
+                       "Warning:db_write_buf",
+                       "size",
+                       size,
+                       "CRC",
+                       crc32);
+    }
 
     sized_buf sized_headerbuf = { headerbuf, 8 };
     written = raw_write(file, &sized_headerbuf, end_pos);

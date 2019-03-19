@@ -53,7 +53,16 @@ void MockOps::DelegateToFake() {
             .WillByDefault(Invoke(wrapped_ops.get(), &FileOpsInterface::goto_eof));
     ON_CALL(*this, advise(_, _, _, _, _))
         .WillByDefault(Invoke(wrapped_ops.get(), &FileOpsInterface::advise));
-
+    ON_CALL(*this, set_tracing_enabled(_))
+            .WillByDefault(Invoke(wrapped_ops.get(),
+                                  &FileOpsInterface::set_tracing_enabled));
+    ON_CALL(*this, set_write_validation_enabled(_))
+            .WillByDefault(
+                    Invoke(wrapped_ops.get(),
+                           &FileOpsInterface::set_write_validation_enabled));
+    ON_CALL(*this, set_mprotect_enabled(_))
+            .WillByDefault(Invoke(wrapped_ops.get(),
+                                  &FileOpsInterface::set_mprotect_enabled));
 }
 
 LogOps::LogOps(FileOpsInterface* ops) : wrapped_ops(ops) {}
@@ -124,6 +133,28 @@ couchstore_error_t LogOps::advise(couchstore_error_info_t* errinfo,
     auto rv = wrapped_ops->advise(errinfo, handle, offset, len, advice);
     std::cerr << "@advise(" << errinfo << ", " << handle << ", " << offset
               << ", " << len << ", " << advice << ") -> " << rv << std::endl;
+    return rv;
+}
+
+couchstore_error_t LogOps::set_tracing_enabled(couch_file_handle handle) {
+    auto rv = wrapped_ops->set_tracing_enabled(handle);
+    std::cerr << "@set_tracing_enabled(" << handle << ") -> " << rv
+              << std::endl;
+    return rv;
+}
+
+couchstore_error_t LogOps::set_write_validation_enabled(
+        couch_file_handle handle) {
+    auto rv = wrapped_ops->set_write_validation_enabled(handle);
+    std::cerr << "@set_write_validation_enabled(" << handle << ") -> " << rv
+              << std::endl;
+    return rv;
+}
+
+couchstore_error_t LogOps::set_mprotect_enabled(couch_file_handle handle) {
+    auto rv = wrapped_ops->set_mprotect_enabled(handle);
+    std::cerr << "@set_mprotect_enabled(" << handle << ") -> " << rv
+              << std::endl;
     return rv;
 }
 

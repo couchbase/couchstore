@@ -65,6 +65,12 @@ public:
                                             cs_off_t offset, cs_off_t len,
                                             couchstore_file_advice_t advice));
     MOCK_METHOD1(destructor, void(couch_file_handle handle));
+    MOCK_METHOD1(set_tracing_enabled,
+                 couchstore_error_t(couch_file_handle handle));
+    MOCK_METHOD1(set_write_validation_enabled,
+                 couchstore_error_t(couch_file_handle handle));
+    MOCK_METHOD1(set_mprotect_enabled,
+                 couchstore_error_t(couch_file_handle handle));
 
     void DelegateToFake();
 
@@ -104,6 +110,10 @@ public:
                               couch_file_handle handle, cs_off_t offset,
                               cs_off_t len,
                               couchstore_file_advice_t advice) override;
+    couchstore_error_t set_tracing_enabled(couch_file_handle handle) override;
+    couchstore_error_t set_write_validation_enabled(
+            couch_file_handle handle) override;
+    couchstore_error_t set_mprotect_enabled(couch_file_handle handle) override;
     void destructor(couch_file_handle handle) override;
 protected:
     std::unique_ptr<FileOpsInterface> wrapped_ops;

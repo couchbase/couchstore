@@ -1,11 +1,12 @@
-/* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #include "config.h"
-#include <fcntl.h>
-#include <platform/cb_malloc.h>
-#include <string.h>
-#include <stdlib.h>
 #include <assert.h>
+#include <fcntl.h>
+#include <phosphor/phosphor.h>
+#include <platform/cb_malloc.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "internal.h"
 #include "node_types.h"
@@ -309,6 +310,20 @@ static tree_file_options get_tree_file_options_from_flags(couchstore_open_flags 
         options.periodic_sync_bytes = uint64_t(1024) << (sync_flag - 1);
     }
 
+    /* set the tracing and validation options */
+    options.tracing_enabled = false;
+    options.write_validation_enabled = false;
+    options.mprotect_enabled = false;
+    if (flags & COUCHSTORE_OPEN_WITH_TRACING) {
+        options.tracing_enabled = true;
+    }
+    if (flags & COUCHSTORE_OPEN_WITH_WRITE_VALIDATION) {
+        options.write_validation_enabled = true;
+    }
+    if (flags & COUCHSTORE_OPEN_WITH_MPROTECT) {
+        options.mprotect_enabled = true;
+    }
+
     return options;
 }
 
@@ -415,11 +430,18 @@ couchstore_error_t couchstore_open_db_ex(const char *filename,
     db->dropped = 0;
 
 cleanup:
-    if(errcode != COUCHSTORE_SUCCESS) {
+    if ((openflags & O_RDWR) && (db->file.options.tracing_enabled)) {
+        TRACE_INSTANT2("couchstore_write",
+                       "couchstore_open_db_ex",
+                       "filename",
+                       filename,
+                       "errcode",
+                       int(errcode));
+    }
+    if (errcode != COUCHSTORE_SUCCESS) {
         couchstore_close_file(db);
         couchstore_free_db(db);
     }
-
     return errcode;
 }
 
@@ -427,7 +449,6 @@ LIBCOUCHSTORE_API
 couchstore_error_t couchstore_close_file(Db* db)
 {
     COLLECT_LATENCY();
-
     if(db->dropped) {
         return COUCHSTORE_SUCCESS;
     }

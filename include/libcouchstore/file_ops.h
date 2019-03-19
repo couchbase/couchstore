@@ -131,6 +131,37 @@ public:
     }
 
     /**
+     * Specify tracing  is enabled
+     *
+     * @param handle file handle to set the verification mode for.
+     * @return COUCHSTORE_SUCCESS upon success
+     */
+    virtual couchstore_error_t set_tracing_enabled(couch_file_handle handle) {
+        return COUCHSTORE_ERROR_NOT_SUPPORTED;
+    }
+
+    /**
+     * Specify that write validation is enabled
+     *
+     * @param handle file handle to set the verification mode for.
+     * @return COUCHSTORE_SUCCESS upon success
+     */
+    virtual couchstore_error_t set_write_validation_enabled(
+            couch_file_handle handle) {
+        return COUCHSTORE_ERROR_NOT_SUPPORTED;
+    }
+
+    /**
+     * Specify that mprotect is enabled
+     *
+     * @param handle file handle to set the verification mode for.
+     * @return COUCHSTORE_SUCCESS upon success
+     */
+    virtual couchstore_error_t set_mprotect_enabled(couch_file_handle handle) {
+        return COUCHSTORE_ERROR_NOT_SUPPORTED;
+    }
+
+    /**
      * Read a chunk of data from a given offset in the file.
      *
      * @param handle file handle to read from

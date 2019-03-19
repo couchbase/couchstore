@@ -1,17 +1,16 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #include "config.h"
 
+#include <phosphor/phosphor.h>
 #include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
-#include <platform/cbassert.h>
-
-#include "couch_btree.h"
-#include "util.h"
 #include "arena.h"
+#include "couch_btree.h"
 #include "node_types.h"
-
+#include "util.h"
 
 static couchstore_error_t flush_mr_partial(couchfile_modify_result *res, size_t mr_quota);
 static couchstore_error_t flush_mr(couchfile_modify_result *res);
@@ -251,6 +250,12 @@ static couchstore_error_t flush_mr_partial(couchfile_modify_result *res, size_t 
     errcode = static_cast<couchstore_error_t>(db_write_buf_compressed(res->rq->file, &writebuf, &diskpos, &disk_size));
     cb_free(nodebuf);  // here endeth the nodebuf.
     if (errcode != COUCHSTORE_SUCCESS) {
+        if (res->rq->file->options.tracing_enabled) {
+            TRACE_INSTANT1("couchstore_write",
+                           "flush_mr_partial",
+                           "errcode",
+                           int(errcode));
+        }
         return errcode;
     }
 
