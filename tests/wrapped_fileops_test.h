@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include "config.h"
 #include <libcouchstore/couch_db.h>
 #include "test_fileops.h"
 #include "internal.h"

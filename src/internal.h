@@ -9,7 +9,6 @@
  * function to give you what you need.
  */
 #include <libcouchstore/couch_db.h>
-#include "config.h"
 #include "crc32.h"
 
 #define COUCH_BLOCK_SIZE 4096

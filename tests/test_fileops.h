@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include "config.h"
 #include <libcouchstore/couch_db.h>
 #include <map>
 #include <memory>
