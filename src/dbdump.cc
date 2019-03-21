@@ -509,7 +509,7 @@ static int visit_node(Db *db,
         if (mode == DumpBySequence) {
             printf("#%" PRIu64 " ", docinfo->db_seq);
         }
-        printsb(&docinfo->id);
+        printDocId(" id:", &docinfo->id);
 
         count = (int *) ctx;
         (*count)++;
