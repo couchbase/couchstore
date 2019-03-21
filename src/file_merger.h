@@ -21,7 +21,7 @@
 #ifndef _FILE_MERGER_H
 #define _FILE_MERGER_H
 
-#include "config.h"
+#include "couchstore_config.h"
 #include <stdio.h>
 #include <libcouchstore/couch_db.h>
 

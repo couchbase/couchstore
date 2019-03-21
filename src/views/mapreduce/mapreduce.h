@@ -23,7 +23,7 @@
 #ifndef _MAPREDUCE_H
 #define _MAPREDUCE_H
 
-#include "config.h"
+#include "couchstore_config.h"
 #include "visibility.h"
 #include <libcouchstore/visibility.h>
 #include <stdbool.h>

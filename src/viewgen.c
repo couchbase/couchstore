@@ -1,4 +1,4 @@
-#include "config.h"
+#include "couchstore_config.h"
 #include <libcouchstore/couch_index.h>
 #include <stdbool.h>
 #include <stdio.h>

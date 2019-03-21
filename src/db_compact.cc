@@ -1,5 +1,5 @@
 /* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-#include "config.h"
+#include "couchstore_config.h"
 #include "internal.h"
 #include "couch_btree.h"
 #include "reduces.h"

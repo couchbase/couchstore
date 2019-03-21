@@ -185,7 +185,7 @@ INSTALL(TARGETS couch_dbdump
         RUNTIME DESTINATION bin)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake.h.in
-               ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+               ${CMAKE_CURRENT_BINARY_DIR}/couchstore_config.h)
 
 # Tests:
 

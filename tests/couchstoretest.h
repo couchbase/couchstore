@@ -16,7 +16,7 @@
  */
 #pragma once
 
-#include "config.h"
+#include "couchstore_config.h"
 #include "test_fileops.h"
 #include "documents.h"
 

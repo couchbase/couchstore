@@ -1,7 +1,7 @@
 #ifndef COUCH_BITFIELD_H
 #define COUCH_BITFIELD_H
 
-#include "config.h"
+#include "couchstore_config.h"
 #include "internal.h"
 #include <string.h>
 

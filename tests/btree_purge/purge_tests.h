@@ -21,7 +21,7 @@
 #ifndef _PURGE_TESTS_H
 #define _PURGE_TESTS_H
 
-#include "config.h"
+#include "couchstore_config.h"
 #include <stdio.h>
 
 #ifdef __cplusplus

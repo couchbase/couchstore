@@ -18,7 +18,7 @@
  * the License.
  **/
 
-#include "config.h"
+#include "couchstore_config.h"
 #include "util.h"
 
 #include "../mapreduce/mapreduce.h"

@@ -2,7 +2,7 @@
 #ifndef _VALUES_H
 #define _VALUES_H
 
-#include "config.h"
+#include "couchstore_config.h"
 #include <stdint.h>
 #include <libcouchstore/visibility.h>
 #include <libcouchstore/couch_db.h>

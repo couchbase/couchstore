@@ -15,7 +15,7 @@
  *   limitations under the License.
  */
 
-#include "config.h"
+#include "couchstore_config.h"
 #include "couch_btree.h"
 #include "internal.h"
 #include "util.h"

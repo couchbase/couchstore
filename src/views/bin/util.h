@@ -21,7 +21,7 @@
 #ifndef _BIN_UTILS_H
 #define _BIN_UTILS_H
 
-#include "config.h"
+#include "couchstore_config.h"
 
 #include <platform/platform_thread.h>
 

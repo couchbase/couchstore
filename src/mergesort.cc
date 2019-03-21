@@ -4,7 +4,7 @@
    pje@efgh.com
    http://www.efgh.com/software/mergesor.htm
 */
-#include "config.h"
+#include "couchstore_config.h"
 #include "internal.h"
 #include "mergesort.h"
 

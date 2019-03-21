@@ -1,4 +1,4 @@
-#include "config.h"
+#include "couchstore_config.h"
 #include <libcouchstore/couch_db.h>
 #include <stdio.h>
 #include <stdlib.h>

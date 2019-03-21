@@ -4,7 +4,7 @@
    http://www.efgh.com/software/llmsort.htm
 */
 
-#include "config.h"
+#include "couchstore_config.h"
 #include "mergesort.h"
 #include <string.h>
 

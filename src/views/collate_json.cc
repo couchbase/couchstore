@@ -2,7 +2,7 @@
 
 /* Reference: http://wiki.apache.org/couchdb/View_collation */
 
-#include "config.h"
+#include "couchstore_config.h"
 
 #include "collate_json.h"
 #include <ctype.h>

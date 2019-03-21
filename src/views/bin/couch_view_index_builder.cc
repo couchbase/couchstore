@@ -18,7 +18,7 @@
  * the License.
  **/
 
-#include "config.h"
+#include "couchstore_config.h"
 
 #include <platform/cb_malloc.h>
 #include <stdio.h>

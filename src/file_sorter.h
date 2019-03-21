@@ -21,7 +21,7 @@
 #ifndef _FILE_SORTER_H
 #define _FILE_SORTER_H
 
-#include "config.h"
+#include "couchstore_config.h"
 #include <libcouchstore/couch_db.h>
 #include "file_merger.h"
 

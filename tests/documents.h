@@ -25,7 +25,7 @@
 
 #pragma once
 
-#include "config.h"
+#include "couchstore_config.h"
 
 #include <libcouchstore/couch_db.h>
 #include <set>

@@ -21,7 +21,7 @@
 #ifndef _MAPREDUCE_TESTS_H
 #define _MAPREDUCE_TESTS_H
 
-#include "config.h"
+#include "couchstore_config.h"
 
 #include <stdio.h>
 #include <string.h>

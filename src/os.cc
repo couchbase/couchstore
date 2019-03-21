@@ -14,7 +14,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-#include "config.h"
+#include "couchstore_config.h"
 #include <sys/types.h>
 #include <fcntl.h>
 #include <errno.h>

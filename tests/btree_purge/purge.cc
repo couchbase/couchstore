@@ -18,7 +18,7 @@
  * the License.
  **/
 
-#include "config.h"
+#include "couchstore_config.h"
 #include "../../src/couch_btree.h"
 #include "../macros.h"
 #include "purge_tests.h"

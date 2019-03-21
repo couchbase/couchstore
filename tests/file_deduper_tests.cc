@@ -18,7 +18,7 @@
  * the License.
  **/
 
-#include "config.h"
+#include "couchstore_config.h"
 
 #include "../src/file_merger.h"
 #include "macros.h"

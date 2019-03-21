@@ -21,7 +21,7 @@
 #ifndef _VIEW_FILE_SORTER_H
 #define _VIEW_FILE_SORTER_H
 
-#include "config.h"
+#include "couchstore_config.h"
 #include <libcouchstore/visibility.h>
 #include "../file_sorter.h"
 #include "util.h"

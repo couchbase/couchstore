@@ -21,7 +21,7 @@
 #ifndef _VIEW_SPATIAL_UTILS_H
 #define _VIEW_SPATIAL_UTILS_H
 
-#include "config.h"
+#include "couchstore_config.h"
 #include <libcouchstore/couch_db.h>
 #include "../file_merger.h"
 #include "../couch_btree.h"

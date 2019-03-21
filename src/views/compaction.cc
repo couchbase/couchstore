@@ -17,7 +17,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  **/
-#include "config.h"
+#include "couchstore_config.h"
 #include "bitmap.h"
 #include "values.h"
 #include "compaction.h"

@@ -15,7 +15,7 @@
  *   limitations under the License.
  */
 
-#include "config.h"
+#include "couchstore_config.h"
 #include "iobuffer.h"
 #include "internal.h"
 

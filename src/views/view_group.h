@@ -21,7 +21,7 @@
 #ifndef COUCHSTORE_VIEW_GROUP_H
 #define COUCHSTORE_VIEW_GROUP_H
 
-#include "config.h"
+#include "couchstore_config.h"
 #include <stdio.h>
 #include <libcouchstore/couch_db.h>
 #include "index_header.h"

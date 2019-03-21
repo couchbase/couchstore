@@ -21,7 +21,7 @@
 #ifndef _INDEX_HEADER_H
 #define _INDEX_HEADER_H
 
-#include "config.h"
+#include "couchstore_config.h"
 #include <stdint.h>
 #include <libcouchstore/visibility.h>
 #include <libcouchstore/couch_db.h>

@@ -5,7 +5,7 @@
 //  Created by Jens Alfke on 4/13/12.
 //  Copyright (c) 2012 Couchbase, Inc. All rights reserved.
 //
-#include "config.h"
+#include "couchstore_config.h"
 #include "arena.h"
 #include <stdlib.h>
 #include <string.h>

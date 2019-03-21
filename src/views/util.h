@@ -21,7 +21,7 @@
 #ifndef _VIEW_UTILS_H
 #define _VIEW_UTILS_H
 
-#include "config.h"
+#include "couchstore_config.h"
 #include <stdio.h>
 #include <libcouchstore/couch_db.h>
 #include "../file_merger.h"
