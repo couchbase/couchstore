@@ -33,7 +33,8 @@ INCLUDE_DIRECTORIES(AFTER
                     ${KVEngineAPI_BINARY_DIR})
 
 INCLUDE_DIRECTORIES(AFTER ${ICU_INCLUDE_DIR}
-                          ${V8_INCLUDE_DIR})
+                          ${V8_INCLUDE_DIR}
+                          ${SNAPPY_INCLUDE_DIR})
 
 CHECK_INCLUDE_FILES("netinet/in.h" HAVE_NETINET_IN_H)
 CHECK_INCLUDE_FILES("inttypes.h" HAVE_INTTYPES_H)
