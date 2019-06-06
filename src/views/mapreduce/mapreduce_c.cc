@@ -428,9 +428,9 @@ void deinit_terminator_thread(bool fatal_exit=false)
 
 
 LIBCOUCHSTORE_API
-void mapreduce_init()
+void mapreduce_init(const char* executable_img)
 {
-    initV8();
+    initV8(executable_img);
     init_terminator_thread();
 }
 

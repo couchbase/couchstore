@@ -113,9 +113,10 @@ static void freeJsonListEntries(json_results_list_t &list);
 static inline Handle<Array> jsonListToJsArray(const mapreduce_json_list_t &list);
 
 static Platform *v8platform;
-void initV8()
+
+void initV8(const char* executable_img)
 {
-    V8::InitializeICU();
+    V8::InitializeICUDefaultLocation(executable_img, nullptr);
     v8platform = platform::CreateDefaultPlatform();
     V8::InitializePlatform(v8platform);
     V8::Initialize();
@@ -232,7 +233,7 @@ static Local<Context> createJsContext()
     Isolate *isolate = Isolate::GetCurrent();
     EscapableHandleScope handle_scope(isolate);
 
-    Handle<ObjectTemplate> global = ObjectTemplate::New();
+    Handle<ObjectTemplate> global = ObjectTemplate::New(isolate);
     global->Set(createUtf8String(isolate, "emit"),
             FunctionTemplate::New(isolate, emit));
 
@@ -472,7 +473,7 @@ mapreduce_json_t runRereduce(mapreduce_ctx_t *ctx,
 
 void terminateTask(mapreduce_ctx_t *ctx)
 {
-    V8::TerminateExecution(ctx->isolate);
+    ctx->isolate->TerminateExecution();
     ctx->taskStartTime = -1;
 }
 
@@ -520,14 +521,20 @@ static Handle<Function> compileFunction(const std::string &funSource)
                 exceptionString(try_catch));
     }
 
-    Handle<Value> result = script->Run();
+    MaybeLocal<Value> result = script->Run(context);
+    Local<Value> retval;
 
-    if (result.IsEmpty()) {
+    if (!result.ToLocal(&retval)) {
         throw MapReduceError(MAPREDUCE_SYNTAX_ERROR,
                 exceptionString(try_catch));
     }
 
-    if (!result->IsFunction()) {
+    if (retval.IsEmpty()) {
+        throw MapReduceError(MAPREDUCE_SYNTAX_ERROR,
+                exceptionString(try_catch));
+    }
+
+    if (!retval->IsFunction()) {
         throw MapReduceError(MAPREDUCE_SYNTAX_ERROR,
                 std::string("Invalid function: ") + funSource.c_str());
     }
@@ -535,20 +542,22 @@ static Handle<Function> compileFunction(const std::string &funSource)
     // Use EscapableHandleScope and return using .Escape
     // This will ensure that return values are not garbage collected
     // as soon as the function returns.
-    return handle_scope.Escape(Handle<Function>::Cast(result));
+    return handle_scope.Escape(Handle<Function>::Cast(retval));
 }
 
 
 static std::string exceptionString(const TryCatch &tryCatch)
 {
+    Isolate *isolate = Isolate::GetCurrent();
+    Local<Context> context(isolate->GetCurrentContext());
     HandleScope handle_scope(Isolate::GetCurrent());
-    String::Utf8Value exception(tryCatch.Exception());
+    String::Utf8Value exception(isolate, tryCatch.Exception());
     const char *exceptionString = (*exception);
 
     if (exceptionString) {
         Handle<Message> message = tryCatch.Message();
         return std::string(exceptionString) + " (line " +
-            std::to_string(message->GetLineNumber()) + ":" +
+            std::to_string(message->GetLineNumber(context).FromMaybe(0)) + ":" +
             std::to_string(message->GetStartColumn()) + ")";
     }
 
@@ -622,12 +631,13 @@ static inline mapreduce_json_t jsonStringify(const Handle<Value> &obj)
 
     if (!result->IsUndefined()) {
         Handle<String> str = Handle<String>::Cast(result);
-        jsonResult.length = str->Utf8Length();
+        jsonResult.length = str->Utf8Length(isoData->ctx->isolate);
         jsonResult.json = (char *) cb_malloc(jsonResult.length);
         if (jsonResult.json == NULL) {
             throw std::bad_alloc();
         }
-        str->WriteUtf8(jsonResult.json, jsonResult.length,
+        str->WriteUtf8(isoData->ctx->isolate,
+                       jsonResult.json, jsonResult.length,
                        NULL, String::NO_NULL_TERMINATION);
     } else {
         jsonResult.length = sizeof("null") - 1;

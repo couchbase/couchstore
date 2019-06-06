@@ -14,14 +14,13 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-
-extern void mapreduce_init();
+extern void mapreduce_init(const char*);
 extern void mapreduce_deinit();
 extern void view_tests();
 extern void purge_tests();
 
-int main() {
-    mapreduce_init();
+int main(int argc, char* argv[]) {
+    mapreduce_init(argv[1]);
 
     view_tests();
     purge_tests();

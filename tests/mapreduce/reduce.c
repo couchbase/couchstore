@@ -150,7 +150,7 @@ static void test_runtime_error(void)
     cb_assert(result == NULL);
     cb_assert(error_msg != NULL);
     cb_assert(strcmp(
-        "TypeError: Cannot read property 'bar' of undefined (line 1:55)",
+        "TypeError: Cannot read property 'bar' of undefined (line 1:56)",
         error_msg) == 0);
 
     mapreduce_free_error_msg(error_msg);
@@ -163,7 +163,7 @@ static void test_runtime_error(void)
     cb_assert(reduction == NULL);
     cb_assert(error_msg != NULL);
     cb_assert(strcmp(
-        "TypeError: Cannot read property 'bar' of undefined (line 1:55)",
+        "TypeError: Cannot read property 'bar' of undefined (line 1:56)",
         error_msg) == 0);
 
     mapreduce_free_error_msg(error_msg);
@@ -408,10 +408,10 @@ static void free_json_list(mapreduce_json_list_t *list)
     cb_free(list);
 }
 
-int main(void)
+int main(int argc, char* argv[])
 {
     fprintf(stderr, "Running reduce tests\n");
-    mapreduce_init();
+    mapreduce_init(argv[1]);
 
     mapreduce_set_timeout(1);
     test_timeout();

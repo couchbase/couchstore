@@ -27,7 +27,6 @@
 #include "visibility.h"
 #include <libcouchstore/visibility.h>
 #include <stdbool.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -80,9 +79,11 @@ extern "C" {
      * This API needs to be called once per process to initialize
      * v8 javascript engine. This needs to be called before
      * any v8 APIs like creating v8 isolate and v8 context.
+     * The API takes the pathname of the current executable image
+     * to calculate the path of icudat.dtl relative to it for ICU.
      **/
     LIBCOUCHSTORE_API
-    void initV8();
+    void initV8(const char* executable_img);
 
     /**
      * This API needs to be called once per process to cleanup
@@ -93,9 +94,11 @@ extern "C" {
 
     /**
      * All mapreduce initialization are done in this function.
+     * The function takes the current executable pathname to
+     * calculate the path of icudtl.dat relative to it for ICU.
      **/
     LIBCOUCHSTORE_API
-    void mapreduce_init();
+    void mapreduce_init(const char* executable_img);
 
     /**
      * All mapreduce deinitialization are done in this function.

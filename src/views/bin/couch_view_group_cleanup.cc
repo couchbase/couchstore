@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
         goto out;
     }
 
-    mapreduce_init();
+    mapreduce_init(argv[0]);
     ret = couchstore_cleanup_view_group(group_info,
                                         &header_pos,
                                         &purge_count,

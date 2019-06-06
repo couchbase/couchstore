@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
         goto out;
     }
 
-    mapreduce_init();
+    mapreduce_init(argv[0]);
     ret = couchstore_compact_view_group(group_info,
                                         target_file,
                                         &header_buf,

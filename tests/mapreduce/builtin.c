@@ -154,10 +154,10 @@ static void test_date_to_array_function(void)
     mapreduce_free_context(context);
 }
 
-int main(void)
+int main(int argc, char* argv[])
 {
     fprintf(stderr, "Running mapreduce builtin tests\n");
-    mapreduce_init();
+    mapreduce_init(argv[1]);
 
     test_sum_function();
     test_b64decode_function();
