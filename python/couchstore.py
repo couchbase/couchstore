@@ -86,7 +86,7 @@ class SizedBuf(ctypes.Structure):
     def __str__(self):
         return ctypes.string_at(self.buf, self.size).decode()
 
-    def getBytes(self):
+    def get_bytes(self):
         return ctypes.string_at(self.buf, self.size)
 
 
@@ -196,7 +196,7 @@ class DocumentInfo(object):
                                                      ctypes.byref(info),
                                                      ctypes.byref(docptr),
                                                      ctypes.c_uint64(options)))
-        contents = str(docptr.contents.data)
+        contents = docptr.contents.data.get_bytes()
         _lib.couchstore_free_document(docptr)
         return contents
 
