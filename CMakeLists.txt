@@ -46,6 +46,9 @@ IF (WIN32)
   SET(COUCHSTORE_FILE_OPS "src/os_win.cc")
 ELSE(WIN32)
   SET(COUCHSTORE_FILE_OPS "src/os.cc")
+  # v8 expects icudtl.dat to be next to binary
+  INSTALL(FILES ${CMAKE_INSTALL_PREFIX}/lib/icudtl.dat
+          DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 ENDIF(WIN32)
 
 SET(COUCHSTORE_SOURCES src/arena.cc
