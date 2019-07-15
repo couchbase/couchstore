@@ -26,6 +26,7 @@
 #include <string.h>
 #include <errno.h>
 #include <libcouchstore/couch_db.h>
+#include <v8.h>
 #include "../file_merger.h"
 #include "../util.h"
 #include "util.h"
@@ -42,6 +43,7 @@ typedef enum {
 
 int main(int argc, char *argv[])
 {
+    v8::V8::InitializeICUDefaultLocation(argv[0], nullptr);
     merge_file_type_t view_file_type;
     int num_files;
     int i, j;
