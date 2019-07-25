@@ -222,7 +222,7 @@ static couchstore_error_t flush_buffer(couchstore_error_info_t *errinfo,
         fprintf(stderr, "BUFFER: %p flush %zd bytes at %zd --> %zd\n",
                 buf, buf->length, buf->offset, raw_written);
 #endif
-        if (raw_written <= 0)
+        if (raw_written < 0)
             return (couchstore_error_t) raw_written;
         buf->length -= raw_written;
         buf->offset += raw_written;

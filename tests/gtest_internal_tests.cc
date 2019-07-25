@@ -234,6 +234,75 @@ TEST_F(CouchstoreInternalTest, buffered_io_options)
     }
 }
 
+/* Test to verify pwrite returning less bytes than passed in
+   is handled for buffered and unbuffered case.
+   return 0 or write 1 byte at a time */
+typedef ParameterisedFileOpsErrorInjectionTest PwriteReturnTest;
+TEST_P(PwriteReturnTest, CheckLessPwriteReturn) {
+    remove(filePath.c_str());
+
+    const uint32_t docsInTest = 100;
+    std::string key_str, value_str;
+    Documents documents(docsInTest);
+    bool buffered = GetParam();
+
+    for (uint32_t ii = 0; ii < docsInTest; ii++) {
+        key_str = "doc" + std::to_string(ii);
+        value_str = "test_doc_body:" + std::to_string(ii);
+        documents.setDoc(ii, key_str, value_str);
+    }
+
+    // open with the requested option
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db_ex(filePath.c_str(),
+                                    buffered ? COUCHSTORE_OPEN_FLAG_CREATE:
+                                    COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED,
+                                    &ops, &db));
+
+    // make pwrite return 0 some times and write 1 byte other times
+    EXPECT_CALL(ops, pwrite(_, _, _, _, _)).WillRepeatedly(Invoke(
+         [this](couchstore_error_info_t* errinfo, couch_file_handle handle,
+                const void* buf, size_t nbytes, cs_off_t offset) {
+             static int x=0;
+
+             if (x++ % 5 == 0)
+                 return 0;
+             return (int)ops.get_wrapped()->pwrite(errinfo, handle, buf, 1, offset);
+          }));
+
+    // add a doc and commit to trigger pwrite more times
+    for (uint32_t ii = 0; ii < docsInTest; ii++) {
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_save_document(db,
+                                           documents.getDoc(ii),
+                                           documents.getDocInfo(ii),
+                                           0));
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    }
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+
+    // Check docs.
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
+    documents.resetCounters();
+    std::vector<sized_buf> buf(docsInTest);
+    for (uint32_t ii = 0; ii < docsInTest; ++ii) {
+        buf[ii] = documents.getDoc(ii)->id;
+    }
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        &buf[0],
+                                        docsInTest,
+                                        0,
+                                        &Documents::docIterCheckCallback,
+                                        &documents));
+    EXPECT_EQ(static_cast<int>(docsInTest),
+              documents.getCallbacks());
+}
+
+INSTANTIATE_TEST_CASE_P(Parameterised, PwriteReturnTest,
+                       ::testing::Values(true, false),
+                       ::testing::PrintToStringParamName());
 /**
  * Test to check whether or not custom B+tree node size passed to
  * open_db() API correctly set internal file options.

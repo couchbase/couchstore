@@ -13,6 +13,24 @@
 #include "crc32.h"
 #include "util.h"
 
+static ssize_t write_entire_buffer(tree_file *file, const void* buf,
+                                   size_t nbytes, cs_off_t offset) {
+    size_t left_to_write = nbytes;
+    const char* src = reinterpret_cast<const char*>(buf);
+
+    while (left_to_write) {
+        ssize_t written = file->ops->pwrite(&file->lastError, file->handle,
+                                            src, nbytes, offset);
+        if (written < 0) {
+            return written;
+        }
+        left_to_write -= written;
+        src += written;
+        offset += written;
+    }
+    return (ssize_t)nbytes;
+}
+
 static ssize_t raw_write(tree_file *file, const sized_buf *buf, cs_off_t pos)
 {
     cs_off_t write_pos = pos;
@@ -20,6 +38,10 @@ static ssize_t raw_write(tree_file *file, const sized_buf *buf, cs_off_t pos)
     char blockprefix = 0;
     ssize_t written;
     size_t block_remain;
+
+    /*
+    break up the write buffer into blocks adding the block prefix "0" as needed
+    */
     while (buf_pos < buf->size) {
         block_remain = COUCH_BLOCK_SIZE - (write_pos % COUCH_BLOCK_SIZE);
         if (block_remain > (buf->size - buf_pos)) {
@@ -27,17 +49,14 @@ static ssize_t raw_write(tree_file *file, const sized_buf *buf, cs_off_t pos)
         }
 
         if (write_pos % COUCH_BLOCK_SIZE == 0) {
-            written = file->ops->pwrite(&file->lastError, file->handle,
-                                        &blockprefix, 1, write_pos);
+            written = write_entire_buffer(file, &blockprefix, 1, write_pos);
             if (written < 0) {
                 return written;
             }
-            write_pos += 1;
+            write_pos += written;
             continue;
         }
-
-        written = file->ops->pwrite(&file->lastError, file->handle,
-                                    buf->buf + buf_pos, block_remain, write_pos);
+        written = write_entire_buffer(file, buf->buf + buf_pos, block_remain, write_pos);
         if (written < 0) {
             return written;
         }
@@ -65,8 +84,7 @@ couchstore_error_t write_header(tree_file *file, sized_buf *buf, cs_off_t *pos)
     memcpy(&headerbuf[1], &size, 4);
     memcpy(&headerbuf[5], &crc32, 4);
 
-    written = file->ops->pwrite(&file->lastError, file->handle,
-                                &headerbuf, sizeof(headerbuf), write_pos);
+    written = write_entire_buffer(file, &headerbuf, sizeof(headerbuf), write_pos);
     if (written < 0) {
         return (couchstore_error_t)written;
     }
