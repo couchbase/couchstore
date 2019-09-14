@@ -25,11 +25,18 @@ struct buffered_file_ops_params {
     buffered_file_ops_params();
     buffered_file_ops_params(const buffered_file_ops_params& src);
     buffered_file_ops_params(const bool _read_only,
+                             bool _tracing_enabled,
+                             bool _write_validation_enabled,
+                             bool _mprotect_enabled,
                              const uint32_t _read_buffer_capacity,
                              const uint32_t _max_read_buffers);
 
     // Flag indicating whether or not the file is being opened as read only.
     bool readOnly;
+    /* Flags for tracing and validation */
+    bool tracing_enabled;
+    bool write_validation_enabled;
+    bool mprotect_enabled;
     // Read buffer capacity.
     uint32_t read_buffer_capacity;
     // Max read buffer count.
@@ -62,6 +69,10 @@ public:
                              couch_file_handle handle) override;
     couchstore_error_t set_periodic_sync(couch_file_handle handle,
                                          uint64_t period_bytes) override;
+    couchstore_error_t set_tracing_enabled(couch_file_handle handle) override;
+    couchstore_error_t set_write_validation_enabled(
+            couch_file_handle handle) override;
+    couchstore_error_t set_mprotect_enabled(couch_file_handle handle) override;
     ssize_t pread(couchstore_error_info_t* errinfo,
                   couch_file_handle handle, void* buf, size_t nbytes,
                   cs_off_t offset) override;

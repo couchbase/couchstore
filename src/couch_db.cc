@@ -331,6 +331,20 @@ static tree_file_options get_tree_file_options_from_flags(couchstore_open_flags 
         options.periodic_sync_bytes = uint64_t(1024) << (sync_flag - 1);
     }
 
+    /* set the tracing and validation options */
+    options.tracing_enabled = false;
+    options.write_validation_enabled = false;
+    options.mprotect_enabled = false;
+    if (flags & COUCHSTORE_OPEN_WITH_TRACING) {
+        options.tracing_enabled = true;
+    }
+    if (flags & COUCHSTORE_OPEN_WITH_WRITE_VALIDATION) {
+        options.write_validation_enabled = true;
+    }
+    if (flags & COUCHSTORE_OPEN_WITH_MPROTECT) {
+        options.mprotect_enabled = true;
+    }
+
     return options;
 }
 
@@ -437,7 +451,7 @@ couchstore_error_t couchstore_open_db_ex(const char *filename,
     db->dropped = 0;
 
 cleanup:
-    if(errcode != COUCHSTORE_SUCCESS) {
+    if (errcode != COUCHSTORE_SUCCESS) {
         couchstore_close_file(db);
         couchstore_free_db(db);
     }
