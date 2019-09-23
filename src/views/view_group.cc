@@ -19,6 +19,7 @@
  **/
 
 #include "couchstore_config.h"
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1272,6 +1273,8 @@ static couchstore_error_t update_btree(const char *source_file,
 
     f = fopen(source_file, "rb");
     if (f == NULL) {
+        fprintf(stderr, "Error while opening file: source file %s, errorcode %s\n",
+                source_file, strerror(errno));
         ret = COUCHSTORE_ERROR_OPEN_FILE;
         goto cleanup;
     }

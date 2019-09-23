@@ -21,6 +21,7 @@
 
 #include "file_merger.h"
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <platform/cb_malloc.h>
@@ -129,6 +130,8 @@ file_merger_error_t merge_files(const char *source_files[],
         ctx.files[i] = fopen(source_files[i], "rb");
 
         if (ctx.files[i] == NULL) {
+            fprintf(stderr, "Error while opening file %s errcode %s\n",
+                    source_files[i], strerror(errno));
             for (j = 0; j < i; ++j) {
                 fclose(ctx.files[j]);
             }
