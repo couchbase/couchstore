@@ -92,6 +92,12 @@ public:
          * since it was created.
          */
         virtual size_t getWriteCount() = 0;
+
+        /**
+         * Return the number of write() bytes written to this file handle
+         * since it was created.
+         */
+        virtual size_t getWriteBytes() = 0;
     };
 
     /**
