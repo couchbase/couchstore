@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static couchstore_error_t flush_mr_partial(couchfile_modify_result *res, size_t mr_quota);
+static couchstore_error_t flush_mr_partial(couchfile_modify_result *res, int mr_quota);
 static couchstore_error_t flush_mr(couchfile_modify_result *res);
 static couchstore_error_t purge_node(couchfile_modify_request *rq,
                                       node_pointer *nptr,
@@ -202,7 +202,7 @@ static couchstore_error_t flush_mr(couchfile_modify_result *res)
 
 //Write a node using enough items from the values list to create a node
 //with uncompressed size of at least mr_quota
-static couchstore_error_t flush_mr_partial(couchfile_modify_result *res, size_t mr_quota)
+static couchstore_error_t flush_mr_partial(couchfile_modify_result *res, int mr_quota)
 {
     char *dst;
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
