@@ -18,20 +18,14 @@
  * the License.
  **/
 
-#ifndef _FILE_NAME_UTILS_H
-#define _FILE_NAME_UTILS_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-    char *file_basename(const char *path);
-
-    char *tmp_file_path(const char *tmp_dir, const char *prefix);
-
+char *file_basename(const char *path);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

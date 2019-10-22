@@ -22,72 +22,13 @@
 # define WINDOWS
 # include <io.h>
 #else
-# ifndef _BSD_SOURCE
-/* for mkstemp() */
-#  define _BSD_SOURCE
-# endif
 # include <libgen.h>
-# include <unistd.h>
 #endif
 
 #include "file_name_utils.h"
 
 #include <platform/cb_malloc.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-
-#define TMP_FILE_SUFFIX ".XXXXXX"
-
-
-char *tmp_file_path(const char *tmp_dir, const char *prefix)
-{
-    char *file_path;
-    size_t tmp_dir_len, prefix_len, total_len;
-#ifdef WINDOWS
-    errno_t err;
-#else
-    int fd;
-#endif
-
-
-    tmp_dir_len = strlen(tmp_dir);
-    prefix_len = strlen(prefix);
-    total_len = tmp_dir_len + 1 + prefix_len + sizeof(TMP_FILE_SUFFIX);
-    file_path = (char *) cb_malloc(total_len);
-
-    if (file_path == NULL) {
-        return NULL;
-    }
-
-    memcpy(file_path, tmp_dir, tmp_dir_len);
-    /* Windows specific file API functions and stdio file functions on Windows
-     * convert forward slashes to back slashes. */
-    file_path[tmp_dir_len] = '/';
-    memcpy(file_path + tmp_dir_len + 1, prefix, prefix_len);
-    memcpy(file_path + tmp_dir_len + 1 + prefix_len,
-           TMP_FILE_SUFFIX,
-           sizeof(TMP_FILE_SUFFIX));
-
-#ifdef WINDOWS
-    err = _mktemp_s(file_path, total_len);
-    if (err != 0) {
-        cb_free(file_path);
-        return NULL;
-    }
-#else
-    fd = mkstemp(file_path);
-    if (fd == -1) {
-        cb_free(file_path);
-        return NULL;
-    }
-    close(fd);
-    remove(file_path);
-#endif
-
-    return file_path;
-}
-
 
 char *file_basename(const char *path)
 {
