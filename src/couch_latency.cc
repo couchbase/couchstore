@@ -94,12 +94,10 @@ void CouchLatency::getLatencyInfo(couchstore_latency_callback_fn cb_func,
     }
 }
 
-LIBCOUCHSTORE_API
 void couchstore_latency_collector_start() {
     CouchLatency::init();
 }
 
-LIBCOUCHSTORE_API
 void couchstore_get_latency_info(couchstore_latency_callback_fn callback,
                                  couchstore_latency_dump_options options,
                                  void *ctx) {
@@ -111,8 +109,6 @@ void couchstore_get_latency_info(couchstore_latency_callback_fn callback,
     tmp->getLatencyInfo(callback, options, ctx);
 }
 
-
-LIBCOUCHSTORE_API
 void couchstore_latency_collector_stop() {
     CouchLatency::destroyInstance();
 }

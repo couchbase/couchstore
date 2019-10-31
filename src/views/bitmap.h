@@ -21,7 +21,6 @@
 #ifndef _BITMAP_H
 #define _BITMAP_H
 
-#include <libcouchstore/visibility.h>
 #include <limits.h>
 
 #ifdef __cplusplus

@@ -222,7 +222,6 @@ static couchstore_error_t create_header(Db *db)
     return db_write_header(db);
 }
 
-LIBCOUCHSTORE_API
 uint64_t couchstore_get_header_position(Db *db)
 {
     return db->header.position;
@@ -264,7 +263,6 @@ couchstore_error_t precommit(Db *db)
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_commit(Db *db)
 {
     COLLECT_LATENCY();
@@ -348,7 +346,6 @@ static tree_file_options get_tree_file_options_from_flags(couchstore_open_flags 
     return options;
 }
 
-LIBCOUCHSTORE_API
 couchstore_open_flags couchstore_encode_periodic_sync_flags(uint64_t bytes) {
     // Convert to encoding supported by couchstore_open_flags - KB power-of-2
     // value.
@@ -362,7 +359,6 @@ couchstore_open_flags couchstore_encode_periodic_sync_flags(uint64_t bytes) {
     return ((shiftAmount + 1)) << 24;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_open_db(const char *filename,
                                       couchstore_open_flags flags,
                                       Db **pDb)
@@ -371,7 +367,6 @@ couchstore_error_t couchstore_open_db(const char *filename,
                                  couchstore_get_default_file_ops(), pDb);
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_open_db_ex(const char *filename,
                                          couchstore_open_flags flags,
                                          FileOpsInterface* ops,
@@ -459,7 +454,6 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_close_file(Db* db)
 {
     COLLECT_LATENCY();
@@ -472,7 +466,6 @@ couchstore_error_t couchstore_close_file(Db* db)
     return error;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_rewind_db_header(Db *db)
 {
     COLLECT_LATENCY();
@@ -501,7 +494,6 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_free_db(Db* db)
 {
     COLLECT_LATENCY();
@@ -527,12 +519,10 @@ couchstore_error_t couchstore_free_db(Db* db)
     return COUCHSTORE_SUCCESS;
 }
 
-LIBCOUCHSTORE_API
 const char* couchstore_get_db_filename(Db *db) {
     return db->file.path;
 }
 
-LIBCOUCHSTORE_API
 FileOpsInterface::FHStats* couchstore_get_db_filestats(Db* db) {
     return db->file.ops->get_stats(db->file.handle);
 }
@@ -565,13 +555,11 @@ DocInfo* couchstore_alloc_docinfo(const sized_buf *id, const sized_buf *rev_meta
     return docInfo;
 }
 
-LIBCOUCHSTORE_API
 void couchstore_free_docinfo(DocInfo *docinfo)
 {
     cb_free(docinfo);
 }
 
-LIBCOUCHSTORE_API
 void couchstore_free_document(Doc *doc)
 {
     if (doc) {
@@ -715,7 +703,6 @@ static couchstore_error_t docinfo_fetch_by_seq(couchfile_lookup_request *rq,
     return by_seq_read_docinfo(pInfo, k, v);
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_docinfo_by_id(Db *db,
                                             const void *id,
                                             size_t idlen,
@@ -755,7 +742,6 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_docinfo_by_sequence(Db *db,
                                                   uint64_t sequence,
                                                   DocInfo **pInfo)
@@ -795,7 +781,6 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_open_doc_with_docinfo(Db *db,
                                                     const DocInfo *docinfo,
                                                     Doc **pDoc,
@@ -823,7 +808,6 @@ couchstore_error_t couchstore_open_doc_with_docinfo(Db *db,
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_open_document(Db *db,
                                             const void *id,
                                             size_t idlen,
@@ -919,7 +903,6 @@ static couchstore_error_t lookup_callback(couchfile_lookup_request *rq,
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_changes_since(Db *db,
                                             uint64_t since,
                                             couchstore_docinfos_options options,
@@ -959,7 +942,6 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_all_docs(Db *db,
                                        const sized_buf* startKeyPtr,
                                        couchstore_docinfos_options options,
@@ -1075,7 +1057,6 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_walk_id_tree(Db *db,
                                            const sized_buf* startDocID,
                                            couchstore_docinfos_options options,
@@ -1088,7 +1069,6 @@ couchstore_error_t couchstore_walk_id_tree(Db *db,
                                 options, ebin_cmp, callback, ctx);
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_walk_seq_tree(Db *db,
                                            uint64_t startSequence,
                                            couchstore_docinfos_options options,
@@ -1178,7 +1158,6 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_docinfos_by_id(Db *db,
                                              const sized_buf ids[],
                                              unsigned numDocs,
@@ -1196,7 +1175,6 @@ couchstore_error_t couchstore_docinfos_by_id(Db *db,
                             ctx);
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_docinfos_by_sequence(Db *db,
                                                    const uint64_t sequence[],
                                                    unsigned numDocs,
@@ -1231,7 +1209,6 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_db_info(Db *db, DbInfo* dbinfo) {
     if (db == NULL || dbinfo == NULL) {
         return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
@@ -1292,7 +1269,6 @@ static couchstore_error_t local_doc_fetch(couchfile_lookup_request *rq,
     return COUCHSTORE_SUCCESS;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_open_local_document(Db *db,
                                                   const void *id,
                                                   size_t idlen,
@@ -1329,7 +1305,6 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_save_local_document(Db *db, LocalDoc *lDoc)
 {
     couchstore_error_t errcode;
@@ -1371,7 +1346,6 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 void couchstore_free_local_document(LocalDoc *lDoc)
 {
     if (lDoc) {
@@ -1380,7 +1354,6 @@ void couchstore_free_local_document(LocalDoc *lDoc)
     }
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_last_os_error(const Db *db,
                                             char* buf,
                                             size_t size) {
@@ -1417,7 +1390,6 @@ couchstore_error_t couchstore_last_os_error(const Db *db,
     return COUCHSTORE_SUCCESS;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_last_internal_error(const Db *db,
                                                   char* buf,
                                                   size_t size) {
@@ -1487,7 +1459,6 @@ cleanup:
     return errcode;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_changes_count(Db* db,
                                             uint64_t min_seq,
                                             uint64_t max_seq,

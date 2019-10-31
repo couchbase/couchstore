@@ -32,7 +32,6 @@ static file_sorter_error_t do_sort_file(const char *file_path,
                                         int skip_writeback,
                                         view_file_merge_ctx_t *ctx);
 
-LIBCOUCHSTORE_API
 file_sorter_error_t sort_view_kvs_ops_file(const char *file_path,
                                            const char *tmp_dir)
 {
@@ -44,8 +43,6 @@ file_sorter_error_t sort_view_kvs_ops_file(const char *file_path,
     return do_sort_file(file_path, tmp_dir, NULL, 0, &ctx);
 }
 
-
-LIBCOUCHSTORE_API
 file_sorter_error_t sort_view_kvs_file(const char *file_path,
                                        const char *tmp_dir,
                                        file_merger_feed_record_t callback,
@@ -60,8 +57,6 @@ file_sorter_error_t sort_view_kvs_file(const char *file_path,
     return do_sort_file(file_path, tmp_dir, callback, 1, &ctx);
 }
 
-
-LIBCOUCHSTORE_API
 file_sorter_error_t sort_view_ids_ops_file(const char *file_path,
                                            const char *tmp_dir)
 {
@@ -73,8 +68,6 @@ file_sorter_error_t sort_view_ids_ops_file(const char *file_path,
     return do_sort_file(file_path, tmp_dir, NULL, 0, &ctx);
 }
 
-
-LIBCOUCHSTORE_API
 file_sorter_error_t sort_view_ids_file(const char *file_path,
                                        const char *tmp_dir,
                                        file_merger_feed_record_t callback,
@@ -89,8 +82,6 @@ file_sorter_error_t sort_view_ids_file(const char *file_path,
     return do_sort_file(file_path, tmp_dir, callback, 1, &ctx);
 }
 
-
-LIBCOUCHSTORE_API
 file_sorter_error_t sort_spatial_kvs_file(const char *file_path,
                                           const char *tmp_dir,
                                           file_merger_feed_record_t callback,
@@ -108,8 +99,6 @@ file_sorter_error_t sort_spatial_kvs_file(const char *file_path,
     return ret;
 }
 
-
-LIBCOUCHSTORE_API
 file_sorter_error_t sort_spatial_kvs_ops_file(const char *file_path,
                                               const char *tmp_dir,
                                               view_file_merge_ctx_t *ctx)

@@ -82,7 +82,6 @@ extern "C" {
      * The API takes the pathname of the current executable image
      * to calculate the path of icudat.dtl relative to it for ICU.
      **/
-    LIBCOUCHSTORE_API
     void initV8(const char* executable_img);
 
     /**
@@ -90,7 +89,7 @@ extern "C" {
      * v8 resources. This needs to be called after disposing all
      * v8 thread contexts like v8 isolate and v8 context.
      **/
-    LIBCOUCHSTORE_API NO_SANITIZE_VPTR void deinitV8();
+    NO_SANITIZE_VPTR void deinitV8();
 
     /**
      * All mapreduce initialization are done in this function.
@@ -125,7 +124,6 @@ extern "C" {
      * assigned an error message, for which the caller is responsible to
      * deallocate via mapreduce_free_error_msg().
      **/
-    LIBMAPREDUCE_API
     mapreduce_error_t mapreduce_start_map_context(const char *map_functions[],
                                                   int num_functions,
                                                   void **context,
@@ -136,22 +134,17 @@ extern "C" {
      * free'ing result output parameter with a call to
      * mapreduce_free_map_result_list().
      */
-    LIBMAPREDUCE_API
     mapreduce_error_t mapreduce_map(void *context,
                                     const mapreduce_json_t *doc,
                                     const mapreduce_json_t *meta,
                                     mapreduce_map_result_list_t **result);
 
-    LIBMAPREDUCE_API
     void mapreduce_free_json_list(mapreduce_json_list_t *list);
 
-    LIBMAPREDUCE_API
     void mapreduce_free_json(mapreduce_json_t *value);
 
-    LIBMAPREDUCE_API
     void mapreduce_free_map_result_list(mapreduce_map_result_list_t *list);
 
-    LIBMAPREDUCE_API
     void mapreduce_free_error_msg(char *error_msg);
 
     /**
@@ -159,7 +152,6 @@ extern "C" {
      * assigned an error message, for which the caller is responsible to
      * deallocate via mapreduce_free_error_msg().
      **/
-    LIBMAPREDUCE_API
     mapreduce_error_t mapreduce_start_reduce_context(const char *reduce_functions[],
                                                      int num_functions,
                                                      void **context,
@@ -174,7 +166,6 @@ extern "C" {
      * free'ing result output parameter with a call to
      * mapreduce_free_json_list().
      */
-    LIBMAPREDUCE_API
     mapreduce_error_t mapreduce_reduce_all(void *context,
                                            const mapreduce_json_list_t *keys,
                                            const mapreduce_json_list_t *values,
@@ -190,7 +181,6 @@ extern "C" {
      * free'ing result output parameter with a call to
      * mapreduce_free_json().
      **/
-    LIBMAPREDUCE_API
     mapreduce_error_t mapreduce_reduce(void *context,
                                        int reduceFunNum,
                                        const mapreduce_json_list_t *keys,
@@ -207,17 +197,14 @@ extern "C" {
      * free'ing result output parameter with a call to
      * mapreduce_free_json().
      **/
-    LIBMAPREDUCE_API
     mapreduce_error_t mapreduce_rereduce(void *context,
                                          int reduceFunNum,
                                          const mapreduce_json_list_t *reductions,
                                          mapreduce_json_t **result,
                                          char **error_msg);
 
-    LIBMAPREDUCE_API
     void mapreduce_free_context(void *context);
 
-    LIBMAPREDUCE_API
     void mapreduce_set_timeout(unsigned int seconds);
 
 

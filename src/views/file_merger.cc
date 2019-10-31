@@ -29,8 +29,6 @@ static file_merger_error_t merge_view_files(const char *source_files[],
                                             const char *dest_path,
                                             view_file_merge_ctx_t *ctx);
 
-
-LIBCOUCHSTORE_API
 file_merger_error_t merge_view_kvs_ops_files(const char *source_files[],
                                              unsigned num_source_files,
                                              const char *dest_path)
@@ -43,8 +41,6 @@ file_merger_error_t merge_view_kvs_ops_files(const char *source_files[],
     return merge_view_files(source_files, num_source_files, dest_path, &ctx);
 }
 
-
-LIBCOUCHSTORE_API
 file_merger_error_t merge_view_ids_ops_files(const char *source_files[],
                                              unsigned num_source_files,
                                              const char *dest_path)
@@ -57,8 +53,6 @@ file_merger_error_t merge_view_ids_ops_files(const char *source_files[],
     return merge_view_files(source_files, num_source_files, dest_path, &ctx);
 }
 
-
-LIBCOUCHSTORE_API
 file_merger_error_t merge_spatial_kvs_ops_files(const char *source_files[],
                                                 unsigned num_source_files,
                                                 const char *dest_path,

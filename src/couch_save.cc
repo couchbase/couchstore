@@ -447,7 +447,6 @@ couchstore_error_t couchstore_save_documents(Db* db,
             db, docs, infos, numDocs, options, nullptr, nullptr);
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_save_document(Db *db, const Doc *doc,
                                             DocInfo *info, couchstore_save_options options)
 {

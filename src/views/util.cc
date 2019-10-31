@@ -199,8 +199,6 @@ void free_view_record(void *record, void *ctx)
     cb_free(record);
 }
 
-
-LIBCOUCHSTORE_API
 char *couchstore_read_line(FILE *in, char *buf, int size)
 {
     size_t len;
@@ -217,8 +215,6 @@ char *couchstore_read_line(FILE *in, char *buf, int size)
     return buf;
 }
 
-
-LIBCOUCHSTORE_API
 uint64_t couchstore_read_int(FILE *in, char *buf, size_t size,
                                                   couchstore_error_t *ret)
 {

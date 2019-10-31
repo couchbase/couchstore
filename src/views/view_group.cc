@@ -194,7 +194,6 @@ static couchstore_error_t compact_spatial(tree_file *source,
                                           compactor_stats_t *stats,
                                           node_pointer **out_root);
 
-LIBCOUCHSTORE_API
 view_group_info_t *couchstore_read_view_group_info(FILE *in_stream,
                                                    FILE *error_stream)
 {
@@ -425,8 +424,6 @@ static couchstore_error_t read_spatial_info(view_group_info_t *info,
     return COUCHSTORE_SUCCESS;
 }
 
-
-LIBCOUCHSTORE_API
 void couchstore_free_view_group_info(view_group_info_t *info)
 {
     int i, j;
@@ -504,8 +501,6 @@ couchstore_error_t open_view_group_file(const char *path,
     return ret;
 }
 
-
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_build_view_group(view_group_info_t *info,
                                                const char *id_records_file,
                                                const char *kv_records_files[],
@@ -1071,8 +1066,6 @@ static couchstore_error_t cleanup_view_btree(tree_file *file,
     return ret;
 }
 
-
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_cleanup_view_group(view_group_info_t *info,
                                                  uint64_t *header_pos,
                                                  uint64_t *purge_count,
@@ -1425,7 +1418,6 @@ static couchstore_error_t update_view_btree(const char *source_file,
     return ret;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_update_view_group(view_group_info_t *info,
                                                const char *id_records_file,
                                                const char *kv_records_files[],
@@ -1796,7 +1788,6 @@ static couchstore_error_t compact_view_btree(tree_file *source,
     return ret;
 }
 
-LIBCOUCHSTORE_API
 couchstore_error_t couchstore_compact_view_group(view_group_info_t *info,
                                                  const char *target_file,
                                                  const sized_buf *header_buf,

@@ -38,7 +38,8 @@ INCLUDE_DIRECTORIES(AFTER
 
 INCLUDE_DIRECTORIES(AFTER ${ICU_INCLUDE_DIR}
                           ${V8_INCLUDE_DIR}
-                          ${SNAPPY_INCLUDE_DIR})
+                          ${SNAPPY_INCLUDE_DIR}
+                          ${FOLLY_INCLUDE_DIR})
 
 CHECK_INCLUDE_FILES("netinet/in.h" HAVE_NETINET_IN_H)
 CHECK_INCLUDE_FILES("inttypes.h" HAVE_INTTYPES_H)
@@ -55,67 +56,88 @@ ELSE(WIN32)
           DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 ENDIF(WIN32)
 
-SET(COUCHSTORE_SOURCES src/arena.cc
-                       src/bitfield.cc
-                       src/btree_modify.cc
-                       src/btree_read.cc
-                       src/couch_db.cc
-                       src/couch_file_read.cc
-                       src/couch_file_write.cc
-                       src/couch_latency.cc
-                       src/couch_save.cc
-                       src/crc32.cc
-                       src/db_compact.cc
-                       src/file_merger.cc
-                       src/file_name_utils.c
-                       src/file_sorter.cc
-                       src/iobuffer.cc
-                       src/llmsort.cc
-                       src/mergesort.cc
-                       src/node_types.cc
-                       src/reduces.cc
-                       src/strerror.cc
-                       src/tree_writer.cc
-                       src/util.cc
-                       src/views/bitmap.c
-                       src/views/collate_json.cc
-                       src/views/file_merger.cc
-                       src/views/file_sorter.cc
-                       src/views/index_header.cc
-                       src/views/keys.cc
-                       src/views/mapreduce/mapreduce.cc
-                       src/views/mapreduce/mapreduce_c.cc
-                       src/views/reducers.cc
-                       src/views/reductions.cc
-                       src/views/sorted_list.c
-                       src/views/spatial.cc
-                       src/views/spatial_modify.cc
-                       src/views/util.cc
-                       src/views/values.cc
-                       src/views/view_group.cc
-                       src/views/purgers.cc
-                       src/views/compaction.cc
-                       src/quicksort.c
-                       ${COUCHSTORE_FILE_OPS})
-SET(COUCHSTORE_LIBRARIES ${V8_LIBRARIES} ${ICU_LIBRARIES} cbcompress platform phosphor)
+# Create two object libraries, one for the core couchstore code
+ADD_LIBRARY(couchstore_objs OBJECT
+        src/arena.cc
+        src/bitfield.cc
+        src/btree_modify.cc
+        src/btree_read.cc
+        src/couch_db.cc
+        src/couch_file_read.cc
+        src/couch_file_write.cc
+        src/couch_latency.cc
+        src/couch_save.cc
+        src/crc32.cc
+        src/db_compact.cc
+        src/file_merger.cc
+        src/file_name_utils.c
+        src/file_sorter.cc
+        src/iobuffer.cc
+        src/llmsort.cc
+        src/mergesort.cc
+        src/node_types.cc
+        src/quicksort.c
+        src/reduces.cc
+        src/strerror.cc
+        src/tree_writer.cc
+        src/util.cc
+        ${COUCHSTORE_FILE_OPS})
+TARGET_COMPILE_DEFINITIONS(couchstore_objs PUBLIC -Dcouchstore_EXPORTS)
+SET_PROPERTY(TARGET couchstore_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 
-SET(COUCHSTORE_GTEST_LIBRARIES gtest gtest_main gmock phosphor)
-SET(COUCHSTORE_GTEST_INCLUDES ${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
+# second object library is for the view specific code
+ADD_LIBRARY(couchstore_view_objs OBJECT
+        src/views/bitmap.c
+        src/views/collate_json.cc
+        src/views/file_merger.cc
+        src/views/file_sorter.cc
+        src/views/index_header.cc
+        src/views/keys.cc
+        src/views/mapreduce/mapreduce.cc
+        src/views/mapreduce/mapreduce_c.cc
+        src/views/reducers.cc
+        src/views/reductions.cc
+        src/views/sorted_list.c
+        src/views/spatial.cc
+        src/views/spatial_modify.cc
+        src/views/util.cc
+        src/views/values.cc
+        src/views/view_group.cc
+        src/views/purgers.cc
+        src/views/compaction.cc
+        $<TARGET_OBJECTS:couchstore_objs>)
+TARGET_COMPILE_DEFINITIONS(couchstore_view_objs PUBLIC -Dcouchstore_EXPORTS)
+SET_PROPERTY(TARGET couchstore_view_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 
-ADD_LIBRARY(couchstore SHARED ${COUCHSTORE_SOURCES})
-SET_TARGET_PROPERTIES(couchstore PROPERTIES COMPILE_FLAGS "-DLIBCOUCHSTORE_INTERNAL=1 -DLIBMAPREDUCE_INTERNAL=1")
-TARGET_LINK_LIBRARIES(couchstore ${COUCHSTORE_LIBRARIES})
+# libcouchstore, core couchstore library
+ADD_LIBRARY(couchstore SHARED $<TARGET_OBJECTS:couchstore_objs>)
+SET(COUCHSTORE_LIBS cbcompress platform phosphor)
+TARGET_LINK_LIBRARIES(couchstore ${COUCHSTORE_LIBS})
+
 GENERATE_EXPORT_HEADER(couchstore
                        EXPORT_MACRO_NAME LIBCOUCHSTORE_API
                        EXPORT_FILE_NAME ${CMAKE_CURRENT_BINARY_DIR}/include/libcouchstore/visibility.h
                        NO_EXPORT_MACRO_NAME STATIC
                        STATIC_DEFINE LIBCOUCHSTORE_NO_VISIBILITY)
+
+TARGET_INCLUDE_DIRECTORIES(couchstore_objs PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
+TARGET_INCLUDE_DIRECTORIES(couchstore_view_objs PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_INCLUDE_DIRECTORIES(couchstore PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
+
+# libcouchstore_views - core couchstore library + view code and is dependent on
+# v8 and icu libraries
+ADD_LIBRARY(couchstore_views SHARED
+            $<TARGET_OBJECTS:couchstore_objs>
+            $<TARGET_OBJECTS:couchstore_view_objs>)
+SET(COUCHSTORE_VIEW_LIBS ${COUCHSTORE_LIBS} ${V8_LIBRARIES} ${ICU_LIBRARIES})
+TARGET_LINK_LIBRARIES(couchstore_views ${COUCHSTORE_VIEW_LIBS})
+TARGET_INCLUDE_DIRECTORIES(couchstore_views PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couch_dbdump
                src/dbdump.cc
                src/tracking_file_ops.cc
-               ${COUCHSTORE_SOURCES}
+               $<TARGET_OBJECTS:couchstore_objs>
+               $<TARGET_OBJECTS:couchstore_view_objs>
                ${KVEngineAPI_BINARY_DIR}/xattr/visibility.h)
 
 SET_TARGET_PROPERTIES(couch_dbdump PROPERTIES COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
@@ -125,11 +147,11 @@ TARGET_INCLUDE_DIRECTORIES(couch_dbdump
                            ${FLATBUFFERS_INCLUDE_DIR})
 
 TARGET_LINK_LIBRARIES(couch_dbdump
-                      ${COUCHSTORE_LIBRARIES}
                       mcbp
                       xattr
                       ${FLATBUFFERS_LIBRARIES}
-                      ep-engine_collections)
+                      ep-engine_collections
+                      ${COUCHSTORE_VIEW_LIBS})
 
 ADD_EXECUTABLE(couch_dbck src/dbck.cc)
 TARGET_LINK_LIBRARIES(couch_dbck couchstore platform)
@@ -141,23 +163,27 @@ ADD_EXECUTABLE(couch_compact src/compactor.cc)
 TARGET_LINK_LIBRARIES(couch_compact couchstore)
 
 ADD_EXECUTABLE(couch_view_file_merger src/views/bin/couch_view_file_merger.cc src/views/bin/util.cc)
-TARGET_LINK_LIBRARIES(couch_view_file_merger couchstore dirutils)
+TARGET_LINK_LIBRARIES(couch_view_file_merger couchstore_views dirutils)
 
 ADD_EXECUTABLE(couch_view_index_builder src/views/bin/couch_view_index_builder.cc src/views/bin/util.cc)
-TARGET_LINK_LIBRARIES(couch_view_index_builder couchstore dirutils)
+TARGET_LINK_LIBRARIES(couch_view_index_builder couchstore_views dirutils)
+TARGET_INCLUDE_DIRECTORIES(couch_view_index_builder PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couch_view_group_cleanup src/views/bin/couch_view_group_cleanup.cc src/views/bin/util.cc)
-TARGET_LINK_LIBRARIES(couch_view_group_cleanup couchstore dirutils)
+TARGET_LINK_LIBRARIES(couch_view_group_cleanup couchstore_views dirutils)
+TARGET_INCLUDE_DIRECTORIES(couch_view_group_cleanup PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couch_view_index_updater src/views/bin/couch_view_index_updater.cc src/views/bin/util.cc)
-TARGET_LINK_LIBRARIES(couch_view_index_updater couchstore dirutils)
+TARGET_LINK_LIBRARIES(couch_view_index_updater couchstore_views dirutils)
+TARGET_INCLUDE_DIRECTORIES(couch_view_index_updater PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couch_view_group_compactor src/views/bin/couch_view_group_compactor.cc src/views/bin/util.cc)
-TARGET_LINK_LIBRARIES(couch_view_group_compactor couchstore dirutils)
+TARGET_LINK_LIBRARIES(couch_view_group_compactor couchstore_views dirutils)
+TARGET_INCLUDE_DIRECTORIES(couch_view_group_compactor PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couch_create src/couch_create.cc src/crc32.cc)
 TARGET_LINK_LIBRARIES(couch_create couchstore platform)
-
+TARGET_INCLUDE_DIRECTORIES(couch_create PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 IF (INSTALL_HEADER_FILES)
    INSTALL(FILES
@@ -171,6 +197,7 @@ IF (INSTALL_HEADER_FILES)
 ENDIF(INSTALL_HEADER_FILES)
 
 INSTALL(TARGETS couchstore
+                couchstore_views
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
@@ -235,8 +262,9 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
     MACRO(M_MAKE_LEGACY_TEST name)
         ADD_EXECUTABLE(${name} ${ARGN})
         SET_TARGET_PROPERTIES(${name} PROPERTIES
-                              COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
-        TARGET_LINK_LIBRARIES(${name} couchstore dirutils)
+                              COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
+        TARGET_LINK_LIBRARIES(${name} couchstore couchstore_views dirutils)
+        TARGET_INCLUDE_DIRECTORIES(${name} PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
     ENDMACRO()
 
     M_MAKE_LEGACY_TEST(couchstore_file-deduper-test
@@ -286,14 +314,16 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                    tests/btree_purge/purge_tests.h
                    tests/btree_purge/tests.cc
                    tests/btree_purge/purge.cc
-                   ${COUCHSTORE_SOURCES})
+                   $<TARGET_OBJECTS:couchstore_objs>
+                   $<TARGET_OBJECTS:couchstore_view_objs>)
     SET_TARGET_PROPERTIES(couchstore_testapp PROPERTIES
-                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
+                         COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
     TARGET_INCLUDE_DIRECTORIES(couchstore_testapp
                                PRIVATE
                                ${CMAKE_CURRENT_BINARY_DIR}/include)
-    TARGET_LINK_LIBRARIES(couchstore_testapp ${COUCHSTORE_LIBRARIES})
-
+    TARGET_LINK_LIBRARIES(couchstore_testapp ${COUCHSTORE_VIEW_LIBS})
+    SET(COUCHSTORE_GTEST_LIBRARIES gtest gtest_main gmock phosphor)
+    SET(COUCHSTORE_GTEST_INCLUDES ${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
     ADD_EXECUTABLE(couchstore_gtest
                    tests/couchstoretest.cc
                    tests/documents.cc
@@ -303,7 +333,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                    src/crc32.cc
                    ${COUCHSTORE_FILE_OPS})
     SET_TARGET_PROPERTIES(couchstore_gtest PROPERTIES
-                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
+                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
     TARGET_INCLUDE_DIRECTORIES(couchstore_gtest PRIVATE ${COUCHSTORE_GTEST_INCLUDES})
     TARGET_LINK_LIBRARIES(couchstore_gtest couchstore ${COUCHSTORE_GTEST_LIBRARIES})
 
@@ -312,15 +342,16 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                    tests/documents.cc
                    tests/gtest_internal_tests.cc
                    tests/test_fileops.cc
-                   ${COUCHSTORE_SOURCES})
+                   $<TARGET_OBJECTS:couchstore_objs>)
     SET_TARGET_PROPERTIES(couchstore_internal_gtest PROPERTIES
-                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
+                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
     TARGET_INCLUDE_DIRECTORIES(couchstore_internal_gtest
                                PRIVATE
                                ${CMAKE_CURRENT_BINARY_DIR}/include)
+
     TARGET_LINK_LIBRARIES(couchstore_internal_gtest
                           ${COUCHSTORE_GTEST_LIBRARIES}
-                          ${COUCHSTORE_LIBRARIES})
+                          ${COUCHSTORE_LIBS})
 
     # This is an object library and can be used for verifying
     # FileOpsInterface implementations that wrap other FileOps
@@ -331,7 +362,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                 tests/test_fileops.cc
                 ${COUCHSTORE_FILE_OPS})
     SET_TARGET_PROPERTIES(couchstore_wrapped_fileops_test_framework PROPERTIES
-                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
+                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
     TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test_framework
                                PRIVATE
                                ${COUCHSTORE_GTEST_INCLUDES}
@@ -344,7 +375,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                    tests/wrapped_fileops_test.cc
                    $<TARGET_OBJECTS:couchstore_wrapped_fileops_test_framework>)
     SET_TARGET_PROPERTIES(couchstore_wrapped_fileops_test PROPERTIES
-                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1 -DTESTAPP=1")
+                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
     TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test
                                PRIVATE
                                ${CMAKE_CURRENT_BINARY_DIR}/include)

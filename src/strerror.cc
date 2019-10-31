@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <libcouchstore/couch_db.h>
 
-LIBCOUCHSTORE_API
 const char *couchstore_strerror(couchstore_error_t errcode)
 {
     switch (errcode) {

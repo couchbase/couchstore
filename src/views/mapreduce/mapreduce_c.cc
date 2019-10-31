@@ -56,8 +56,6 @@ static void register_ctx(mapreduce_ctx_t *ctx);
 static void unregister_ctx(mapreduce_ctx_t *ctx);
 static void terminator_loop();
 
-
-LIBMAPREDUCE_API
 mapreduce_error_t mapreduce_start_map_context(const char *map_functions[],
                                               int num_functions,
                                               void **context,
@@ -66,8 +64,6 @@ mapreduce_error_t mapreduce_start_map_context(const char *map_functions[],
     return start_context(map_functions, num_functions, context, error_msg);
 }
 
-
-LIBMAPREDUCE_API
 mapreduce_error_t mapreduce_map(void *context,
                                 const mapreduce_json_t *doc,
                                 const mapreduce_json_t *meta,
@@ -107,8 +103,6 @@ mapreduce_error_t mapreduce_map(void *context,
     return MAPREDUCE_SUCCESS;
 }
 
-
-LIBMAPREDUCE_API
 mapreduce_error_t mapreduce_start_reduce_context(const char *reduce_functions[],
                                                  int num_functions,
                                                  void **context,
@@ -117,8 +111,6 @@ mapreduce_error_t mapreduce_start_reduce_context(const char *reduce_functions[],
     return start_context(reduce_functions, num_functions, context, error_msg);
 }
 
-
-LIBMAPREDUCE_API
 mapreduce_error_t mapreduce_reduce_all(void *context,
                                        const mapreduce_json_list_t *keys,
                                        const mapreduce_json_list_t *values,
@@ -168,8 +160,6 @@ mapreduce_error_t mapreduce_reduce_all(void *context,
     return MAPREDUCE_SUCCESS;
 }
 
-
-LIBMAPREDUCE_API
 mapreduce_error_t mapreduce_reduce(void *context,
                                    int reduceFunNum,
                                    const mapreduce_json_list_t *keys,
@@ -202,8 +192,6 @@ mapreduce_error_t mapreduce_reduce(void *context,
     return MAPREDUCE_SUCCESS;
 }
 
-
-LIBMAPREDUCE_API
 mapreduce_error_t mapreduce_rereduce(void *context,
                                      int reduceFunNum,
                                      const mapreduce_json_list_t *reductions,
@@ -235,8 +223,6 @@ mapreduce_error_t mapreduce_rereduce(void *context,
     return MAPREDUCE_SUCCESS;
 }
 
-
-LIBMAPREDUCE_API
 void mapreduce_free_context(void *context)
 {
     if (context != NULL) {
@@ -248,8 +234,6 @@ void mapreduce_free_context(void *context)
     }
 }
 
-
-LIBMAPREDUCE_API
 void mapreduce_free_json(mapreduce_json_t *value)
 {
     if (value != NULL) {
@@ -258,8 +242,6 @@ void mapreduce_free_json(mapreduce_json_t *value)
     }
 }
 
-
-LIBMAPREDUCE_API
 void mapreduce_free_json_list(mapreduce_json_list_t *list)
 {
     if (list != NULL) {
@@ -271,8 +253,6 @@ void mapreduce_free_json_list(mapreduce_json_list_t *list)
     }
 }
 
-
-LIBMAPREDUCE_API
 void mapreduce_free_map_result_list(mapreduce_map_result_list_t *list)
 {
     if (list == NULL) {
@@ -305,15 +285,11 @@ void mapreduce_free_map_result_list(mapreduce_map_result_list_t *list)
     cb_free(list);
 }
 
-
-LIBMAPREDUCE_API
 void mapreduce_free_error_msg(char *error_msg)
 {
     cb_free(error_msg);
 }
 
-
-LIBMAPREDUCE_API
 void mapreduce_set_timeout(unsigned int seconds)
 {
     std::lock_guard<std::mutex> lk(cvMutex);
@@ -386,7 +362,6 @@ static void copy_error_msg(const std::string &msg, char **to)
     }
 }
 
-LIBCOUCHSTORE_API
 void init_terminator_thread()
 {
     std::lock_guard<std::mutex> initGuard(initMutex);
@@ -410,7 +385,6 @@ void init_terminator_thread()
     terminator_active = true;
 }
 
-LIBCOUCHSTORE_API
 void deinit_terminator_thread(bool fatal_exit=false)
 {
     initMutex.lock();
@@ -426,15 +400,12 @@ void deinit_terminator_thread(bool fatal_exit=false)
     if(!fatal_exit) initMutex.unlock();
 }
 
-
-LIBCOUCHSTORE_API
 void mapreduce_init(const char* executable_img)
 {
     initV8(executable_img);
     init_terminator_thread();
 }
 
-LIBCOUCHSTORE_API
 void mapreduce_deinit()
 {
     deinit_terminator_thread();
