@@ -36,7 +36,7 @@ INCLUDE_DIRECTORIES(AFTER
                     ${KVEngineAPI_SOURCE_DIR}
                     ${KVEngineAPI_BINARY_DIR})
 
-INCLUDE_DIRECTORIES(AFTER ${ICU_INCLUDE_DIR}
+INCLUDE_DIRECTORIES(AFTER SYSTEM ${ICU_INCLUDE_DIR}
                           ${V8_INCLUDE_DIR}
                           ${SNAPPY_INCLUDE_DIR}
                           ${FOLLY_INCLUDE_DIR})
