@@ -93,10 +93,7 @@ extern "C" {
     typedef struct couchfile_modify_action {
         int type;
         sized_buf *key;
-        union _act_value {
-            sized_buf *data;
-            void *arg;
-        } value;
+        sized_buf* data;
         sized_buf* seq;
     } couchfile_modify_action;
 
@@ -135,6 +132,7 @@ extern "C" {
         int num_actions;
         couchfile_modify_action *actions;
         void (*fetch_callback) (struct couchfile_modify_request *rq, sized_buf *k, sized_buf *v, void *arg);
+        void* fetch_callback_ctx;
         reduce_fn reduce;
         reduce_fn rereduce;
         void *user_reduce_ctx;

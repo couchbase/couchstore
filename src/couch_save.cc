@@ -145,7 +145,7 @@ static void idfetch_update_cb(couchfile_modify_request *rq,
     encode_raw48(oldseq, (raw_48*)delbuf->buf);
 
     ctx->seqacts[ctx->actpos].type = ACTION_REMOVE;
-    ctx->seqacts[ctx->actpos].value.data = NULL;
+    ctx->seqacts[ctx->actpos].data = NULL;
     ctx->seqacts[ctx->actpos].key = delbuf;
 
     ctx->actpos++;
@@ -217,13 +217,12 @@ static couchstore_error_t update_indexes(Db* db,
         ptrdiff_t isorted = sorted_ids[ii] - ids;   // recover index of ii'th id in sort order
 
         idacts[ii * 2].type = ACTION_FETCH;
-        idacts[ii * 2].value.arg = &fetcharg;
+        idacts[ii * 2].key = &ids[isorted];
         idacts[ii * 2 + 1].type = ACTION_INSERT;
-        idacts[ii * 2 + 1].value.data = &idvals[isorted];
+        idacts[ii * 2 + 1].data = &idvals[isorted];
         // Allow the by_id building to find the by_seqno for each id.
         // The save_callback method passes back id and seqno to the caller.
         idacts[ii * 2 + 1].seq = &seqs[isorted];
-        idacts[ii * 2].key = &ids[isorted];
         idacts[ii * 2 + 1].key = &ids[isorted];
     }
 
@@ -234,6 +233,7 @@ static couchstore_error_t update_indexes(Db* db,
     idrq.reduce = by_id_reduce;
     idrq.rereduce = by_id_rereduce;
     idrq.fetch_callback = idfetch_update_cb;
+    idrq.fetch_callback_ctx = &fetcharg;
     idrq.compacting = 0;
     idrq.enable_purging = false;
     idrq.purge_kp = NULL;
@@ -249,7 +249,7 @@ static couchstore_error_t update_indexes(Db* db,
 
     while (fetcharg.valpos < numdocs) {
         seqacts[fetcharg.actpos].type = ACTION_INSERT;
-        seqacts[fetcharg.actpos].value.data = &seqvals[fetcharg.valpos];
+        seqacts[fetcharg.actpos].data = &seqvals[fetcharg.valpos];
         seqacts[fetcharg.actpos].key = &seqs[fetcharg.valpos];
         fetcharg.valpos++;
         fetcharg.actpos++;

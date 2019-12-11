@@ -477,12 +477,14 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                     switch (rq->actions[start].type) {
                     case ACTION_INSERT:
                         local_result->modified = 1;
-                        mr_push_item(rq->actions[start].key, rq->actions[start].value.data, local_result);
+                        mr_push_item(rq->actions[start].key,
+                                     rq->actions[start].data,
+                                     local_result);
                         if (rq->save_callback && rq->docinfo_callback) {
                             do_save_callback(rq,
                                              rq->actions[start].key,
                                              nullptr,
-                                             rq->actions[start].value.data);
+                                             rq->actions[start].data);
                         }
                         break;
 
@@ -493,7 +495,10 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                     case ACTION_FETCH:
                         if (rq->fetch_callback) {
                             //not found
-                            (*rq->fetch_callback)(rq, rq->actions[start].key, NULL, rq->actions[start].value.arg);
+                            (*rq->fetch_callback)(rq,
+                                                  rq->actions[start].key,
+                                                  NULL,
+                                                  rq->fetch_callback_ctx);
                         }
                     }
                     start++;
@@ -504,12 +509,14 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                     switch (rq->actions[start].type) {
                     case ACTION_INSERT:
                         local_result->modified = 1;
-                        mr_push_item(rq->actions[start].key, rq->actions[start].value.data, local_result);
+                        mr_push_item(rq->actions[start].key,
+                                     rq->actions[start].data,
+                                     local_result);
                         if (rq->save_callback && rq->docinfo_callback) {
                             do_save_callback(rq,
                                              rq->actions[start].key,
                                              &val_buf,
-                                             rq->actions[start].value.data);
+                                             rq->actions[start].data);
                         }
                         break;
 
@@ -519,7 +526,10 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
 
                     case ACTION_FETCH:
                         if (rq->fetch_callback) {
-                            (*rq->fetch_callback)(rq, rq->actions[start].key, &val_buf, rq->actions[start].value.arg);
+                            (*rq->fetch_callback)(rq,
+                                                  rq->actions[start].key,
+                                                  &val_buf,
+                                                  rq->fetch_callback_ctx);
                         }
                         //Do next action on same item in the node, as our action was a fetch
                         //and there may be an equivalent insert or remove
@@ -542,12 +552,14 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
             switch (rq->actions[start].type) {
             case ACTION_INSERT:
                 local_result->modified = 1;
-                mr_push_item(rq->actions[start].key, rq->actions[start].value.data, local_result);
+                mr_push_item(rq->actions[start].key,
+                             rq->actions[start].data,
+                             local_result);
                 if (rq->save_callback && rq->docinfo_callback) {
                     do_save_callback(rq,
                                      rq->actions[start].key,
                                      nullptr,
-                                     rq->actions[start].value.data);
+                                     rq->actions[start].data);
                 }
                 break;
 
@@ -558,7 +570,10 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
             case ACTION_FETCH:
                 if (rq->fetch_callback) {
                     //not found
-                    (*rq->fetch_callback)(rq, rq->actions[start].key, NULL, rq->actions[start].value.arg);
+                    (*rq->fetch_callback)(rq,
+                                          rq->actions[start].key,
+                                          NULL,
+                                          rq->fetch_callback_ctx);
                 }
                 break;
             }

@@ -1320,7 +1320,7 @@ couchstore_error_t couchstore_save_local_document(Db *db, LocalDoc *lDoc)
     }
 
     ldupdate.key = &lDoc->id;
-    ldupdate.value.data = &lDoc->json;
+    ldupdate.data = &lDoc->json;
 
     rq.cmp.compare = ebin_cmp;
     rq.num_actions = 1;

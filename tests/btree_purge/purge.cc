@@ -473,7 +473,7 @@ static node_pointer *insert_items(tree_file *file, node_pointer *root,
         vals[i].buf = (char *) &arr2[i];
 
         acts[i].type = ACTION_INSERT;
-        acts[i].value.data = &vals[i];
+        acts[i].data = &vals[i];
         acts[i].key = &keys[i];
     }
 
@@ -833,7 +833,7 @@ void test_add_remove_purge()
         keys[i].size  = sizeof(int);
         keys[i].buf = (char *) &arr[i];
         acts[i].key = &keys[i];
-        acts[i].value.data = &keys[i];
+        acts[i].data = &keys[i];
     }
 
     purge_rq.actions = acts;
