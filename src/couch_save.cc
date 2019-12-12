@@ -174,8 +174,7 @@ static couchstore_error_t update_indexes(Db* db,
 
     /**
      * Buffer size breakdown (per item) by use order:
-     * 1 x sizeof(couchfile_modify_action) for id tree Fetchs (Compares)
-     * 1 x sizeof(couchfile_modify_action) for id tree Inserts
+     * 1 x sizeof(couchfile_modify_action) for id tree FetchInserts
      *
      * 1 x sizeof(sized_buf) for the delbuf sized_buffer created in
      *     idfetch_update_cb
@@ -186,12 +185,13 @@ static couchstore_error_t update_indexes(Db* db,
      *     the idfetch_update_cb (id tree Fetch callback)
      * 1 x sizeof(couchfile_modify_action) for seq tree Inserts
      */
-    size = 4 * sizeof(couchfile_modify_action) + sizeof(sized_buf) + 6;
+    size = 3 * sizeof(couchfile_modify_action) + sizeof(sized_buf) + 6;
 
     actbuf = fatbuf_alloc(numdocs * size);
     error_unless(actbuf, COUCHSTORE_ERROR_ALLOC_FAIL);
 
-    idacts = static_cast<couchfile_modify_action*>(fatbuf_get(actbuf, numdocs * sizeof(couchfile_modify_action) * 2));
+    idacts = static_cast<couchfile_modify_action*>(
+            fatbuf_get(actbuf, numdocs * sizeof(couchfile_modify_action)));
     seqacts = static_cast<couchfile_modify_action*>(fatbuf_get(actbuf, numdocs * sizeof(couchfile_modify_action) * 2));
     error_unless(idacts && seqacts, COUCHSTORE_ERROR_ALLOC_FAIL);
 
@@ -216,20 +216,18 @@ static couchstore_error_t update_indexes(Db* db,
     for (ii = 0; ii < numdocs; ii++) {
         ptrdiff_t isorted = sorted_ids[ii] - ids;   // recover index of ii'th id in sort order
 
-        idacts[ii * 2].type = ACTION_FETCH;
-        idacts[ii * 2].key = &ids[isorted];
-        idacts[ii * 2 + 1].type = ACTION_INSERT;
-        idacts[ii * 2 + 1].data = &idvals[isorted];
+        idacts[ii].type = ACTION_FETCH_INSERT;
+        idacts[ii].data = &idvals[isorted];
         // Allow the by_id building to find the by_seqno for each id.
         // The save_callback method passes back id and seqno to the caller.
-        idacts[ii * 2 + 1].seq = &seqs[isorted];
-        idacts[ii * 2 + 1].key = &ids[isorted];
+        idacts[ii].seq = &seqs[isorted];
+        idacts[ii].key = &ids[isorted];
     }
 
     idrq.cmp.compare = ebin_cmp;
     idrq.file = &db->file;
     idrq.actions = idacts;
-    idrq.num_actions = numdocs * 2;
+    idrq.num_actions = numdocs;
     idrq.reduce = by_id_reduce;
     idrq.rereduce = by_id_rereduce;
     idrq.fetch_callback = idfetch_update_cb;
