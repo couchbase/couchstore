@@ -4,10 +4,6 @@
 #include "internal.h"
 #include "arena.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // B+tree KV (leaf) node size limit.
 #define DB_KV_CHUNK_THRESHOLD 1279
 // B+tree KP (intermediate) node size limit.
@@ -202,8 +198,5 @@ extern "C" {
                               couchstore_error_t *errcode);
 
     couchfile_modify_result *make_modres(arena* a, couchfile_modify_request *rq);
-#ifdef __cplusplus
-}
-#endif
 
 #endif
