@@ -89,17 +89,17 @@ static int seq_action_compare(const void *actv1, const void *actv2)
 
     uint64_t seq1, seq2;
 
-    seq1 = decode_sequence_key(act1->key);
-    seq2 = decode_sequence_key(act2->key);
+    seq1 = decode_sequence_key(act1->getKey());
+    seq2 = decode_sequence_key(act2->getKey());
 
     if (seq1 < seq2) {
         return -1;
     }
     if (seq1 == seq2) {
-        if (act1->type < act2->type) {
+        if (act1->getType() < act2->getType()) {
             return -1;
         }
-        if (act1->type > act2->type) {
+        if (act1->getType() > act2->getType()) {
             return 1;
         }
         return 0;
@@ -144,9 +144,9 @@ static void idfetch_update_cb(couchfile_modify_request *rq,
     memset(delbuf->buf, 0, 6);
     encode_raw48(oldseq, (raw_48*)delbuf->buf);
 
-    ctx->seqacts[ctx->actpos].type = ACTION_REMOVE;
+    ctx->seqacts[ctx->actpos].setType(ACTION_REMOVE);
     ctx->seqacts[ctx->actpos].data = NULL;
-    ctx->seqacts[ctx->actpos].key = delbuf;
+    ctx->seqacts[ctx->actpos].setKey(delbuf);
 
     ctx->actpos++;
 }
@@ -216,12 +216,12 @@ static couchstore_error_t update_indexes(Db* db,
     for (ii = 0; ii < numdocs; ii++) {
         ptrdiff_t isorted = sorted_ids[ii] - ids;   // recover index of ii'th id in sort order
 
-        idacts[ii].type = ACTION_FETCH_INSERT;
+        idacts[ii].setType(ACTION_FETCH_INSERT);
         idacts[ii].data = &idvals[isorted];
         // Allow the by_id building to find the by_seqno for each id.
         // The save_callback method passes back id and seqno to the caller.
         idacts[ii].seq = &seqs[isorted];
-        idacts[ii].key = &ids[isorted];
+        idacts[ii].setKey(&ids[isorted]);
     }
 
     // Update the by id index
@@ -251,9 +251,9 @@ static couchstore_error_t update_indexes(Db* db,
     // we allocated specifically for seqacts and run into idacts which we no
     // longer need as we have finished processing them.
     while (fetcharg.valpos < numdocs) {
-        seqacts[fetcharg.actpos].type = ACTION_INSERT;
+        seqacts[fetcharg.actpos].setType(ACTION_INSERT);
         seqacts[fetcharg.actpos].data = &seqvals[fetcharg.valpos];
-        seqacts[fetcharg.actpos].key = &seqs[fetcharg.valpos];
+        seqacts[fetcharg.actpos].setKey(&seqs[fetcharg.valpos]);
         fetcharg.valpos++;
         fetcharg.actpos++;
     }

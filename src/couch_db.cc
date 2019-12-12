@@ -1314,12 +1314,12 @@ couchstore_error_t couchstore_save_local_document(Db *db, LocalDoc *lDoc)
     error_unless(!db->dropped, COUCHSTORE_ERROR_FILE_CLOSED);
 
     if (lDoc->deleted) {
-        ldupdate.type = ACTION_REMOVE;
+        ldupdate.setType(ACTION_REMOVE);
     } else {
-        ldupdate.type = ACTION_INSERT;
+        ldupdate.setType(ACTION_INSERT);
     }
 
-    ldupdate.key = &lDoc->id;
+    ldupdate.setKey(&lDoc->id);
     ldupdate.data = &lDoc->json;
 
     rq.cmp.compare = ebin_cmp;
