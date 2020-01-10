@@ -472,9 +472,9 @@ static node_pointer *insert_items(tree_file *file, node_pointer *root,
         vals[i].size = sizeof(int);
         vals[i].buf = (char *) &arr2[i];
 
-        acts[i].type = ACTION_INSERT;
-        acts[i].value.data = &vals[i];
-        acts[i].key = &keys[i];
+        acts[i].setType(ACTION_INSERT);
+        acts[i].data = &vals[i];
+        acts[i].setKey(&keys[i]);
     }
 
     rq.cmp.compare = int_cmp;
@@ -821,19 +821,18 @@ void test_add_remove_purge()
     arr[4] = 200000;
     arr[5] = 500000;
 
-    acts[0].type = ACTION_INSERT;
-    acts[1].type = ACTION_REMOVE;
-    acts[2].type = ACTION_REMOVE;
-    acts[3].type = ACTION_INSERT;
-    acts[4].type = ACTION_REMOVE;
-    acts[5].type = ACTION_INSERT;
-
+    acts[0].setType(ACTION_INSERT);
+    acts[1].setType(ACTION_REMOVE);
+    acts[2].setType(ACTION_REMOVE);
+    acts[3].setType(ACTION_INSERT);
+    acts[4].setType(ACTION_REMOVE);
+    acts[5].setType(ACTION_INSERT);
 
     for (i = 0; i < 6; i++) {
         keys[i].size  = sizeof(int);
         keys[i].buf = (char *) &arr[i];
-        acts[i].key = &keys[i];
-        acts[i].value.data = &keys[i];
+        acts[i].setKey(&keys[i]);
+        acts[i].data = &keys[i];
     }
 
     purge_rq.actions = acts;

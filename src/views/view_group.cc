@@ -1288,9 +1288,9 @@ static couchstore_error_t update_btree(const char *source_file,
         }
 
         /* Add action */
-        actions[rq.num_actions].type = op;
-        actions[rq.num_actions].key = &keybufs[rq.num_actions];
-        actions[rq.num_actions].value.data = &valbufs[rq.num_actions];
+        actions[rq.num_actions].setType(op);
+        actions[rq.num_actions].setKey(&keybufs[rq.num_actions]);
+        actions[rq.num_actions].data = &valbufs[rq.num_actions];
 
         if (inserted && op == ACTION_INSERT) {
             (*inserted)++;

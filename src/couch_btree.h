@@ -1,12 +1,18 @@
 #ifndef COUCH_BTREE_H
 #define COUCH_BTREE_H
-#include <libcouchstore/couch_common.h>
-#include "internal.h"
-#include "arena.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "arena.h"
+#include "internal.h"
+
+// GFlags / Glog: we build it statically, but gflags / glog headers default to
+// defining all public symbols as dllimport which results in linker errors - the
+// compiler is expecting dll(shared) symbols and not static. Explicitly define
+// GFLAGS_DLL_DEFINE_FLAG / GOOGLE_GLOG_DLL_DECL as empty to avoid this.
+# define GOOGLE_GLOG_DLL_DECL
+
+#include <folly/PackedSyncPtr.h>
+
+#include <libcouchstore/couch_common.h>
 
 // B+tree KV (leaf) node size limit.
 #define DB_KV_CHUNK_THRESHOLD 1279
@@ -89,14 +95,29 @@ extern "C" {
 #define ACTION_FETCH  0
 #define ACTION_REMOVE 1
 #define ACTION_INSERT 2
+#define ACTION_FETCH_INSERT 3
 
     typedef struct couchfile_modify_action {
-        int type;
-        sized_buf *key;
-        union _act_value {
-            sized_buf *data;
-            void *arg;
-        } value;
+        uint8_t getType() const {
+            return packedKeyPtr.extra();
+        }
+        sized_buf* getKey() const {
+            return packedKeyPtr.get();
+        }
+
+        void setType(uint8_t t) {
+            packedKeyPtr.setExtra(t);
+        }
+
+        void setKey(sized_buf* k) {
+            packedKeyPtr.set(k);
+        }
+
+        // Packed ptr to allow us to reduce the size of couchfile_modify_action
+        // by 8 bytes as we pack the type into the overhead of the ptr to the
+        // key
+        folly::PackedSyncPtr<sized_buf> packedKeyPtr;
+        sized_buf* data;
         sized_buf* seq;
     } couchfile_modify_action;
 
@@ -135,6 +156,7 @@ extern "C" {
         int num_actions;
         couchfile_modify_action *actions;
         void (*fetch_callback) (struct couchfile_modify_request *rq, sized_buf *k, sized_buf *v, void *arg);
+        void* fetch_callback_ctx;
         reduce_fn reduce;
         reduce_fn rereduce;
         void *user_reduce_ctx;
@@ -203,8 +225,5 @@ extern "C" {
                               couchstore_error_t *errcode);
 
     couchfile_modify_result *make_modres(arena* a, couchfile_modify_request *rq);
-#ifdef __cplusplus
-}
-#endif
 
 #endif
