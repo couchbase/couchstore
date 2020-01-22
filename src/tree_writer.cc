@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 
-#define ID_SORT_CHUNK_SIZE (100 * 1024 * 1024) // 100MB. Make tuneable?
+#define ID_SORT_CHUNK_SIZE (500 * 1024) // max # in memory items in sort run
 #define ID_SORT_MAX_RECORD_SIZE 4196
 
 
