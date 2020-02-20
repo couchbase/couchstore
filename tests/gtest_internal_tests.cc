@@ -300,7 +300,7 @@ TEST_P(PwriteReturnTest, CheckLessPwriteReturn) {
               documents.getCallbacks());
 }
 
-INSTANTIATE_TEST_CASE_P(Parameterised, PwriteReturnTest,
+INSTANTIATE_TEST_SUITE_P(Parameterised, PwriteReturnTest,
                        ::testing::Values(true, false),
                        ::testing::PrintToStringParamName());
 /**
@@ -833,7 +833,7 @@ TEST_P(NewOpenWrite, fail) {
     EXPECT_CALL(ops, pwrite(_, _, _, _, _)).WillOnce(Return(COUCHSTORE_ERROR_WRITE));
     EXPECT_EQ(COUCHSTORE_ERROR_WRITE, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, NewOpenWrite,
+INSTANTIATE_TEST_SUITE_P(Parameterised, NewOpenWrite,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -868,7 +868,7 @@ TEST_P(SaveDocsWrite, fail) {
                                             documents.getDocInfos(), docCount, 0));
     }
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, SaveDocsWrite,
+INSTANTIATE_TEST_SUITE_P(Parameterised, SaveDocsWrite,
                         ::testing::Range(0, 6),
                         ::testing::PrintToStringParamName());
 
@@ -882,7 +882,7 @@ TEST_P(CommitSync, fail) {
         EXPECT_EQ(COUCHSTORE_ERROR_WRITE, couchstore_commit(db));
     }
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, CommitSync,
+INSTANTIATE_TEST_SUITE_P(Parameterised, CommitSync,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -896,7 +896,7 @@ TEST_P(CommitWrite, fail) {
         EXPECT_EQ(COUCHSTORE_ERROR_WRITE, couchstore_commit(db));
     }
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, CommitWrite,
+INSTANTIATE_TEST_SUITE_P(Parameterised, CommitWrite,
                         ::testing::Range(0, 4),
                         ::testing::PrintToStringParamName());
 
@@ -914,7 +914,7 @@ TEST_P(SaveDocWrite, fail) {
                                            documents.getDocInfo(0), 0));
     }
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, SaveDocWrite,
+INSTANTIATE_TEST_SUITE_P(Parameterised, SaveDocWrite,
                         ::testing::Range(0, 6),
                         ::testing::PrintToStringParamName());
 
@@ -933,7 +933,7 @@ TEST_P(DocInfoById, fail) {
 
     }
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, DocInfoById,
+INSTANTIATE_TEST_SUITE_P(Parameterised, DocInfoById,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -953,7 +953,7 @@ TEST_P(DocInfoBySeq, fail) {
     }
     couchstore_free_docinfo(info);
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, DocInfoBySeq,
+INSTANTIATE_TEST_SUITE_P(Parameterised, DocInfoBySeq,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -971,7 +971,7 @@ TEST_P(OpenDocRead, fail) {
                                            &doc, DECOMPRESS_DOC_BODIES));
     }
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, OpenDocRead,
+INSTANTIATE_TEST_SUITE_P(Parameterised, OpenDocRead,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -991,7 +991,7 @@ TEST_P(DocByInfoRead, fail) {
     }
     couchstore_free_docinfo(info);
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, DocByInfoRead,
+INSTANTIATE_TEST_SUITE_P(Parameterised, DocByInfoRead,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -1016,7 +1016,7 @@ TEST_P(ChangesSinceRead, fail) {
     }
     couchstore_free_docinfo(info);
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, ChangesSinceRead,
+INSTANTIATE_TEST_SUITE_P(Parameterised, ChangesSinceRead,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -1037,7 +1037,7 @@ TEST_P(AllDocsRead, fail) {
     }
     couchstore_free_docinfo(info);
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, AllDocsRead,
+INSTANTIATE_TEST_SUITE_P(Parameterised, AllDocsRead,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -1056,7 +1056,7 @@ TEST_P(DocInfosByIdRead, fail) {
 
     }
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, DocInfosByIdRead,
+INSTANTIATE_TEST_SUITE_P(Parameterised, DocInfosByIdRead,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -1077,7 +1077,7 @@ TEST_P(DocInfosBySeqRead, fail) {
     }
     couchstore_free_docinfo(info);
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, DocInfosBySeqRead,
+INSTANTIATE_TEST_SUITE_P(Parameterised, DocInfosBySeqRead,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -1104,7 +1104,7 @@ TEST_P(WalkIdTreeRead, fail) {
     }
     couchstore_free_docinfo(info);
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, WalkIdTreeRead,
+INSTANTIATE_TEST_SUITE_P(Parameterised, WalkIdTreeRead,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -1125,7 +1125,7 @@ TEST_P(WalkSeqTreeRead, fail) {
     }
     couchstore_free_docinfo(info);
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, WalkSeqTreeRead,
+INSTANTIATE_TEST_SUITE_P(Parameterised, WalkSeqTreeRead,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -1143,7 +1143,7 @@ TEST_P(LocalDocFileWrite, fail) {
         EXPECT_EQ(COUCHSTORE_ERROR_WRITE, couchstore_save_local_document(db, &doc));
     }
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, LocalDocFileWrite,
+INSTANTIATE_TEST_SUITE_P(Parameterised, LocalDocFileWrite,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -1166,7 +1166,7 @@ TEST_P(LocalDocFileRead, fail) {
                                                  strlen(&id[0]), &ldoc));
     }
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, LocalDocFileRead,
+INSTANTIATE_TEST_SUITE_P(Parameterised, LocalDocFileRead,
                         ::testing::Range(0, 2),
                         ::testing::PrintToStringParamName());
 
@@ -1184,7 +1184,7 @@ TEST_P(CompactSourceRead, fail) {
 
     }
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, CompactSourceRead,
+INSTANTIATE_TEST_SUITE_P(Parameterised, CompactSourceRead,
                         ::testing::Range(0, 4),
                         ::testing::PrintToStringParamName());
 
@@ -1202,6 +1202,6 @@ TEST_P(CompactTargetWrite, fail) {
 
     }
 }
-INSTANTIATE_TEST_CASE_P(Parameterised, CompactTargetWrite,
+INSTANTIATE_TEST_SUITE_P(Parameterised, CompactTargetWrite,
                         ::testing::Range(0, 6),
                         ::testing::PrintToStringParamName());

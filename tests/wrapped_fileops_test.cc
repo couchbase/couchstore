@@ -52,17 +52,17 @@ typedef testing::Types<TestBufferedFileOps>
 typedef testing::Types<LogOps, testing::NiceMock<MockOps>>
     UnbufferedWrappedOpsImplementations;
 
-INSTANTIATE_TYPED_TEST_CASE_P(CouchstoreOpsTest,
+INSTANTIATE_TYPED_TEST_SUITE_P(CouchstoreOpsTest,
                               WrappedOpsTest,
                               WrappedOpsImplementations
                               );
 
-INSTANTIATE_TYPED_TEST_CASE_P(CouchstoreOpsTest,
+INSTANTIATE_TYPED_TEST_SUITE_P(CouchstoreOpsTest,
                               UnbufferedWrappedOpsTest,
                               UnbufferedWrappedOpsImplementations
                              );
 
-INSTANTIATE_TYPED_TEST_CASE_P(CouchstoreOpsTest,
+INSTANTIATE_TYPED_TEST_SUITE_P(CouchstoreOpsTest,
                               BufferedWrappedOpsTest,
                               BufferedWrappedOpsImplementations
                              );

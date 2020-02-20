@@ -1763,7 +1763,7 @@ TEST_F(CouchstoreTest, mprotect) {
 }
 #endif /* WIN32 */
 
-INSTANTIATE_TEST_CASE_P(DocTest,
+INSTANTIATE_TEST_SUITE_P(DocTest,
                         CouchstoreDoctest,
                         ::testing::Combine(::testing::Bool(), ::testing::Values(4, 69, 666, 4090)),
                         [] (const ::testing::TestParamInfo<std::tuple<bool, int>>& info) {
@@ -1775,7 +1775,7 @@ INSTANTIATE_TEST_CASE_P(DocTest,
 
 
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
         MTLatencyCollectTest,
         CouchstoreMTTest,
         ::testing::Combine(::testing::Values(true, false),

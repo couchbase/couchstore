@@ -99,9 +99,9 @@ template <class T>
 class BufferedWrappedOpsTest : public UnbufferedWrappedOpsTest<T> {
 };
 
-TYPED_TEST_CASE_P(WrappedOpsTest);
-TYPED_TEST_CASE_P(BufferedWrappedOpsTest);
-TYPED_TEST_CASE_P(UnbufferedWrappedOpsTest);
+TYPED_TEST_SUITE_P(WrappedOpsTest);
+TYPED_TEST_SUITE_P(BufferedWrappedOpsTest);
+TYPED_TEST_SUITE_P(UnbufferedWrappedOpsTest);
 
 using namespace testing;
 
@@ -249,15 +249,15 @@ TYPED_TEST_P(BufferedWrappedOpsTest, sync_bufferflush) {
               this->ops.sync(&this->errinfo, this->handle));
 }
 
-REGISTER_TYPED_TEST_CASE_P(
+REGISTER_TYPED_TEST_SUITE_P(
     WrappedOpsTest,
     open, close, pread_single, sync, goto_eof,
     advise, pread_double_cachebuster, pwrite_cachebuster);
 
-REGISTER_TYPED_TEST_CASE_P(
+REGISTER_TYPED_TEST_SUITE_P(
     UnbufferedWrappedOpsTest,
     pread_double_cacheable, pwrite_cacheable);
 
-REGISTER_TYPED_TEST_CASE_P(
+REGISTER_TYPED_TEST_SUITE_P(
     BufferedWrappedOpsTest,
     sync_bufferflush);
