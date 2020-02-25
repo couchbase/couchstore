@@ -137,8 +137,7 @@ ADD_EXECUTABLE(couch_dbdump
                src/dbdump.cc
                src/tracking_file_ops.cc
                $<TARGET_OBJECTS:couchstore_objs>
-               $<TARGET_OBJECTS:couchstore_view_objs>
-               ${KVEngineAPI_BINARY_DIR}/xattr/visibility.h)
+               $<TARGET_OBJECTS:couchstore_view_objs>)
 
 SET_TARGET_PROPERTIES(couch_dbdump PROPERTIES COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
 TARGET_INCLUDE_DIRECTORIES(couch_dbdump
