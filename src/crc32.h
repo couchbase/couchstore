@@ -25,7 +25,8 @@
 
 #pragma once
 
-#include <sys/types.h>
+#include <cstddef>
+#include <cstdint>
 
 typedef enum {
     CRC_UNKNOWN,

@@ -20,10 +20,15 @@
 // couchstore files.
 //
 
+#include "crc32.h"
 #include <getopt.h>
 #include <inttypes.h>
+#include <mcbp/protocol/unsigned_leb128.h>
+#include <nlohmann/json.hpp>
+#include <platform/socket.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <climits>
@@ -40,7 +45,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "crc32.h"
 
 #include "libcouchstore/couch_db.h"
 
@@ -71,6 +75,7 @@ public:
     static const bool low_compression_default = false;
     static const DocType doc_type_default = BINARY_DOC_COMPRESSED;
     static const int flusher_count_default = 8;
+    static const uint32_t collection_id_default = 0;
 
     //
     // Construct a program parameters, all parameters assigned default settings
@@ -104,6 +109,8 @@ public:
                     {"doc-type", required_argument, 0, 't'},
                     {"start-key", required_argument, 0, 's'},
                     {"low-compression", no_argument, 0, 'l'},
+                    {"no-namespace", no_argument, 0, 'n'},
+                    {"namespace-id", required_argument, 0, 'i'},
                     {0, 0, 0, 0}};
             /* getopt_long stores the option index here. */
             int option_index = 0;
@@ -164,6 +171,14 @@ public:
 
             case KEYS_PER_VBUCKET: {
                 keys_per_vbucket = true;
+                break;
+            }
+            case 'n': {
+                namespaced = false;
+                break;
+            }
+            case 'i': {
+                collection_id = atoi(optarg);
                 break;
             }
 
@@ -312,6 +327,14 @@ public:
         return flusher_count;
     }
 
+    bool is_namespaced() const {
+        return namespaced;
+    }
+
+    uint32_t get_collection_id() const {
+        return collection_id;
+    }
+
     static void usage(int exit_code) {
         std::cerr << std::endl;
         std::cerr << "couch_create <options> <vbucket list>" << std::endl;
@@ -346,6 +369,11 @@ public:
         std::cerr << "    --low-compression,-l: Generate documents that don't "
                      "compress well (default "
                   << low_compression_default << ")." << std::endl;
+        std::cerr << "    --no-namespace: Don't namespace the file"
+                  << std::endl;
+        std::cerr << "    --namespace-id: Set the ID to use for namespace. "
+                     "(default "
+                  << collection_id_default << ")" << std::endl;
 
         std::cerr << std::endl
                   << "vbucket list (optional space separated values):"
@@ -434,6 +462,8 @@ private:
     uint64_t start_key;
     bool low_compression;
     int flusher_count;
+    bool namespaced{true};
+    uint32_t collection_id{collection_id_default};
 };
 
 //
@@ -442,16 +472,14 @@ private:
 class Document {
     class Meta {
     public:
-        // Create the meta, cas is a millisecond timestamp
-        Meta(std::chrono::time_point<std::chrono::high_resolution_clock>
-                     casTime,
-             uint32_t e,
-             uint32_t f)
-            : cas(std::chrono::duration_cast<std::chrono::microseconds>(
-                          casTime.time_since_epoch())
-                          .count() &
-                  0xFFFF),
-              exptime(e),
+        /// @param e expiry time
+        /// @param f flags
+        Meta(uint32_t e, uint32_t f)
+            : cas(htonll(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                 std::chrono::system_clock::now()
+                                         .time_since_epoch())
+                                 .count())),
+              exptime(htonl(e)),
               flags(f),
               flex_meta_code(0x01),
               flex_value(0x0) {
@@ -481,7 +509,7 @@ class Document {
 
 public:
     Document(const char* k, int klen, ProgramParameters& params, int dlen)
-        : meta(std::chrono::high_resolution_clock::now(), 0, 0),
+        : meta(0, 0),
           key_len(klen),
           key(NULL),
           data_len(dlen),
@@ -695,7 +723,6 @@ public:
     // Set the special vbstate document
     //
     void set_vbstate() {
-        std::stringstream jsonState;
         std::string state_string;
         if (got_vbstate) {
             if (vbstate_data.find("replica") != std::string::npos) {
@@ -710,28 +737,29 @@ public:
         }
 
         // Set max_cas to a timestamp
-        uint64_t max_cas =
-                std::chrono::duration_cast<std::chrono::microseconds>(
-                        std::chrono::high_resolution_clock::now()
-                                .time_since_epoch())
-                        .count() &
-                0xFFFF;
+        auto now = std::chrono::system_clock::now();
+        auto max_cas = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                               now.time_since_epoch())
+                               .count();
 
-        jsonState << "{\"state\": \"" << state_string << "\""
-                  << ",\"checkpoint_id\": \"0\""
-                  << ",\"max_deleted_seqno\": \"0\""
-                  << ",\"snap_start\": \"" << vb_seq << "\""
-                  << ",\"snap_end\": \"" << vb_seq << "\""
-                  << ",\"max_cas\": \"" << max_cas << "\""
-                  << ",\"drift_counter\": \"0\""
-                  << "}";
-
-        auto vbstate_json = jsonState.str();
+        // looks like an upgrade from '6.0' to 6.5
+        auto json = nlohmann::json{
+                {"state", state_string},
+                {"max_deleted_seqno", "0"},
+                {"high_seqno", std::to_string(vb_seq)},
+                {"purge_seqno", "0"},
+                {"snap_start", std::to_string(vb_seq)},
+                {"snap_end", std::to_string(vb_seq)},
+                {"max_cas", std::to_string(max_cas)},
+                {"hlc_epoch", "0"},
+                {"might_contain_xattrs", false},
+                {"namespaces_supported", params.is_namespaced()}};
+        auto jsonState = json.dump();
         LocalDoc vbstate;
         vbstate.id.buf = (char*)"_local/vbstate";
         vbstate.id.size = sizeof("_local/vbstate") - 1;
-        vbstate.json.buf = (char*)vbstate_json.c_str();
-        vbstate.json.size = vbstate_json.size();
+        vbstate.json.buf = (char*)jsonState.c_str();
+        vbstate.json.size = jsonState.size();
         vbstate.deleted = 0;
 
         couchstore_error_t errCode =
@@ -864,7 +892,8 @@ private:
 
         bool start_counting_vbuckets = false;
 
-        char key[64];
+        cb::mcbp::unsigned_leb128<uint32_t> collectionId(
+                parameters.get_collection_id());
         uint64_t key_max = parameters.is_keys_per_vbucket()
                                    ? ULLONG_MAX
                                    : parameters.get_key_count();
@@ -874,10 +903,23 @@ private:
         for (uint64_t ii = parameters.get_start_key();
              ii < (key_max + parameters.get_start_key());
              ii++) {
-            int key_len = snprintf(key, 64, "K%020" PRId64, key_value);
-            int vbid = client_hash_crc32(reinterpret_cast<const uint8_t*>(key),
-                                         key_len) %
+            std::string documentKey;
+            documentKey.reserve(64);
+            if (parameters.is_namespaced()) {
+                std::copy(collectionId.begin(),
+                          collectionId.end(),
+                          back_inserter(documentKey));
+            }
+
+            char logicalKey[64];
+            int logicalKeyLen =
+                    snprintf(logicalKey, 64, "K%020" PRId64, key_value);
+            int vbid = client_hash_crc32(
+                               reinterpret_cast<const uint8_t*>(logicalKey),
+                               logicalKeyLen) %
                        (parameters.get_vbc());
+
+            documentKey.append(logicalKey);
 
             // Only if the vbucket is managed generate the doc
             if (my_vbuckets.count(vbid) > 0 &&
@@ -901,8 +943,9 @@ private:
 
                 // if there's now a handle, go for it
                 if (vb_handles[vbid] != nullptr) {
-                    vb_handles[vbid]->add_doc(
-                            key, key_len, parameters.get_doc_len());
+                    vb_handles[vbid]->add_doc(documentKey.data(),
+                                              documentKey.size(),
+                                              parameters.get_doc_len());
 
                     // If we're generating keys per vbucket, stop managing this
                     // vbucket when we've it the limit
