@@ -1101,25 +1101,26 @@ int main(int argc, char **argv)
     }
 
     while (ii < argc && strncmp(argv[ii], "-", 1) == 0) {
-        if (strcmp(argv[ii], "--view") == 0) {
+        std::string_view command{argv[ii]};
+        if (command == "--view") {
             decodeIndex = true;
-        } else if (strcmp(argv[ii], "--vbucket") == 0) {
+        } else if (command == "--vbucket") {
             decodeVbucket = true;
-        } else if (strcmp(argv[ii], "--byid") == 0) {
+        } else if (command == "--byid") {
             mode = DumpByID;
-        } else if (strcmp(argv[ii], "--byseq") == 0) {
+        } else if (command == "--byseq") {
             mode = DumpBySequence;
-        } else if (strcmp(argv[ii], "--tree") == 0) {
+        } else if (command == "--tree") {
             dumpTree = true;
-        } else if (strcmp(argv[ii], "--json") == 0) {
+        } else if (command == "--json") {
             dumpJson = true;
-        } else if (strcmp(argv[ii], "--hex-body") == 0) {
+        } else if (command == "--hex-body") {
             dumpHex = true;
-        } else if (strcmp(argv[ii], "--no-body") == 0) {
+        } else if (command == "--no-body") {
             dumpBody = false;
-        } else if (strcmp(argv[ii], "--no-namespace") == 0) {
+        } else if (command == "--no-namespace") {
             decodeNamespace = false;
-        } else if (strcmp(argv[ii], "--key") == 0) {
+        } else if (command == "--key") {
             if (argc < (ii + 1)) {
                 usage();
             }
@@ -1130,11 +1131,11 @@ int main(int argc, char **argv)
                 mode = DumpByID;
             }
             ii++;
-        } else if (strcmp(argv[ii], "--local") == 0) {
+        } else if (command == "--local") {
             mode = DumpLocals;
-        } else if (strcmp(argv[ii], "--map") == 0) {
+        } else if (command == "--map") {
             mode = DumpFileMap;
-        } else if (strcmp(argv[ii], "--iterate-headers") == 0) {
+        } else if (command == "--iterate-headers") {
             iterateHeaders = true;
         } else {
             usage();
