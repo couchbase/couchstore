@@ -50,8 +50,12 @@ static int process_file(const char *file, int iterate_headers)
         return -1;
     }
 
+    printf("DB Info (%s) - total disk size: %s\n\n",
+           file,
+           size_str(db->file.pos));
+
 next_header:
-    printf("DB Info (%s) - header at %" PRIu64 "\n", file, db->header.position);
+    printf("Header at file offset %" PRIu64 "\n", db->header.position);
     printf("   file format version: %" PRIu64 "\n", db->header.disk_version);
     printf("   update_seq: %" PRIu64 "\n", db->header.update_seq);
     printf("   purge_seq: %" PRIu64 "\n", db->header.purge_seq);
@@ -63,7 +67,6 @@ next_header:
     }
 
     print_db_info(db);
-
     const auto id_tree_size =
             db->header.by_id_root ? db->header.by_id_root->subtreesize : 0;
     const auto seqno_tree_size =
@@ -77,7 +80,6 @@ next_header:
     printf("   └── by-id tree:    %s\n", size_str(id_tree_size));
     printf("   └── by-seqno tree: %s\n", size_str(seqno_tree_size));
     printf("   └── local size:    %s\n", size_str(local_tree_size));
-    printf("   total disk size:   %s\n", size_str(db->file.pos));
     if (iterate_headers) {
         if (couchstore_rewind_db_header(db) == COUCHSTORE_SUCCESS) {
             printf("\n");
