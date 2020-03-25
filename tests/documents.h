@@ -167,3 +167,6 @@ private:
     int callbacks;
     int position;
 };
+
+/// Convenience function to convert a size_buf to std::string.
+std::string to_string(sized_buf buf);

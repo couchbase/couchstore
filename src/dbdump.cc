@@ -560,15 +560,27 @@ static int visit_node(Db *db,
         /* This is a tree node: */
         printf("+ (%" PRIu64 ") ", subtreeSize);
         printsbhex(reduceValue, 0);
-    } else if ((docinfo->bp > 0) || (docinfo->bp == 0 && docinfo->deleted)) {
+        return 0;
+    }
+
+    // This is a leaf node.
+    const auto key = docinfo->id;
+    if ((docinfo->bp > 0) || (docinfo->bp == 0 && docinfo->deleted) ||
+            (mode == DumpLocals)) {
         int *count;
-        /* This is a document: */
-        printf("%c (%" PRIu64 ") ", (docinfo->deleted ? 'x' : '*'),
-               (uint64_t)docinfo->physical_size);
+        /* This is a document / local document: */
+        printf("%c (%" PRIu64 ",%" PRIu64 ") ",
+               (docinfo->deleted ? 'x' : '*'),
+               uint64_t(docinfo->physical_size), uint64_t(docinfo->rev_meta.size));
         if (mode == DumpBySequence) {
             printf("#%" PRIu64 " ", docinfo->db_seq);
         }
-        printDocId(" id:", &docinfo->id);
+        if (mode == DumpLocals) {
+            // Local doc has no collections prefix
+            printf(" id:%.*s\n", int(key.size), key.buf);
+        } else {
+            printDocId(" id:", &key);
+        }
 
         count = (int *) ctx;
         (*count)++;
@@ -886,7 +898,12 @@ next_header:
         }
         break;
     case DumpLocals:
-        if (dumpJson) {
+        if (dumpTree) {
+            errcode = couchstore_walk_local_tree(db,
+                                              NULL,
+                                              visit_node,
+                                              &count);
+        } else if (dumpJson) {
             errcode = couchstore_print_local_docs(
                     db, local_doc_print_json, &count);
         } else {
@@ -1113,7 +1130,7 @@ static void usage(void) {
     printf("    --header-offset <offset> Use the header at file offset\n");
     printf("\nAlternate modes:\n");
     printf("    --tree       show file b-tree structure instead of data\n");
-    printf("    --local      dump local documents\n");
+    printf("    --local      dump local documents. Can be used in conjunction with --tree\n");
     printf("    --map        dump block map \n");
     exit(EXIT_FAILURE);
 }
@@ -1185,7 +1202,7 @@ int main(int argc, char **argv)
         ++ii;
     }
 
-    if (ii >= argc || (mode == DumpLocals && dumpTree)) {
+    if (ii >= argc) {
         usage();
     }
 

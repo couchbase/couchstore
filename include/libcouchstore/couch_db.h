@@ -701,6 +701,31 @@ extern "C" {
                                                 couchstore_walk_tree_callback_fn callback,
                                                 void *ctx);
 
+    /**
+     * Iterate through the local B-tree, including interior and leaf nodes as
+     * well as documents.
+     *
+     * The iteration is depth-first, in order by local document ID. The
+     * callback is invoked on a tree node before its children. The first call
+     * is for the root node.
+     *
+     * This is only useful for tools that want to examine the B-tree structure
+     * or reduced values, such as couch_dbdump. It's unlikely that
+     * applications will need to use it.
+     *
+     * @param db the database to iterate through
+     * @param startLocalID  The key to start at, or NULL to start from the beginning
+     * @param callback the callback function used to iterate over all documents
+     * @param ctx client context (passed to the callback)
+     * @return COUCHSTORE_SUCCESS upon success
+     */
+    LIBCOUCHSTORE_API
+    couchstore_error_t couchstore_walk_local_tree(
+            Db* db,
+            const sized_buf* startLocalID,
+            couchstore_walk_tree_callback_fn callback,
+            void* ctx);
+
     /*////////////////////  LOCAL DOCUMENTS: */
 
     /**

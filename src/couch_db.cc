@@ -666,6 +666,19 @@ couchstore_error_t by_id_read_docinfo(DocInfo** pInfo,
     return COUCHSTORE_SUCCESS;
 }
 
+couchstore_error_t local_read_docinfo(DocInfo** pInfo,
+                                      const sized_buf* k,
+                                      const sized_buf* v) {
+    DocInfo* docInfo = couchstore_alloc_docinfo(k, nullptr);
+    if (!docInfo) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
+
+    docInfo->physical_size = v->size;
+    *pInfo = docInfo;
+    return COUCHSTORE_SUCCESS;
+}
+
 //Fill in doc from reading file.
 static couchstore_error_t bp_to_doc(Doc **pDoc, Db *db, cs_off_t bp, couchstore_open_options options)
 {
@@ -861,11 +874,12 @@ cleanup:
 
 // context info passed to lookup_callback via btree_lookup
 typedef struct {
+    enum class Tree { ById, BySeqno, Local};
     Db *db;
     couchstore_docinfos_options options;
     couchstore_changes_callback_fn callback;
     void* callback_context;
-    int by_id;
+    Tree tree;
     int depth;
     couchstore_walk_tree_callback_fn walk_callback;
 } lookup_context;
@@ -881,11 +895,17 @@ static couchstore_error_t lookup_callback(couchfile_lookup_request *rq,
 
     const lookup_context *context = static_cast<const lookup_context *>(rq->callback_ctx);
     DocInfo *docinfo = NULL;
-    couchstore_error_t errcode;
-    if (context->by_id) {
+    couchstore_error_t errcode = COUCHSTORE_SUCCESS;
+    switch (context->tree) {
+    case lookup_context::Tree::ById:
         errcode = by_id_read_docinfo(&docinfo, k, v);
-    } else {
+        break;
+    case lookup_context::Tree::BySeqno:
         errcode = by_seq_read_docinfo(&docinfo, k, v);
+        break;
+    case lookup_context::Tree::Local:
+        errcode = local_read_docinfo(&docinfo, k, v);
+        break;
     }
     if (errcode == COUCHSTORE_ERROR_CORRUPT &&
         (context->options & COUCHSTORE_TOLERATE_CORRUPTION)) {
@@ -939,7 +959,8 @@ couchstore_error_t couchstore_changes_since(Db *db,
     char since_termbuf[6];
     sized_buf since_term;
     sized_buf *keylist = &since_term;
-    lookup_context cbctx = {db, options, callback, ctx, 0, 0, NULL};
+    lookup_context cbctx = {
+            db, options, callback, ctx, lookup_context::Tree::BySeqno, 0, NULL};
     couchfile_lookup_request rq;
     couchstore_error_t errcode;
 
@@ -977,7 +998,7 @@ couchstore_error_t couchstore_all_docs(Db *db,
 
     sized_buf startKey = {NULL, 0};
     sized_buf *keylist = &startKey;
-    lookup_context cbctx = {db, options, callback, ctx, 1, 0, NULL};
+    lookup_context cbctx = {db, options, callback, ctx, lookup_context::Tree::ById, 0, NULL};
     couchfile_lookup_request rq;
     couchstore_error_t errcode;
 
@@ -1028,7 +1049,7 @@ static couchstore_error_t walk_node_callback(struct couchfile_lookup_request *rq
 
 static
 couchstore_error_t couchstore_walk_tree(Db *db,
-                                        int by_id,
+                                        lookup_context::Tree tree,
                                         const node_pointer* root,
                                         const sized_buf* startKeyPtr,
                                         couchstore_docinfos_options options,
@@ -1064,7 +1085,7 @@ couchstore_error_t couchstore_walk_tree(Db *db,
         // Create a new scope here just to mute the warning from the
         // compiler that the goto in the macro error_unless
         // skips the initialization of lookup_ctx..
-        lookup_context lookup_ctx = {db, options, NULL, ctx, by_id, 1, callback};
+        lookup_context lookup_ctx = {db, options, NULL, ctx, tree, 1, callback};
 
         rq.cmp.compare = compare;
         rq.file = &db->file;
@@ -1090,7 +1111,7 @@ couchstore_error_t couchstore_walk_id_tree(Db *db,
 {
     COLLECT_LATENCY();
 
-    return couchstore_walk_tree(db, 1, db->header.by_id_root, startDocID,
+    return couchstore_walk_tree(db, lookup_context::Tree::ById, db->header.by_id_root, startDocID,
                                 options, ebin_cmp, callback, ctx);
 }
 
@@ -1106,8 +1127,25 @@ couchstore_error_t couchstore_walk_seq_tree(Db *db,
     encode_raw48(startSequence, &start_termbuf);
     sized_buf start_term = {(char*)&start_termbuf, 6};
 
-    return couchstore_walk_tree(db, 0, db->header.by_seq_root, &start_term,
+    return couchstore_walk_tree(db, lookup_context::Tree::BySeqno, db->header.by_seq_root, &start_term,
                                 options, seq_cmp, callback, ctx);
+}
+
+couchstore_error_t couchstore_walk_local_tree(
+        Db* db,
+        const sized_buf* startLocalID,
+        couchstore_walk_tree_callback_fn callback,
+        void* ctx) {
+    COLLECT_LATENCY();
+
+    return couchstore_walk_tree(db,
+                                lookup_context::Tree::Local,
+                                db->header.local_docs_root,
+                                startLocalID,
+                                {},
+                                ebin_cmp,
+                                callback,
+                                ctx);
 }
 
 static int id_ptr_cmp(const void *a, const void *b)
@@ -1163,7 +1201,10 @@ static couchstore_error_t iterate_docinfos(Db *db,
         }
 
         // Construct the lookup request:
-        lookup_context cbctx = {db, 0, callback, ctx, (tree == db->header.by_id_root), 0, NULL};
+        const auto treeType = (tree == db->header.by_id_root)
+                                      ? lookup_context::Tree::ById
+                                      : lookup_context::Tree::BySeqno;
+        lookup_context cbctx = {db, 0, callback, ctx, treeType, 0, NULL};
         couchfile_lookup_request rq;
         rq.cmp.compare = key_compare;
         rq.file = &db->file;

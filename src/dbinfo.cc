@@ -39,7 +39,6 @@ static int process_file(const char *file, int iterate_headers)
 {
     Db *db;
     couchstore_error_t errcode;
-    uint64_t btreesize = 0;
     const char* crc_strings[3] = {"warning crc is set to unknown",
                                   "CRC-32",
                                   "CRC-32C"};
@@ -64,14 +63,21 @@ next_header:
     }
 
     print_db_info(db);
-    if (db->header.by_id_root) {
-        btreesize += db->header.by_id_root->subtreesize;
-    }
-    if (db->header.by_seq_root) {
-        btreesize += db->header.by_seq_root->subtreesize;
-    }
-    printf("   B-tree size: %s\n", size_str(btreesize));
-    printf("   total disk size: %s\n", size_str(db->file.pos));
+
+    const auto id_tree_size =
+            db->header.by_id_root ? db->header.by_id_root->subtreesize : 0;
+    const auto seqno_tree_size =
+            db->header.by_seq_root ? db->header.by_seq_root->subtreesize : 0;
+    const auto local_tree_size =
+            db->header.local_docs_root ? db->header.local_docs_root->subtreesize
+                                       : 0;
+    const auto btreesize = id_tree_size + seqno_tree_size + local_tree_size;
+
+    printf("   B-tree size:       %s\n", size_str(btreesize));
+    printf("   └── by-id tree:    %s\n", size_str(id_tree_size));
+    printf("   └── by-seqno tree: %s\n", size_str(seqno_tree_size));
+    printf("   └── local size:    %s\n", size_str(local_tree_size));
+    printf("   total disk size:   %s\n", size_str(db->file.pos));
     if (iterate_headers) {
         if (couchstore_rewind_db_header(db) == COUCHSTORE_SUCCESS) {
             printf("\n");

@@ -23,7 +23,7 @@
 #include <cstring>
 #include <random>
 
-static std::string to_string(sized_buf buf) {
+std::string to_string(sized_buf buf) {
     return std::string(buf.buf, buf.size);
 }
 
