@@ -8,6 +8,8 @@
 #include <libcouchstore/file_ops.h>
 
 #ifdef __cplusplus
+#include <nlohmann/json_fwd.hpp>
+
 extern "C" {
 #endif
 
@@ -920,5 +922,31 @@ extern "C" {
 
 #ifdef __cplusplus
 }
+
+namespace cb {
+namespace couchstore {
+/**
+ * Get the "current" file header
+ *
+ * @param db The database instance to use
+ * @return a JSON representation of the header (to make it work without
+ *         having to create a schema..
+ */
+LIBCOUCHSTORE_API
+nlohmann::json getFileHeader(Db& db);
+
+/**
+ * Seek and load the database at the header at the given offset
+ *
+ * @param db The database instance to use
+ * @param offset The location in the file of the new header to use
+ * @return COUCHSTORE_SUCCESS upon success, otherwise the database will
+ *         be closed and an error returned
+ */
+LIBCOUCHSTORE_API
+couchstore_error_t seek(Db& db, cs_off_t offset);
+} // namespace couchstore
+} // namespace cb
+
 #endif
 #endif

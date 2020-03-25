@@ -10,6 +10,7 @@
  */
 #include <libcouchstore/couch_db.h>
 #include "crc32.h"
+#include <platform/cb_malloc.h>
 
 #define COUCH_BLOCK_SIZE 4096
 #define COUCH_DISK_VERSION_11 11
@@ -105,6 +106,14 @@ extern "C" {
         uint64_t purge_seq;
         uint64_t purge_ptr;
         uint64_t position;
+        void reset() {
+            cb_free(by_id_root);
+            cb_free(by_seq_root);
+            cb_free(local_docs_root);
+            by_id_root = nullptr;
+            by_seq_root = nullptr;
+            local_docs_root = nullptr;
+        }
     } db_header;
 
     struct _db {

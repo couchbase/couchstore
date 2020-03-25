@@ -19,18 +19,20 @@
 
 #include <assert.h>
 #include <fcntl.h>
+#include <nlohmann/json.hpp>
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
 #include <platform/platform_socket.h>
+#include <platform/string_hex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstddef>
 #include <string>
 
+#include "bitfield.h"
+#include "couch_btree.h"
 #include "internal.h"
 #include "node_types.h"
-#include "couch_btree.h"
-#include "bitfield.h"
 #include "reduces.h"
 #include "util.h"
 
@@ -118,6 +120,16 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
 cleanup:
     cb_free(header_buf.raw);
     return errcode;
+}
+
+nlohmann::json cb::couchstore::getFileHeader(Db &db) {
+    nlohmann::json ret;
+    ret["version"] = db.header.disk_version;
+    ret["update_seq"] = db.header.update_seq;
+    ret["purge_seq"] = db.header.purge_seq;
+    ret["purge_ptr"] = db.header.purge_ptr;
+    ret["offset"] = cb::to_hex(couchstore_get_header_position(&db));
+    return ret;
 }
 
 // Finds the database header by scanning back from the end of the file at 4k boundaries
@@ -473,13 +485,7 @@ couchstore_error_t couchstore_rewind_db_header(Db *db)
     couchstore_error_t errcode;
     error_unless(!db->dropped, COUCHSTORE_ERROR_FILE_CLOSED);
     // free current header guts
-    cb_free(db->header.by_id_root);
-    cb_free(db->header.by_seq_root);
-    cb_free(db->header.local_docs_root);
-    db->header.by_id_root = NULL;
-    db->header.by_seq_root = NULL;
-    db->header.local_docs_root = NULL;
-
+    db->header.reset();
     error_unless(db->header.position != 0, COUCHSTORE_ERROR_DB_NO_LONGER_VALID);
     // find older header
     error_pass(find_header(db, db->header.position - 2));
@@ -489,6 +495,25 @@ cleanup:
     if(errcode != COUCHSTORE_SUCCESS) {
         couchstore_close_file(db);
         couchstore_free_db(db);
+        errcode = COUCHSTORE_ERROR_DB_NO_LONGER_VALID;
+    }
+    return errcode;
+}
+
+couchstore_error_t cb::couchstore::seek(Db& db, cs_off_t offset) {
+    COLLECT_LATENCY();
+
+    couchstore_error_t errcode;
+    error_unless(!db.dropped, COUCHSTORE_ERROR_FILE_CLOSED);
+    // free current header guts
+    db.header.reset();
+    error_pass(find_header_at_pos(&db, offset));
+
+cleanup:
+    // if we failed, free the handle and return an error
+    if (errcode != COUCHSTORE_SUCCESS) {
+        couchstore_close_file(&db);
+        couchstore_free_db(&db);
         errcode = COUCHSTORE_ERROR_DB_NO_LONGER_VALID;
     }
     return errcode;

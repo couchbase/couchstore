@@ -30,6 +30,7 @@
 #include <xattr/blob.h>
 #include <xattr/utils.h>
 
+#include <platform/string_hex.h>
 #include <iostream>
 
 #define MAX_HEADER_SIZE (64 * 1024)
@@ -51,6 +52,8 @@ static bool decodeVbucket = true;
 static bool decodeIndex = false;
 static bool decodeNamespace = true;
 static bool iterateHeaders = false;
+static bool dumpHeaders = false;
+static boost::optional<cs_off_t> headerOffset;
 static sized_buf dumpKey;
 
 typedef struct {
@@ -824,11 +827,34 @@ static int process_vbucket_file(const char *file, int *total)
         fprintf(stderr, "Failed to open \"%s\": %s\n",
                 file, couchstore_strerror(errcode));
         return -1;
-    } else {
-        printf("Dumping \"%s\":\n", file);
     }
 
+    if (headerOffset) {
+        errcode = cb::couchstore::seek(*db, headerOffset.get());
+        if (errcode != COUCHSTORE_SUCCESS) {
+            fprintf(stderr,
+                    "Failed to open \"%s\" at offset 0x%" PRIx64 ": %s\n",
+                    file,
+                    headerOffset.get(),
+                    couchstore_strerror(errcode));
+            return -1;
+        }
+    }
+
+    printf("Dumping \"%s\":\n", file);
+
 next_header:
+    if (dumpHeaders) {
+        try {
+            const auto header = cb::couchstore::getFileHeader(*db).dump();
+            printf("File header: %s\n", header.c_str());
+        } catch (const std::exception& ex) {
+            fprintf(stderr, "Failed to fetch database header information: %s\n",
+                   ex.what());
+            return -1;
+        }
+    }
+
     switch (mode) {
     case DumpBySequence:
         if (dumpTree) {
@@ -1083,6 +1109,8 @@ static void usage(void) {
     printf("    --json       dump data as JSON objects (one per line)\n");
     printf("    --no-namespace  don't decode namespaces\n");
     printf("    --iterate-headers  Iterate through all headers\n");
+    printf("    --dump-headers  Dump the file header structure\n");
+    printf("    --header-offset <offset> Use the header at file offset\n");
     printf("\nAlternate modes:\n");
     printf("    --tree       show file b-tree structure instead of data\n");
     printf("    --local      dump local documents\n");
@@ -1137,6 +1165,20 @@ int main(int argc, char **argv)
             mode = DumpFileMap;
         } else if (command == "--iterate-headers") {
             iterateHeaders = true;
+        } else if (command == "--dump-headers") {
+            dumpHeaders = true;
+        } else if (command == "--header-offset") {
+            // read the header offset
+            if (argc < (ii + 1)) {
+                usage();
+            }
+            const std::string number{argv[ii + 1]};
+            if (number.find("0x") == 0) {
+                headerOffset.reset(cb::from_hex(number));
+            } else {
+                headerOffset.reset(std::stoull(number));
+            }
+            ii++;
         } else {
             usage();
         }
