@@ -159,7 +159,7 @@ ADD_EXECUTABLE(couch_dbinfo src/dbinfo.cc)
 TARGET_LINK_LIBRARIES(couch_dbinfo couchstore platform)
 
 ADD_EXECUTABLE(couch_compact src/compactor.cc)
-TARGET_LINK_LIBRARIES(couch_compact couchstore)
+TARGET_LINK_LIBRARIES(couch_compact couchstore platform)
 
 ADD_EXECUTABLE(couch_view_file_merger src/views/bin/couch_view_file_merger.cc src/views/bin/util.cc)
 TARGET_LINK_LIBRARIES(couch_view_file_merger couchstore_views dirutils)
