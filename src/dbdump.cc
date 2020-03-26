@@ -29,9 +29,10 @@
 #include <unistd.h>
 #include <xattr/blob.h>
 #include <xattr/utils.h>
-
 #include <platform/string_hex.h>
+
 #include <iostream>
+#include <optional>
 
 #define MAX_HEADER_SIZE (64 * 1024)
 
@@ -53,7 +54,7 @@ static bool decodeIndex = false;
 static bool decodeNamespace = true;
 static bool iterateHeaders = false;
 static bool dumpHeaders = false;
-static boost::optional<cs_off_t> headerOffset;
+static std::optional<cs_off_t> headerOffset;
 static sized_buf dumpKey;
 
 typedef struct {
@@ -842,12 +843,12 @@ static int process_vbucket_file(const char *file, int *total)
     }
 
     if (headerOffset) {
-        errcode = cb::couchstore::seek(*db, headerOffset.get());
+        errcode = cb::couchstore::seek(*db, *headerOffset);
         if (errcode != COUCHSTORE_SUCCESS) {
             fprintf(stderr,
                     "Failed to open \"%s\" at offset 0x%" PRIx64 ": %s\n",
                     file,
-                    headerOffset.get(),
+                    *headerOffset,
                     couchstore_strerror(errcode));
             return -1;
         }
@@ -1191,9 +1192,9 @@ int main(int argc, char **argv)
             }
             const std::string number{argv[ii + 1]};
             if (number.find("0x") == 0) {
-                headerOffset.reset(cb::from_hex(number));
+                headerOffset = cb::from_hex(number);
             } else {
-                headerOffset.reset(std::stoull(number));
+                headerOffset = std::stoull(number);
             }
             ii++;
         } else {
