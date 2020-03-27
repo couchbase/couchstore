@@ -327,6 +327,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                    tests/couchstoretest.cc
                    tests/documents.cc
                    tests/gtest_tests.cc
+                   tests/test_cxx_util.cc
                    tests/test_fileops.cc
                    src/node_types.cc
                    src/crc32.cc
@@ -334,7 +335,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
     SET_TARGET_PROPERTIES(couchstore_gtest PROPERTIES
                           COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
     TARGET_INCLUDE_DIRECTORIES(couchstore_gtest PRIVATE ${COUCHSTORE_GTEST_INCLUDES})
-    TARGET_LINK_LIBRARIES(couchstore_gtest couchstore ${COUCHSTORE_GTEST_LIBRARIES})
+    TARGET_LINK_LIBRARIES(couchstore_gtest couchstore dirutils ${COUCHSTORE_GTEST_LIBRARIES})
 
     ADD_EXECUTABLE(couchstore_internal_gtest
                    tests/couchstoretest.cc

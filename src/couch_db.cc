@@ -520,6 +520,45 @@ cleanup:
     return errcode;
 }
 
+static couchstore_error_t couchstore_fastforward_db_header(Db* db) {
+    COLLECT_LATENCY();
+
+    auto pos = db->header.position + COUCH_BLOCK_SIZE;
+    couchstore_error_t errcode;
+    error_unless(!db->dropped, COUCHSTORE_ERROR_FILE_CLOSED);
+    // free current header guts
+    db->header.reset();
+
+    while ((errcode = find_header_at_pos(db, pos)) ==
+                   COUCHSTORE_ERROR_NO_HEADER &&
+           pos < db->file.pos) {
+        // No header at that location, try next:
+        pos += COUCH_BLOCK_SIZE;
+    }
+
+cleanup:
+    // if we failed, free the handle and return an error
+    if (errcode != COUCHSTORE_SUCCESS) {
+        couchstore_close_file(db);
+        couchstore_free_db(db);
+        errcode = COUCHSTORE_ERROR_DB_NO_LONGER_VALID;
+    }
+    return errcode;
+}
+
+couchstore_error_t cb::couchstore::seek(Db& db, Direction direction) {
+    switch (direction) {
+    case Direction::Forward:
+        return couchstore_fastforward_db_header(&db);
+    case Direction::Backward:
+        return couchstore_rewind_db_header(&db);
+    }
+
+    couchstore_close_file(&db);
+    couchstore_free_db(&db);
+    return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+}
+
 couchstore_error_t couchstore_free_db(Db* db)
 {
     COLLECT_LATENCY();

@@ -17,6 +17,7 @@
 #include <getopt.h>
 #include <inttypes.h>
 #include <libcouchstore/couch_db.h>
+#include <platform/cbassert.h>
 #include <platform/string_hex.h>
 #include <cstdio>
 #include <cstdlib>
@@ -50,7 +51,8 @@ static void print_db_info(Db* db)
 
 static int process_file(const char* file,
                         int iterate_headers,
-                        const std::optional<cs_off_t>& header_offset) {
+                        const std::optional<cs_off_t>& header_offset,
+                        cb::couchstore::Direction direction) {
     Db *db;
     couchstore_error_t errcode;
     const char* crc_strings[3] = {"warning crc is set to unknown",
@@ -109,7 +111,7 @@ next_header:
     printf("   └── by-seqno tree: %s\n", size_str(seqno_tree_size));
     printf("   └── local size:    %s\n", size_str(local_tree_size));
     if (iterate_headers) {
-        if (couchstore_rewind_db_header(db) == COUCHSTORE_SUCCESS) {
+        if (cb::couchstore::seek(*db, direction) == COUCHSTORE_SUCCESS) {
             printf("\n");
             goto next_header;
         }
@@ -124,8 +126,18 @@ next_header:
 static void usage() {
     std::cerr << R"(Usage: couch_dbinfo [options] <file> [<file2> <file3>]
 Options:
-   -i / --iterate-headers         Dump all headers in the file
-   -o / --header-offset <offset>  Specify the offset of the header to use
+   -i / --iterate-headers[=<direction>]
+      Dump all headers in the file. Direction may be:
+         forward   Going forward in history (oldest first, newest last)
+         backward  Going back in history (newest first, oldest last)
+   -o / --header-offset <offset>
+      Specify the offset of the header to use (may be combined with
+      --iterate-header to iterate a subset of the file).
+
+Note:
+Unless --header-offset is specified the program selects the last
+header block found in the file.
+
 )";
     exit(EXIT_FAILURE);
 }
@@ -137,10 +149,12 @@ int main(int argc, char **argv)
     int iterate_headers = getenv("ITERATE_HEADERS") != nullptr;
     int cmd;
     std::optional<cs_off_t> header_offset;
+    using cb::couchstore::Direction;
+    Direction direction = Direction::Backward;
 
     struct option long_options[] = {
             {"header-offset", required_argument, nullptr, 'o'},
-            {"iterate-headers", no_argument, nullptr, 'i'},
+            {"iterate-headers", optional_argument, nullptr, 'i'},
             {"help", no_argument, nullptr, '?'},
             {nullptr, 0, nullptr, 0}};
 
@@ -149,8 +163,27 @@ int main(int argc, char **argv)
         switch (cmd) {
         case 'i':
             iterate_headers = 1;
+            if (optarg) {
+                std::string_view arg{optarg};
+                if (arg == "forward") {
+                    direction = Direction::Forward;
+                } else if (arg == "backward") {
+                    direction = Direction::Backward;
+                } else {
+                    std::cerr << "Invalid direction for --iterate-headers"
+                              << std::endl;
+                    usage();
+                }
+            }
             break;
         case 'o':
+            // There is a bug in clang-analyze that it _thinks_ that optarg
+            // may be nullptr as I did check for it at line 165, but the
+            // the observant reader should see that header-offset have a
+            // required argument, and iterate-headers have an _optional_
+            // argument so optarg MUST be non-null here. Lets add a test
+            // for it to make clang-analyze happy...
+            cb_assert(optarg);
             if (strcmp(optarg, "0x") == 0) {
                 header_offset.emplace(cb::from_hex(optarg));
             } else {
@@ -168,7 +201,8 @@ int main(int argc, char **argv)
     }
 
     for (ii = optind; ii < argc; ++ii) {
-        error += process_file(argv[ii], iterate_headers, header_offset);
+        error += process_file(
+                argv[ii], iterate_headers, header_offset, direction);
     }
 
     if (error) {

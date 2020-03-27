@@ -970,6 +970,20 @@ nlohmann::json getFileHeader(Db& db);
  */
 LIBCOUCHSTORE_API
 couchstore_error_t seek(Db& db, cs_off_t offset);
+
+enum class Direction : uint8_t { Forward, Backward };
+
+/**
+ * Find the next (forward or backward) header in a database file and open that
+ *
+ * @param db The database instance to use
+ * @param direction The direction in the database
+ * @return COUCHSTORE_SUCCESS upon success, otherwise the database will
+ *         be closed and an error returned
+ */
+LIBCOUCHSTORE_API
+couchstore_error_t seek(Db& db, Direction direction);
+
 } // namespace couchstore
 } // namespace cb
 
