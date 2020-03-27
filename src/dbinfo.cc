@@ -76,9 +76,16 @@ static int process_file(const char* file,
         }
     }
 
-    printf("DB Info (%s) - total disk size: %s\n\n",
+    printf("DB Info (%s) - total disk size: %s\n",
            file,
            size_str(db->file.pos));
+    if (db->file.crc_mode < 3) {
+        printf("   crc: %s\n", crc_strings[db->file.crc_mode]);
+    } else {
+        printf("   crc: warning crc_mode is out of range %" PRIu32 "\n",
+               db->file.crc_mode);
+    }
+    printf("\n");
 
 next_header:
     printf("Header at file offset %" PRIu64 "\n", db->header.position);
@@ -86,11 +93,6 @@ next_header:
     printf("   update_seq: %" PRIu64 "\n", db->header.update_seq);
     printf("   purge_seq: %" PRIu64 "\n", db->header.purge_seq);
 
-    if (db->file.crc_mode < 3) {
-        printf("   crc: %s\n", crc_strings[db->file.crc_mode]);
-    } else {
-        printf("   crc: warning crc_mode is out of range %" PRIu32 "\n",  db->file.crc_mode);
-    }
 
     print_db_info(db);
     const auto id_tree_size =
