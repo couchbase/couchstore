@@ -167,9 +167,10 @@ static couchstore_error_t find_header(Db *db, int64_t start_pos)
  * used to return the respective sizes in this header if
  * needed.
  */
-size_t calculate_header_size(Db *db, size_t& seqrootsize,
-                             size_t& idrootsize, size_t& localrootsize)
-{
+static size_t calculate_header_size(Db* db,
+                                    size_t& seqrootsize,
+                                    size_t& idrootsize,
+                                    size_t& localrootsize) {
     seqrootsize = idrootsize = localrootsize = 0;
 
     if (db->header.by_seq_root) {
