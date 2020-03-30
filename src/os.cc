@@ -169,12 +169,10 @@ ssize_t PosixFileOps::pwrite(couchstore_error_info_t* errinfo,
             read_buf = (char*)read_buf + got_bytes;
         }
 
-        uint32_t write_crc32 =
-                get_checksum(reinterpret_cast<uint8_t*>(const_cast<void*>(buf)),
-                             len_to_read,
-                             CRC32C);
+        uint32_t write_crc32 = get_checksum(
+                static_cast<const uint8_t*>(buf), len_to_read, CRC32C);
         uint32_t read_crc32 = get_checksum(
-                reinterpret_cast<uint8_t*>(tmp), len_to_read, CRC32C);
+                reinterpret_cast<const uint8_t*>(tmp), len_to_read, CRC32C);
 
         if (write_crc32 != read_crc32) {
             if (file->tracing_enabled) {
