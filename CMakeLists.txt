@@ -62,6 +62,7 @@ ADD_LIBRARY(couchstore_objs OBJECT
         src/bitfield.cc
         src/btree_modify.cc
         src/btree_read.cc
+        src/couch_cxx_util.cc
         src/couch_db.cc
         src/couch_file_read.cc
         src/couch_file_write.cc

@@ -984,6 +984,62 @@ enum class Direction : uint8_t { Forward, Backward };
 LIBCOUCHSTORE_API
 couchstore_error_t seek(Db& db, Direction direction);
 
+struct LIBCOUCHSTORE_API DbDeleter {
+    void operator()(Db* db);
+};
+using UniqueDbPtr = std::unique_ptr<Db, DbDeleter>;
+
+struct LIBCOUCHSTORE_API DocInfoDeleter {
+    void operator()(DocInfo* info);
+};
+using UniqueDocInfoPtr = std::unique_ptr<DocInfo, DocInfoDeleter>;
+
+struct LIBCOUCHSTORE_API DocDeleter {
+    void operator()(Doc* doc);
+};
+using UniqueDocPtr = std::unique_ptr<Doc, DocDeleter>;
+
+struct LIBCOUCHSTORE_API LocalDocDeleter {
+    void operator()(LocalDoc* doc);
+};
+using UniqueLocalDocPtr = std::unique_ptr<LocalDoc, LocalDocDeleter>;
+
+/**
+ * Helper method to wrap the C api to open a local document
+ *
+ * @param db the database to use
+ * @param id the key to open
+ * @return a pair containing the status of the operation and the document
+ *           (if status == COUCHSTORE_SUCCESS)
+ */
+LIBCOUCHSTORE_API
+std::pair<couchstore_error_t, UniqueLocalDocPtr> openLocalDocument(
+        Db& db, std::string_view id);
+
+/**
+ * Helper method to wrap the C api to open a local document
+ *
+ * @param db the database to use
+ * @param docinfo the doc info structure containing the document to open
+ * @return a pair containing the status of the operation and the document
+ *           (if status == COUCHSTORE_SUCCESS)
+ */
+LIBCOUCHSTORE_API
+std::pair<couchstore_error_t, UniqueLocalDocPtr> openLocalDocument(
+        Db& db, const DocInfo& docInfo);
+
+/**
+ * Helper method to wrap the C api to open a document
+ *
+ * @param db the database to use
+ * @param docinfo the doc info structure containing the document to open
+ * @return a pair containing the status of the operation and the document
+ *           (if status == COUCHSTORE_SUCCESS)
+ */
+LIBCOUCHSTORE_API
+std::pair<couchstore_error_t, UniqueDocPtr> openDocument(
+        Db& db, const DocInfo& docInfo);
+
 } // namespace couchstore
 } // namespace cb
 
