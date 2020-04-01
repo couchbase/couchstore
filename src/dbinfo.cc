@@ -53,29 +53,18 @@ static int process_file(const char* file,
                         int iterate_headers,
                         const std::optional<cs_off_t>& header_offset,
                         cb::couchstore::Direction direction) {
-    Db *db;
-    couchstore_error_t errcode;
     const char* crc_strings[3] = {"warning crc is set to unknown",
                                   "CRC-32",
                                   "CRC-32C"};
 
-    errcode = couchstore_open_db(file, COUCHSTORE_OPEN_FLAG_RDONLY, &db);
+    auto [errcode, db] = cb::couchstore::openDatabase(
+            file, COUCHSTORE_OPEN_FLAG_RDONLY, {}, header_offset);
     if (errcode != COUCHSTORE_SUCCESS) {
-        fprintf(stderr, "Failed to open \"%s\": %s\n",
-                file, couchstore_strerror(errcode));
+        fprintf(stderr,
+                "Failed to open \"%s\": %s\n",
+                file,
+                couchstore_strerror(errcode));
         return -1;
-    }
-
-    if (header_offset) {
-        errcode = cb::couchstore::seek(*db, header_offset.value());
-        if (errcode != COUCHSTORE_SUCCESS) {
-            fprintf(stderr,
-                    "Failed to open \"%s\" at offset 0x%" PRIx64 ": %s\n",
-                    file,
-                    header_offset.value(),
-                    couchstore_strerror(errcode));
-            return -1;
-        }
     }
 
     printf("DB Info (%s) - total disk size: %s\n",
@@ -95,8 +84,7 @@ next_header:
     printf("   update_seq: %" PRIu64 "\n", db->header.update_seq);
     printf("   purge_seq: %" PRIu64 "\n", db->header.purge_seq);
 
-
-    print_db_info(db);
+    print_db_info(db.get());
     const auto id_tree_size =
             db->header.by_id_root ? db->header.by_id_root->subtreesize : 0;
     const auto seqno_tree_size =
@@ -115,9 +103,6 @@ next_header:
             printf("\n");
             goto next_header;
         }
-    } else {
-        couchstore_close_file(db);
-        couchstore_free_db(db);
     }
 
     return 0;

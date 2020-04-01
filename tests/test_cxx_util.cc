@@ -26,6 +26,21 @@ protected:
     void SetUp() override {
         Test::SetUp();
         filename = cb::io::mktemp("CouchstoreCxxTest");
+        auto db = openDb();
+
+        std::string value;
+        value.resize(cb::couchstore::getDiskBlockSize(*db));
+
+        for (int ii = 0; ii < 10; ii++) {
+            headers.emplace_back(couchstore_get_header_position(db.get()));
+            // Store a document which makes sure that the header won't
+            // arrive at the next block (so that if we try to seek in the
+            // file we won't find the header block at the next offset)
+            storeDocument(*db, std::to_string(ii), value);
+            ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
+            ASSERT_LT(headers.back(), couchstore_get_header_position(db.get()));
+        }
+        headers.emplace_back(couchstore_get_header_position(db.get()));
     }
 
     void TearDown() override {
@@ -44,7 +59,18 @@ protected:
         return std::move(db);
     }
 
+    void storeDocument(Db& db, std::string_view key, std::string_view value) {
+        Doc doc = {};
+        doc.id = {const_cast<char*>(key.data()), key.size()};
+        doc.data = {const_cast<char*>(value.data()), value.size()};
+        DocInfo docInfo = {};
+        docInfo.id = doc.id;
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_save_document(&db, &doc, &docInfo, 0));
+    }
+
     std::string filename;
+    std::vector<cs_off_t> headers;
 };
 
 /**
@@ -60,27 +86,82 @@ protected:
  * block towards the beginning of the file it search towards the end
  * of the file).
  */
-TEST_F(CouchstoreCxxTest, seek) {
+TEST_F(CouchstoreCxxTest, seekDirections) {
     using cb::couchstore::Direction;
     auto db = openDb();
-    std::vector<cs_off_t> headers;
-    for (int ii = 0; ii < 10; ii++) {
-        headers.emplace_back(couchstore_get_header_position(db.get()));
-        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
-        ASSERT_LT(headers.back(), couchstore_get_header_position(db.get()));
-    }
 
     // Verify that we can rewind back to the first header in the file
-    for (int idx = headers.size() - 1; idx >= 0; --idx) {
-        EXPECT_EQ(COUCHSTORE_SUCCESS,
+    for (int idx = headers.size() - 2; idx >= 0; --idx) {
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
                   cb::couchstore::seek(*db, Direction::Backward));
         EXPECT_EQ(headers[idx], couchstore_get_header_position(db.get()));
     }
 
+    // expect to be at offset 0
+    EXPECT_EQ(0, couchstore_get_header_position(db.get()));
+    ASSERT_EQ(COUCHSTORE_ERROR_NO_HEADER,
+              cb::couchstore::seek(*db, Direction::Backward));
+    // And we shouldn't have moved
+    EXPECT_EQ(0, couchstore_get_header_position(db.get()));
+
     // And fast forward should find the same headers.
     for (int ii = 0; ii < 10; ii++) {
         EXPECT_EQ(headers[ii], couchstore_get_header_position(db.get()));
-        EXPECT_EQ(COUCHSTORE_SUCCESS,
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
                   cb::couchstore::seek(*db, Direction::Forward));
     }
+
+    // And we should be at the end of the file
+    ASSERT_EQ(COUCHSTORE_ERROR_NO_HEADER,
+              cb::couchstore::seek(*db, Direction::Forward));
+    // And we shouldn't have moved
+    EXPECT_EQ(headers.back(), couchstore_get_header_position(db.get()));
+
+    // verify that we handle invalid arguments
+    EXPECT_EQ(COUCHSTORE_ERROR_INVALID_ARGUMENTS,
+              cb::couchstore::seek(*db, Direction(4)));
+
+    // Verify that we don't crash if we use a closed file
+    couchstore_close_file(db.get());
+    EXPECT_EQ(COUCHSTORE_ERROR_FILE_CLOSED,
+              cb::couchstore::seek(*db, Direction::Forward));
+    EXPECT_EQ(COUCHSTORE_ERROR_FILE_CLOSED,
+              cb::couchstore::seek(*db, Direction::Backward));
+}
+
+TEST_F(CouchstoreCxxTest, seek) {
+    using cb::couchstore::Direction;
+    auto db = openDb();
+    const auto DiskBlockSize = cb::couchstore::getDiskBlockSize(*db);
+
+    // verify that we can seek to a given point in time
+    for (auto& offset : headers) {
+        ASSERT_EQ(COUCHSTORE_SUCCESS, cb::couchstore::seek(*db, offset));
+        EXPECT_EQ(offset, couchstore_get_header_position(db.get()));
+    }
+
+    // Verify that we can't jump beyond the file size
+    ASSERT_EQ(COUCHSTORE_ERROR_NO_HEADER,
+              cb::couchstore::seek(*db, headers.back() + DiskBlockSize));
+    // And the failure didn't move us
+    EXPECT_EQ(headers.back(), couchstore_get_header_position(db.get()));
+
+    // Verify that we don't allow unaligned addresses
+    ASSERT_EQ(COUCHSTORE_ERROR_INVALID_ARGUMENTS,
+              cb::couchstore::seek(*db, DiskBlockSize - 10));
+    // And the failure didn't move us
+    EXPECT_EQ(headers.back(), couchstore_get_header_position(db.get()));
+
+    // Verify that we can't seek to a data block. We should have a header at
+    // the beginning of the file, then a document and btree which exceeds the
+    // the rest of that block and into the next block so that the next header
+    // is at the beginning of the 3rd block in the file
+    EXPECT_EQ(0, headers[0]);
+    EXPECT_EQ(2 * DiskBlockSize, headers[1]);
+    EXPECT_EQ(COUCHSTORE_ERROR_NO_HEADER,
+              cb::couchstore::seek(*db, DiskBlockSize));
+
+    // Verify that we don't crash if we use a closed file
+    couchstore_close_file(db.get());
+    EXPECT_EQ(COUCHSTORE_ERROR_FILE_CLOSED, cb::couchstore::seek(*db, 0));
 }

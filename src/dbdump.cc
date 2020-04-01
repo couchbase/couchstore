@@ -842,6 +842,10 @@ static int process_vbucket_file(const char *file, int *total)
         return -1;
     }
 
+    // Use a unique pointer to keep track of the database instance to make
+    // sure it is released properly in all exit paths
+    cb::couchstore::UniqueDbPtr uniqueDbPtr(db);
+
     if (headerOffset) {
         errcode = cb::couchstore::seek(*db, *headerOffset);
         if (errcode != COUCHSTORE_SUCCESS) {
@@ -938,13 +942,12 @@ next_header:
         break;
     }
     if (iterateHeaders) {
-        if (couchstore_rewind_db_header(db) == COUCHSTORE_SUCCESS) {
+        errcode =
+                cb::couchstore::seek(*db, cb::couchstore::Direction::Backward);
+        if (errcode == COUCHSTORE_SUCCESS) {
             printf("\n");
             goto next_header;
         }
-    } else { /* rewind_db_header does its own cleanup on failure */
-        couchstore_close_file(db);
-        couchstore_free_db(db);
     }
 
     if (errcode < 0) {

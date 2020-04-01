@@ -14,7 +14,7 @@
  *   limitations under the License.
  */
 
-#include <libcouchstore/couch_db.h>
+#include "internal.h"
 
 namespace cb {
 namespace couchstore {
@@ -77,13 +77,19 @@ std::pair<couchstore_error_t, UniqueDbPtr> openDatabase(
     }
     auto error = couchstore_open_db_ex(filename.c_str(), flags, fileops, &db);
     if (error == COUCHSTORE_SUCCESS) {
-        if (offset && (error = seek(*db, *offset)) != COUCHSTORE_SUCCESS) {
-            return {error, UniqueDbPtr{}};
+        if (offset) {
+            UniqueDbPtr uniqueDbPtr{db};
+            auto status = seek(*uniqueDbPtr, *offset);
+            return {status, std::move(uniqueDbPtr)};
         }
         return {COUCHSTORE_SUCCESS, UniqueDbPtr{db}};
     }
 
     return {error, UniqueDbPtr{}};
+}
+
+size_t getDiskBlockSize(Db&) {
+    return COUCH_BLOCK_SIZE;
 }
 
 } // namespace couchstore

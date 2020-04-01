@@ -200,6 +200,18 @@ extern "C" {
     couchstore_error_t couchstore_rewind_db_header(Db *db);
 
     /**
+     * Fast forward a db handle to the next header present in the file.
+     * If there is no next header, the db handle will be *closed*, and
+     * COUCHSTORE_DB_NO_LONGER_VALID will be returned.
+     *
+     * @param db The database handle to fast forward
+     * @return COUCHSTORE_SUCCESS upon success, COUCHSTORE_DB_NO_LONGER_VALID if
+     *         no header was found.
+     */
+    LIBCOUCHSTORE_API
+    couchstore_error_t couchstore_fastforward_db_header(Db* db);
+
+    /**
      * Get the default FileOpsInterface object
      */
     LIBCOUCHSTORE_API
@@ -951,39 +963,6 @@ extern "C" {
 
 namespace cb {
 namespace couchstore {
-/**
- * Get the "current" file header
- *
- * @param db The database instance to use
- * @return a JSON representation of the header (to make it work without
- *         having to create a schema..
- */
-LIBCOUCHSTORE_API
-nlohmann::json getFileHeader(Db& db);
-
-/**
- * Seek and load the database at the header at the given offset
- *
- * @param db The database instance to use
- * @param offset The location in the file of the new header to use
- * @return COUCHSTORE_SUCCESS upon success, otherwise the database will
- *         be closed and an error returned
- */
-LIBCOUCHSTORE_API
-couchstore_error_t seek(Db& db, cs_off_t offset);
-
-enum class Direction : uint8_t { Forward, Backward };
-
-/**
- * Find the next (forward or backward) header in a database file and open that
- *
- * @param db The database instance to use
- * @param direction The direction in the database
- * @return COUCHSTORE_SUCCESS upon success, otherwise the database will
- *         be closed and an error returned
- */
-LIBCOUCHSTORE_API
-couchstore_error_t seek(Db& db, Direction direction);
 
 struct LIBCOUCHSTORE_API DbDeleter {
     void operator()(Db* db);
@@ -1004,6 +983,38 @@ struct LIBCOUCHSTORE_API LocalDocDeleter {
     void operator()(LocalDoc* doc);
 };
 using UniqueLocalDocPtr = std::unique_ptr<LocalDoc, LocalDocDeleter>;
+
+/**
+ * Get the "current" file header
+ *
+ * @param db The database instance to use
+ * @return a JSON representation of the header (to make it work without
+ *         having to create a schema..
+ */
+LIBCOUCHSTORE_API
+nlohmann::json getFileHeader(Db& db);
+
+/**
+ * Seek and load the database at the header at the given offset
+ *
+ * @param db The database instance to use
+ * @param offset The location in the file of the new header to use
+ * @return The status of the operation
+ */
+LIBCOUCHSTORE_API
+couchstore_error_t seek(Db& db, cs_off_t offset);
+
+enum class Direction : uint8_t { Forward, Backward };
+
+/**
+ * Find the next (forward or backward) header in a database file and open that
+ *
+ * @param db The database instance to use
+ * @param direction The direction in the database
+ * @return The status of the operation
+ */
+LIBCOUCHSTORE_API
+couchstore_error_t seek(Db& db, Direction direction);
 
 /**
  * Helper method to wrap the C api to open a local document
@@ -1057,6 +1068,15 @@ std::pair<couchstore_error_t, UniqueDbPtr> openDatabase(
         couchstore_open_flags flags,
         FileOpsInterface* fileops = {},
         std::optional<cs_off_t> offset = {});
+
+/**
+ * Get the physical block size used by this database instance
+ *
+ * @param db the database instance in use
+ * @return the number of bytes for the block size
+ */
+LIBCOUCHSTORE_API
+size_t getDiskBlockSize(Db& db);
 
 } // namespace couchstore
 } // namespace cb

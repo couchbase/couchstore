@@ -479,8 +479,20 @@ couchstore_error_t couchstore_close_file(Db* db)
     return error;
 }
 
-couchstore_error_t couchstore_rewind_db_header(Db *db)
-{
+/**
+ * Rewind to the previous version of the file header
+ *
+ * couchstore_rewind_db_header closed the file and released the
+ * resources as part of cleanup of failures which made it
+ * harder to use in a C++ context where you had a unique_ptr to
+ * the object (to avoid doing manual cleanup in every error situation).
+ * This method returns the real error code, and the caller may let
+ * may clean up the object etc
+ *
+ * @param db the database handle to operate on
+ * @return the status of the operation
+ */
+static couchstore_error_t couchstore_rewind_db_header_impl(Db* db) {
     COLLECT_LATENCY();
 
     couchstore_error_t errcode;
@@ -492,8 +504,14 @@ couchstore_error_t couchstore_rewind_db_header(Db *db)
     error_pass(find_header(db, db->header.position - 2));
 
 cleanup:
+    return errcode;
+}
+
+couchstore_error_t couchstore_rewind_db_header(Db* db) {
+    auto errcode = couchstore_rewind_db_header_impl(db);
+
     // if we failed, free the handle and return an error
-    if(errcode != COUCHSTORE_SUCCESS) {
+    if (errcode != COUCHSTORE_SUCCESS) {
         couchstore_close_file(db);
         couchstore_free_db(db);
         errcode = COUCHSTORE_ERROR_DB_NO_LONGER_VALID;
@@ -501,42 +519,28 @@ cleanup:
     return errcode;
 }
 
-couchstore_error_t cb::couchstore::seek(Db& db, cs_off_t offset) {
-    COLLECT_LATENCY();
-
-    couchstore_error_t errcode;
-    error_unless(!db.dropped, COUCHSTORE_ERROR_FILE_CLOSED);
-    // free current header guts
-    db.header.reset();
-    error_pass(find_header_at_pos(&db, offset));
-
-cleanup:
-    // if we failed, free the handle and return an error
-    if (errcode != COUCHSTORE_SUCCESS) {
-        couchstore_close_file(&db);
-        couchstore_free_db(&db);
-        errcode = COUCHSTORE_ERROR_DB_NO_LONGER_VALID;
-    }
-    return errcode;
-}
-
-static couchstore_error_t couchstore_fastforward_db_header(Db* db) {
+static couchstore_error_t couchstore_fastforward_db_header_impl(Db* db) {
     COLLECT_LATENCY();
 
     auto pos = db->header.position + COUCH_BLOCK_SIZE;
-    couchstore_error_t errcode;
+    couchstore_error_t errcode = COUCHSTORE_ERROR_NO_HEADER;
     error_unless(!db->dropped, COUCHSTORE_ERROR_FILE_CLOSED);
     // free current header guts
     db->header.reset();
 
-    while ((errcode = find_header_at_pos(db, pos)) ==
-                   COUCHSTORE_ERROR_NO_HEADER &&
-           pos < db->file.pos) {
+    while (pos < db->file.pos && (errcode = find_header_at_pos(db, pos)) ==
+                                         COUCHSTORE_ERROR_NO_HEADER) {
         // No header at that location, try next:
         pos += COUCH_BLOCK_SIZE;
     }
 
 cleanup:
+    return errcode;
+}
+
+couchstore_error_t couchstore_fastforward_db_header(Db* db) {
+    auto errcode = couchstore_fastforward_db_header_impl(db);
+
     // if we failed, free the handle and return an error
     if (errcode != COUCHSTORE_SUCCESS) {
         couchstore_close_file(db);
@@ -546,18 +550,6 @@ cleanup:
     return errcode;
 }
 
-couchstore_error_t cb::couchstore::seek(Db& db, Direction direction) {
-    switch (direction) {
-    case Direction::Forward:
-        return couchstore_fastforward_db_header(&db);
-    case Direction::Backward:
-        return couchstore_rewind_db_header(&db);
-    }
-
-    couchstore_close_file(&db);
-    couchstore_free_db(&db);
-    return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
-}
 
 couchstore_error_t couchstore_free_db(Db* db)
 {
@@ -1589,3 +1581,95 @@ couchstore_error_t couchstore_changes_count(Db* db,
 cleanup:
     return errcode;
 }
+
+namespace cb {
+namespace couchstore {
+
+couchstore_error_t seek(Db& db, cs_off_t offset) {
+    COLLECT_LATENCY();
+    if (db.dropped) {
+        return COUCHSTORE_ERROR_FILE_CLOSED;
+    }
+
+    // All header blocks are located at the beginning of a block
+    if (offset % COUCH_BLOCK_SIZE) {
+        return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+    }
+
+    if (uint64_t(offset) >= db.file.pos) {
+        // Requested offset is beyond the file size
+        return COUCHSTORE_ERROR_NO_HEADER;
+    }
+
+    const auto current = db.header.position;
+
+    couchstore_error_t errcode;
+    error_unless(!db.dropped, COUCHSTORE_ERROR_FILE_CLOSED);
+    // free current header guts
+    db.header.reset();
+    error_pass(find_header_at_pos(&db, offset));
+
+cleanup:
+    // if we failed, free the handle and return an error
+    if (errcode == COUCHSTORE_SUCCESS) {
+        return COUCHSTORE_SUCCESS;
+    }
+
+    // Try to reopen the previous database!!
+    if (find_header_at_pos(&db, current) != COUCHSTORE_SUCCESS) {
+        // failed to open the database we had open... Drop the file
+        // but don't release the handle (as couchstore_close_file may
+        // be called multiple times)
+        couchstore_close_file(&db);
+        return COUCHSTORE_ERROR_DB_NO_LONGER_VALID;
+    }
+
+    return errcode;
+}
+
+couchstore_error_t seek(Db& db, Direction direction) {
+    if (db.dropped) {
+        return COUCHSTORE_ERROR_FILE_CLOSED;
+    }
+
+    couchstore_error_t errorcode = COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+    const auto current = db.header.position;
+
+    switch (direction) {
+    case Direction::Forward:
+        // "optimization": if we're at the end of the file we don't
+        // need to drop the internal data and reload them..
+        if (db.header.position + COUCH_BLOCK_SIZE > db.file.pos) {
+            return COUCHSTORE_ERROR_NO_HEADER;
+        }
+        errorcode = couchstore_fastforward_db_header_impl(&db);
+        break;
+    case Direction::Backward:
+        // "optimization": if we're at the beginning of the file we don't
+        // need to drop the internal data and reload them..
+        if (db.header.position == 0) {
+            return COUCHSTORE_ERROR_NO_HEADER;
+        }
+        errorcode = couchstore_rewind_db_header_impl(&db);
+        break;
+    }
+
+    if (errorcode == COUCHSTORE_SUCCESS ||
+        errorcode == COUCHSTORE_ERROR_INVALID_ARGUMENTS) {
+        return errorcode;
+    }
+
+    // Try to reopen the previous database!!
+    if (find_header_at_pos(&db, current) != COUCHSTORE_SUCCESS) {
+        // failed to open the database we had open... Drop the file
+        // but don't release the handle (as couchstore_close_file may
+        // be called multiple times)
+        couchstore_close_file(&db);
+        return COUCHSTORE_ERROR_DB_NO_LONGER_VALID;
+    }
+
+    return errorcode;
+}
+
+} // namespace couchstore
+} // namespace cb
