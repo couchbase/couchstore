@@ -65,5 +65,26 @@ std::pair<couchstore_error_t, UniqueDocPtr> openDocument(
     }
     return {error, UniqueDocPtr{}};
 }
+
+std::pair<couchstore_error_t, UniqueDbPtr> openDatabase(
+        const std::string& filename,
+        couchstore_open_flags flags,
+        FileOpsInterface* fileops,
+        std::optional<cs_off_t> offset) {
+    Db* db = nullptr;
+    if (!fileops) {
+        fileops = couchstore_get_default_file_ops();
+    }
+    auto error = couchstore_open_db_ex(filename.c_str(), flags, fileops, &db);
+    if (error == COUCHSTORE_SUCCESS) {
+        if (offset && (error = seek(*db, *offset)) != COUCHSTORE_SUCCESS) {
+            return {error, UniqueDbPtr{}};
+        }
+        return {COUCHSTORE_SUCCESS, UniqueDbPtr{db}};
+    }
+
+    return {error, UniqueDbPtr{}};
+}
+
 } // namespace couchstore
 } // namespace cb

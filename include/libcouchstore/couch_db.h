@@ -9,6 +9,7 @@
 
 #ifdef __cplusplus
 #include <nlohmann/json_fwd.hpp>
+#include <optional>
 
 extern "C" {
 #endif
@@ -1039,6 +1040,23 @@ std::pair<couchstore_error_t, UniqueLocalDocPtr> openLocalDocument(
 LIBCOUCHSTORE_API
 std::pair<couchstore_error_t, UniqueDocPtr> openDocument(
         Db& db, const DocInfo& docInfo);
+
+/**
+ * Helper method to wrap the C api to open a database
+ *
+ * @param filename The file name to open the file
+ * @param flags Open flags
+ * @param fileops optional file ops interface to use
+ * @param offset optional offset in the file for the header to use
+ * @return a pair containing the status of the operation and the database
+ *           handle (if status == COUCHSTORE_SUCCESS)
+ */
+LIBCOUCHSTORE_API
+std::pair<couchstore_error_t, UniqueDbPtr> openDatabase(
+        const std::string& filename,
+        couchstore_open_flags flags,
+        FileOpsInterface* fileops = {},
+        std::optional<cs_off_t> offset = {});
 
 } // namespace couchstore
 } // namespace cb

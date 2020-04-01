@@ -19,6 +19,8 @@
 #include <libcouchstore/couch_db.h>
 #include <platform/dirutils.h>
 
+using namespace cb::couchstore;
+
 class CouchstoreCxxTest : public ::testing::Test {
 protected:
     void SetUp() override {
@@ -31,17 +33,15 @@ protected:
         cb::io::rmrf(filename);
     }
 
-    Db* openDb() {
-        Db* db = nullptr;
-        const auto errcode = couchstore_open_db(
-                filename.c_str(),
-                COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED,
-                &db);
-        if (errcode != COUCHSTORE_SUCCESS) {
+    UniqueDbPtr openDb() {
+        auto [status, db] = openDatabase(
+                filename,
+                COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED);
+        if (status != COUCHSTORE_SUCCESS) {
             throw std::runtime_error(std::string{"Failed to open database: "} +
-                                     couchstore_strerror(errcode));
+                                     couchstore_strerror(status));
         }
-        return db;
+        return std::move(db);
     }
 
     std::string filename;
@@ -62,28 +62,25 @@ protected:
  */
 TEST_F(CouchstoreCxxTest, seek) {
     using cb::couchstore::Direction;
-    auto* db = openDb();
+    auto db = openDb();
     std::vector<cs_off_t> headers;
     for (int ii = 0; ii < 10; ii++) {
-        headers.emplace_back(couchstore_get_header_position(db));
-        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
-        ASSERT_LT(headers.back(), couchstore_get_header_position(db));
+        headers.emplace_back(couchstore_get_header_position(db.get()));
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
+        ASSERT_LT(headers.back(), couchstore_get_header_position(db.get()));
     }
 
     // Verify that we can rewind back to the first header in the file
     for (int idx = headers.size() - 1; idx >= 0; --idx) {
         EXPECT_EQ(COUCHSTORE_SUCCESS,
                   cb::couchstore::seek(*db, Direction::Backward));
-        EXPECT_EQ(headers[idx], couchstore_get_header_position(db));
+        EXPECT_EQ(headers[idx], couchstore_get_header_position(db.get()));
     }
 
     // And fast forward should find the same headers.
     for (int ii = 0; ii < 10; ii++) {
-        EXPECT_EQ(headers[ii], couchstore_get_header_position(db));
+        EXPECT_EQ(headers[ii], couchstore_get_header_position(db.get()));
         EXPECT_EQ(COUCHSTORE_SUCCESS,
                   cb::couchstore::seek(*db, Direction::Forward));
     }
-
-    couchstore_close_file(db);
-    couchstore_free_db(db);
 }
