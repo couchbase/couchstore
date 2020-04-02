@@ -17,6 +17,7 @@
 
 #include <folly/portability/GTest.h>
 #include <libcouchstore/couch_db.h>
+#include <nlohmann/json.hpp>
 #include <platform/dirutils.h>
 
 using namespace cb::couchstore;
@@ -48,10 +49,10 @@ protected:
         cb::io::rmrf(filename);
     }
 
-    UniqueDbPtr openDb() {
-        auto [status, db] = openDatabase(
-                filename,
-                COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED);
+    UniqueDbPtr openDb(
+            couchstore_open_flags flags = COUCHSTORE_OPEN_FLAG_CREATE |
+                                          COUCHSTORE_OPEN_FLAG_UNBUFFERED) {
+        auto [status, db] = openDatabase(filename, flags);
         if (status != COUCHSTORE_SUCCESS) {
             throw std::runtime_error(std::string{"Failed to open database: "} +
                                      couchstore_strerror(status));
@@ -164,4 +165,41 @@ TEST_F(CouchstoreCxxTest, seek) {
     // Verify that we don't crash if we use a closed file
     couchstore_close_file(db.get());
     EXPECT_EQ(COUCHSTORE_ERROR_FILE_CLOSED, cb::couchstore::seek(*db, 0));
+}
+
+// Verify that we work as expected on files with the previous disk formats
+TEST_F(CouchstoreCxxTest, CommitTimestampOldDiskFormat) {
+    cb::io::rmrf(filename);
+    auto db = openDb(COUCHSTORE_OPEN_FLAG_CREATE |
+                     COUCHSTORE_OPEN_WITH_LEGACY_CRC);
+    auto header = cb::couchstore::getFileHeader(*db);
+    EXPECT_EQ(0, header["timestamp"].get<size_t>());
+    couchstore_commit_ex(db.get(), 0xdeadbeef);
+
+    // Verify that the timestamp was cleared from the "in memory" copy
+    header = cb::couchstore::getFileHeader(*db);
+    EXPECT_EQ(0, header["timestamp"].get<size_t>());
+
+    // verify that it wasn't stored on the disk
+    db = openDb(COUCHSTORE_OPEN_FLAG_RDONLY);
+    header = cb::couchstore::getFileHeader(*db);
+    EXPECT_EQ(0, header["timestamp"].get<size_t>());
+}
+
+TEST_F(CouchstoreCxxTest, CommitTimestamp) {
+    auto db = openDb();
+    auto header = cb::couchstore::getFileHeader(*db);
+    // When we created the database in SetUp we did a commit which added
+    // the current time as the header...
+    EXPECT_NE(0, header["timestamp"].get<uint64_t>());
+    EXPECT_GT(std::chrono::steady_clock::now().time_since_epoch().count(),
+              header["timestamp"].get<uint64_t>());
+    couchstore_commit_ex(db.get(), 0xdeadbeef);
+    header = cb::couchstore::getFileHeader(*db);
+    EXPECT_EQ(0xdeadbeef, header["timestamp"].get<uint64_t>());
+
+    // verify that the on disk value is what we set it to
+    db = openDb(COUCHSTORE_OPEN_FLAG_RDONLY);
+    header = cb::couchstore::getFileHeader(*db);
+    EXPECT_EQ(0xdeadbeef, header["timestamp"].get<size_t>());
 }

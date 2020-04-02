@@ -13,9 +13,15 @@
 #include <platform/cb_malloc.h>
 
 #define COUCH_BLOCK_SIZE 4096
+
 #define COUCH_DISK_VERSION_11 11
+// Version 12 differs from version 11 by using the more CPU efficient
+// CRC32C instead of CRC32 and was introduced in Couchbase 4.5.0
 #define COUCH_DISK_VERSION_12 12
-#define COUCH_DISK_VERSION COUCH_DISK_VERSION_12
+// Version 13 of the file adds a timestamp to the header
+// (which the application may provide as part of commit)
+#define COUCH_DISK_VERSION_13 13
+
 #define COUCH_SNAPPY_THRESHOLD 64
 #define MAX_DB_HEADER_SIZE 1024    /* Conservative estimate; just for sanity check */
 
@@ -106,6 +112,7 @@ extern "C" {
         uint64_t purge_seq;
         uint64_t purge_ptr;
         uint64_t position;
+        uint64_t timestamp;
         void reset() {
             cb_free(by_id_root);
             cb_free(by_seq_root);

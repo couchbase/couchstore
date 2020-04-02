@@ -123,7 +123,7 @@ couchstore_error_t couchstore_compact_db_ex(Db* source, const char* target_filen
                                                      {},
                                                      ctx.hook_ctx)));
     }
-    error_pass(couchstore_commit(target));
+    error_pass(couchstore_commit_ex(target, source->header.timestamp));
 cleanup:
     TreeWriterFree(ctx.tree_writer);
     delete_arena(ctx.transient_arena);

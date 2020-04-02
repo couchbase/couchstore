@@ -804,7 +804,11 @@ TEST_F(CouchstoreInternalTest, corrupted_btree_node2)
     ASSERT_GT(docsInTest, param.num_called);
 
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_last_internal_error(db, errbuf, 250));
-    ASSERT_EQ(0,strcmp("'Couchstore::pread_compressed() Invalid compressed buffer length:0 pos:2424'", errbuf));
+    ASSERT_EQ(
+            "'Couchstore::pread_compressed() Invalid compressed buffer "
+            "length:0 pos:" +
+                    std::to_string(param.last_doc_bp + 24) + "'",
+            errbuf);
 
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));

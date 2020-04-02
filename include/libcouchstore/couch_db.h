@@ -374,7 +374,9 @@ extern "C" {
             void* save_cb_ctx);
 
     /**
-     * Commit all pending changes and flush buffers to persistent storage.
+     * Commit all pending changes and flush buffers to persistent storage
+     * (and set the "timestamp" to the number of nanoseconds since epoch
+     * reported by the steady clock)
      *
      * @param db database to perform the commit on
      * @return COUCHSTORE_SUCCESS on success
@@ -382,6 +384,16 @@ extern "C" {
     LIBCOUCHSTORE_API
     couchstore_error_t couchstore_commit(Db *db);
 
+    /**
+     * Commit all pending changes and flush buffers to persistent storage.
+     *
+     * @param db database to perform the commit on
+     * @param timestamp a "number" the application may use to represent
+     *                  its logical "timestamp" of when the data was written.
+     * @return COUCHSTORE_SUCCESS on success
+     */
+    LIBCOUCHSTORE_API
+    couchstore_error_t couchstore_commit_ex(Db* db, uint64_t timestamp);
 
     /*////////////////////  RETRIEVING DOCUMENTS: */
 

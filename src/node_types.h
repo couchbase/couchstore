@@ -30,7 +30,25 @@ typedef struct {
     raw_16 idrootsize;
     raw_16 localrootsize;
     /* Three variable-size raw_btree_root structures follow */
-} raw_file_header;
+} raw_file_header_v12;
+#ifdef __cplusplus
+static_assert(sizeof(raw_file_header_v12) == 25, "Unexpected file header side");
+#endif
+
+typedef struct {
+    raw_08 version;
+    raw_48 update_seq;
+    raw_48 purge_seq;
+    raw_48 purge_ptr;
+    raw_16 seqrootsize;
+    raw_16 idrootsize;
+    raw_16 localrootsize;
+    raw_64 timestamp;
+    /* Three variable-size raw_btree_root structures follow */
+} raw_file_header_v13;
+#ifdef __cplusplus
+static_assert(sizeof(raw_file_header_v13) == 33, "Unexpected file header side");
+#endif
 
 typedef struct {
     raw_48 pointer;
