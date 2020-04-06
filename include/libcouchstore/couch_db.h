@@ -883,8 +883,15 @@ extern "C" {
                                            sized_buf item, // is {nullptr, 0}
                                            void *ctx);
 
-    typedef int (*couchstore_docinfo_hook)(DocInfo **docinfo,
-                                           const sized_buf *item);
+    /**
+     * Callback to rewrite the DocInfo as part of compaction
+     * @param docinfo [IN/OUT] The DocInfo to persist
+     * @param value The documents value
+     * @return 0 no modifications happened to the data
+     *         1 the data was changed
+     */
+    typedef int (*couchstore_docinfo_hook)(DocInfo** docinfo,
+                                           const sized_buf* value);
 
     /**
      * Set purge sequence number. This allows the compactor hook to set the highest
@@ -906,7 +913,8 @@ extern "C" {
      * @param target_filename the filename of the new database to create.
      * @param flags flags that change compaction behavior
      * @param hook time_purge_hook callback
-     * @param dhook get_extmeta_hook callback
+     * @param dhook callback which allows the user to rewrite the document info
+     *              as part of compaction
      * @param hook_ctx compaction_ctx struct
      * @param ops Pointer to the FileOpsInterface implementation
      *            you want the library to use.
