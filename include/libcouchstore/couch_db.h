@@ -913,11 +913,13 @@ extern "C" {
      * @return COUCHSTORE_SUCCESS on success
      */
     LIBCOUCHSTORE_API
-    couchstore_error_t couchstore_compact_db_ex(Db* source, const char* target_filename, uint64_t flags,
+    couchstore_error_t couchstore_compact_db_ex(Db* source,
+                                                const char* target_filename,
+                                                couchstore_compact_flags flags,
                                                 couchstore_compact_hook hook,
-                                                couchstore_docinfo_hook dhook, void* hook_ctx,
+                                                couchstore_docinfo_hook dhook,
+                                                void* hook_ctx,
                                                 FileOpsInterface* ops);
-
 
     /*////////////////////  MISC: */
 
