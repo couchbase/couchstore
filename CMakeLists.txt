@@ -326,6 +326,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                    tests/couchstoretest.cc
                    tests/documents.cc
                    tests/gtest_tests.cc
+                   tests/test_compact.cc
                    tests/test_cxx_util.cc
                    tests/test_fileops.cc
                    src/node_types.cc

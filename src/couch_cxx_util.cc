@@ -68,6 +68,28 @@ std::pair<couchstore_error_t, UniqueDocPtr> openDocument(
     return {error, UniqueDocPtr{}};
 }
 
+std::pair<couchstore_error_t, UniqueDocPtr> openDocument(Db& db,
+                                                         std::string_view key) {
+    Doc* doc = nullptr;
+    auto error = couchstore_open_document(&db, key.data(), key.size(), &doc, 0);
+    if (error == COUCHSTORE_SUCCESS) {
+        return {error, UniqueDocPtr{doc}};
+    }
+    return {error, UniqueDocPtr{}};
+}
+
+LIBCOUCHSTORE_API
+std::pair<couchstore_error_t, UniqueDocInfoPtr> openDocInfo(
+        Db& db, std::string_view key) {
+    DocInfo* docInfo = nullptr;
+    auto error =
+            couchstore_docinfo_by_id(&db, key.data(), key.size(), &docInfo);
+    if (error == COUCHSTORE_SUCCESS) {
+        return {error, UniqueDocInfoPtr{docInfo}};
+    }
+    return {error, UniqueDocInfoPtr{}};
+}
+
 std::pair<couchstore_error_t, UniqueDbPtr> openDatabase(
         const std::string& filename,
         couchstore_open_flags flags,

@@ -857,16 +857,19 @@ extern "C" {
     };
 
     /**
-     * A compactor hook will be given each DocInfo, and can either keep or drop the item
-     * based on its contents.
+     * A compactor hook will be given each DocInfo, and can either keep or drop
+     * the item based on its contents.
      *
-     * It can also return a couchstore error code, which will abort the compaction.
+     * It can also return a couchstore error code, which will abort the
+     * compaction.
      *
-     * If a compactor hook is set, COUCHSTORE_COMPACT_FLAG_DROP_DELETES will *not* drop deletes,
-     * but will bump the purge counter. The hook is responsible for dropping deletes.
+     * If a compactor hook is set, COUCHSTORE_COMPACT_FLAG_DROP_DELETES will
+     * *not* drop deletes, but will bump the purge counter. The hook is
+     * responsible for dropping deletes.
      *
-     * The couchstore_docinfo_hook is for editing the docinfo of the item if the rev_meta
-     * section in docinfo is not found to already contain extended metadata.
+     * The couchstore_docinfo_hook is for editing the docinfo of the item if the
+     * rev_meta section in docinfo is not found to already contain extended
+     * metadata.
      */
     enum {
         COUCHSTORE_COMPACT_KEEP_ITEM = 0,
@@ -894,8 +897,11 @@ extern "C" {
                                            const sized_buf* value);
 
     /**
-     * Set purge sequence number. This allows the compactor hook to set the highest
-     * purged sequence number into the header once compaction is complete
+     * Set purge sequence number.
+     *
+     * This allows the compactor hook to set the highest purged sequence number
+     * into the header once compaction is complete (must happen before
+     * commit in order to be persisted)
      *
      * @param target any database whose's purge_seq needs to be set
      * @param purge_seq the sequence number to set into the header's purge_seq.
@@ -905,8 +911,11 @@ extern "C" {
     couchstore_error_t couchstore_set_purge_seq(Db* target, uint64_t purge_seq);
 
     /**
-     * Compact a database. This creates a new DB file with the same data as the
-     * source db, omitting data that is no longer needed.
+     * Compact a database.
+     *
+     * This creates a new DB file with the same data as the source db,
+     * omitting data that is no longer needed.
+     *
      * Will use specified couch_file_ops to create and write the target db.
      *
      * @param source the source database
@@ -915,7 +924,8 @@ extern "C" {
      * @param hook time_purge_hook callback
      * @param dhook callback which allows the user to rewrite the document info
      *              as part of compaction
-     * @param hook_ctx compaction_ctx struct
+     * @param hook_ctx compaction_ctx struct passed to time_purge_hook as the
+     *                 ctx parameter
      * @param ops Pointer to the FileOpsInterface implementation
      *            you want the library to use.
      * @return COUCHSTORE_SUCCESS on success
@@ -1063,6 +1073,30 @@ std::pair<couchstore_error_t, UniqueLocalDocPtr> openLocalDocument(
 LIBCOUCHSTORE_API
 std::pair<couchstore_error_t, UniqueDocPtr> openDocument(
         Db& db, const DocInfo& docInfo);
+
+/**
+ * Helper method to wrap the C api to open a document
+ *
+ * @param db the database to use
+ * @param key the document to open
+ * @return a pair containing the status of the operation and the document
+ *           (if status == COUCHSTORE_SUCCESS)
+ */
+LIBCOUCHSTORE_API
+std::pair<couchstore_error_t, UniqueDocPtr> openDocument(Db& db,
+                                                         std::string_view key);
+
+/**
+ * Helper method to wrap the C api to open a DocInfo structure
+ *
+ * @param db the database to use
+ * @param key the document to open
+ * @return a pair containing the status of the operation and the DocInfo
+ *           (if status == COUCHSTORE_SUCCESS)
+ */
+LIBCOUCHSTORE_API
+std::pair<couchstore_error_t, UniqueDocInfoPtr> openDocInfo(
+        Db& db, std::string_view key);
 
 /**
  * Helper method to wrap the C api to open a database
