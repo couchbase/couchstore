@@ -172,34 +172,49 @@ TEST_F(CouchstoreCxxTest, CommitTimestampOldDiskFormat) {
     cb::io::rmrf(filename);
     auto db = openDb(COUCHSTORE_OPEN_FLAG_CREATE |
                      COUCHSTORE_OPEN_WITH_LEGACY_CRC);
-    auto header = cb::couchstore::getFileHeader(*db);
-    EXPECT_EQ(0, header["timestamp"].get<size_t>());
+    auto header = cb::couchstore::getHeader(*db);
+    ASSERT_EQ(Header::Version::V11, header.version);
+    EXPECT_EQ(0, header.timestamp);
     couchstore_commit_ex(db.get(), 0xdeadbeef);
 
     // Verify that the timestamp was cleared from the "in memory" copy
-    header = cb::couchstore::getFileHeader(*db);
-    EXPECT_EQ(0, header["timestamp"].get<size_t>());
+    header = cb::couchstore::getHeader(*db);
+    ASSERT_EQ(Header::Version::V11, header.version);
+    EXPECT_EQ(0, header.timestamp);
 
     // verify that it wasn't stored on the disk
     db = openDb(COUCHSTORE_OPEN_FLAG_RDONLY);
-    header = cb::couchstore::getFileHeader(*db);
-    EXPECT_EQ(0, header["timestamp"].get<size_t>());
+    header = cb::couchstore::getHeader(*db);
+    ASSERT_EQ(Header::Version::V11, header.version);
+    EXPECT_EQ(0, header.timestamp);
 }
 
 TEST_F(CouchstoreCxxTest, CommitTimestamp) {
     auto db = openDb();
-    auto header = cb::couchstore::getFileHeader(*db);
+    auto header = cb::couchstore::getHeader(*db);
+    ASSERT_EQ(Header::Version::V13, header.version);
     // When we created the database in SetUp we did a commit which added
     // the current time as the header...
-    EXPECT_NE(0, header["timestamp"].get<uint64_t>());
+    EXPECT_NE(0, header.timestamp);
     EXPECT_GT(std::chrono::steady_clock::now().time_since_epoch().count(),
-              header["timestamp"].get<uint64_t>());
+              header.timestamp);
     couchstore_commit_ex(db.get(), 0xdeadbeef);
-    header = cb::couchstore::getFileHeader(*db);
-    EXPECT_EQ(0xdeadbeef, header["timestamp"].get<uint64_t>());
+    header = cb::couchstore::getHeader(*db);
+    EXPECT_EQ(0xdeadbeef, header.timestamp);
 
     // verify that the on disk value is what we set it to
     db = openDb(COUCHSTORE_OPEN_FLAG_RDONLY);
-    header = cb::couchstore::getFileHeader(*db);
-    EXPECT_EQ(0xdeadbeef, header["timestamp"].get<size_t>());
+    header = cb::couchstore::getHeader(*db);
+    EXPECT_EQ(0xdeadbeef, header.timestamp);
+}
+
+TEST_F(CouchstoreCxxTest, GetHeaderJson) {
+    auto db = openDb();
+    couchstore_commit_ex(db.get(), 0xdeadbeef);
+    auto header = cb::couchstore::getHeader(*db);
+    ASSERT_EQ(Header::Version::V13, header.version);
+    EXPECT_EQ(
+            "{\"header_position\":\"0x0000000000015000\",\"purge_seq\":0,"
+            "\"timestamp\":3735928559,\"update_seq\":10,\"version\":13}",
+            header.to_json().dump());
 }

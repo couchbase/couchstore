@@ -1007,16 +1007,6 @@ struct LIBCOUCHSTORE_API LocalDocDeleter {
 using UniqueLocalDocPtr = std::unique_ptr<LocalDoc, LocalDocDeleter>;
 
 /**
- * Get the "current" file header
- *
- * @param db The database instance to use
- * @return a JSON representation of the header (to make it work without
- *         having to create a schema..
- */
-LIBCOUCHSTORE_API
-nlohmann::json getFileHeader(Db& db);
-
-/**
  * Seek and load the database at the header at the given offset
  *
  * @param db The database instance to use
@@ -1099,6 +1089,40 @@ std::pair<couchstore_error_t, UniqueDbPtr> openDatabase(
  */
 LIBCOUCHSTORE_API
 size_t getDiskBlockSize(Db& db);
+
+struct LIBCOUCHSTORE_API Header {
+    enum class Version {
+        /// Version 11 use the old legacy CRC32 (may still be created by
+        /// specifying COUCHSTORE_OPEN_WITH_LEGACY_CRC to open)
+        V11 = 11,
+        /// Version 12 changed the hash to CRC32C
+        V12 = 12,
+        /// Version 13 adds a timestamp to the header
+        V13 = 13
+    };
+
+    /// The version number for the header
+    Version version;
+    /// The timestamp for the commit (only valid for V13)
+    uint64_t timestamp;
+    /// The sequence number used for updates in the header
+    uint64_t updateSeqNum;
+    /// The purge sequence number in the header
+    uint64_t purgeSeqNum;
+    /// The offset in the database file for the location of the header
+    uint64_t headerPosition;
+
+    nlohmann::json to_json() const;
+};
+
+/**
+ * Get the version number for the database.
+ *
+ * @param db the database instance to query
+ * @return a structure with the header information
+ */
+LIBCOUCHSTORE_API
+Header getHeader(Db& db);
 
 } // namespace couchstore
 } // namespace cb

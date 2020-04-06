@@ -15,6 +15,8 @@
  */
 
 #include "internal.h"
+#include <nlohmann/json.hpp>
+#include <platform/string_hex.h>
 
 namespace cb {
 namespace couchstore {
@@ -90,6 +92,26 @@ std::pair<couchstore_error_t, UniqueDbPtr> openDatabase(
 
 size_t getDiskBlockSize(Db&) {
     return COUCH_BLOCK_SIZE;
+}
+
+nlohmann::json Header::to_json() const {
+    nlohmann::json ret;
+    ret["version"] = uint64_t(version);
+    ret["update_seq"] = updateSeqNum;
+    ret["purge_seq"] = purgeSeqNum;
+    ret["header_position"] = cb::to_hex(headerPosition);
+    ret["timestamp"] = timestamp;
+    return ret;
+}
+
+Header getHeader(Db& db) {
+    Header ret;
+    ret.version = Header::Version(db.header.disk_version);
+    ret.updateSeqNum = db.header.update_seq;
+    ret.purgeSeqNum = db.header.purge_seq;
+    ret.timestamp = db.header.timestamp;
+    ret.headerPosition = db.header.position;
+    return ret;
 }
 
 } // namespace couchstore

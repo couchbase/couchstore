@@ -863,7 +863,7 @@ static int process_vbucket_file(const char *file, int *total)
 next_header:
     if (dumpHeaders) {
         try {
-            const auto header = cb::couchstore::getFileHeader(*db).dump();
+            const auto header = cb::couchstore::getHeader(*db).to_json().dump();
             printf("File header: %s\n", header.c_str());
         } catch (const std::exception& ex) {
             fprintf(stderr, "Failed to fetch database header information: %s\n",

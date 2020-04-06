@@ -19,7 +19,6 @@
 
 #include <assert.h>
 #include <fcntl.h>
-#include <nlohmann/json.hpp>
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
 #include <platform/platform_socket.h>
@@ -174,17 +173,6 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
 cleanup:
     cb_free(header_buf.buf);
     return errcode;
-}
-
-nlohmann::json cb::couchstore::getFileHeader(Db &db) {
-    nlohmann::json ret;
-    ret["version"] = db.header.disk_version;
-    ret["update_seq"] = db.header.update_seq;
-    ret["purge_seq"] = db.header.purge_seq;
-    ret["purge_ptr"] = db.header.purge_ptr;
-    ret["offset"] = cb::to_hex(couchstore_get_header_position(&db));
-    ret["timestamp"] = db.header.timestamp;
-    return ret;
 }
 
 // Finds the database header by scanning back from the end of the file at 4k boundaries
