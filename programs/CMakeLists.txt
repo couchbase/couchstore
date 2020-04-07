@@ -1,1 +1,2 @@
-ADD_SUBDIRECTORY(dbdiff)
+add_subdirectory(dbdiff)
+add_subdirectory(pitr_compact)

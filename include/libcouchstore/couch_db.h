@@ -1210,5 +1210,47 @@ couchstore_error_t compact(Db& source,
                            CompactRewriteDocInfoCallback rewriteDocInfoCallback,
                            FileOpsInterface* ops);
 
+/**
+ * Compact a Couchstore file with support for Point in Time Recovery (PiTR)
+ *
+ * PiTR enabled compaction differs from normal compaction that it won't
+ * do full compaction of the entire database file, but keep multiple headers
+ * in the compacted database file.
+ *
+ * It does full compaction up to the provided timestamp, then squash as
+ * many of the intermediate headers as possible but leave the header closest
+ * to the requested interval.
+ *
+ * NOTE: This is currently experimental and subject to change. Currently it'll
+ *       throw exceptions in some of the error paths (these needs to be cleaned
+ *       up and changed to couchstore_error etc).
+ *
+ * @param source The source database to compact
+ * @param target_filename The name of the target database
+ * @param flags Extra flags to open the database with
+ * @param filterCallback The filter callback to call for each item to check
+ *                       if the document should be part of the compacted
+ *                       database or not
+ * @param rewriteDocInfoCallback The rewrite callback which is called for
+ *                       each DocInfo to be put into the new database (to
+ *                       allow upgrading the metadata section in the DocInfo)
+ * @param ops The File operations to use (defaults to
+ *            couchstore_get_default_file_ops if set to nullptr)
+ * @param timestamp The timestamp for the oldest revision to use (The header
+ *                  _before_ this value is chosen if no exact match is found)
+ * @param delta The delta to add to the timestamp to find the next header
+ *              to keep.
+ * @return Couchstore error code
+ * @throws std::runtime_error
+ */
+LIBCOUCHSTORE_API
+couchstore_error_t compact(Db& source,
+                           const char* target_filename,
+                           couchstore_compact_flags flags,
+                           CompactFilterCallback filterCallback,
+                           CompactRewriteDocInfoCallback rewriteDocInfoCallback,
+                           FileOpsInterface* ops,
+                           uint64_t timestamp,
+                           uint64_t delta);
 } // namespace couchstore
 } // namespace cb

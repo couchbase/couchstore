@@ -1,0 +1,2 @@
+add_executable(pitr_compact pitr_compact.cc)
+target_link_libraries(pitr_compact couchstore platform)

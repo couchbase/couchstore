@@ -411,3 +411,190 @@ TEST_F(CouchstoreCompactTest, CompactionAllowsForRewritingDocInfo) {
         EXPECT_EQ(256, info->rev_meta.size);
     }
 }
+
+/**
+ * Generate a database with multiple headers and verify that we may
+ * perform full compaction up to one point, then incremental / compactions
+ * moving up to the final point in time
+ */
+TEST_F(CouchstoreCompactTest, PitrCompaction) {
+    // Create a database with 100 headers where we update a key in
+    // each header
+    auto db = openSourceDb();
+    for (int ii = 0; ii < 100; ++ii) {
+        storeDocument(*db, "PitrCompaction", std::to_string(ii));
+        // use the timestamp as the timestamp for the header
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), ii));
+    }
+
+    // Function to verify that the documents value in the file is correct
+    // in all values of the headers
+    auto verifyHeaders =
+            [](Db& db, uint64_t oldest, int expected_num_headers) -> void {
+        int num_headers = 1;
+        do {
+            auto header = cb::couchstore::getHeader(db);
+            ASSERT_EQ(cb::couchstore::Header::Version::V13, header.version);
+            if (header.timestamp < oldest ||
+                expected_num_headers == num_headers) {
+                EXPECT_EQ(expected_num_headers, num_headers);
+                return;
+            }
+            auto [status, doc] =
+                    cb::couchstore::openDocument(db, "PitrCompaction");
+            ASSERT_EQ(COUCHSTORE_SUCCESS, status);
+            const auto value = std::string{doc->data.buf, doc->data.size};
+            EXPECT_EQ(value, std::to_string(header.timestamp));
+            num_headers++;
+            ASSERT_EQ(COUCHSTORE_SUCCESS,
+                      cb::couchstore::seek(db,
+                                           cb::couchstore::Direction::Backward))
+                    << "There should be more headers (" << num_headers << " < "
+                    << expected_num_headers << ")";
+        } while (true);
+    };
+
+    // Verify that we've got all of the headers and that the document
+    // has the correct value in all versions
+    verifyHeaders(*openSourceDb(), 1, 99);
+
+    // now compact the database up to 50
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::compact(*db,
+                                      targetFilename.c_str(),
+                                      COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                      {},
+                                      {},
+                                      couchstore_get_default_file_ops(),
+                                      50,
+                                      1));
+
+    db = openTargetDb();
+    int num_headers = 1;
+    while (cb::couchstore::seek(*db, cb::couchstore::Direction::Backward) ==
+           COUCHSTORE_SUCCESS) {
+        ++num_headers;
+    }
+    ASSERT_EQ(50, num_headers);
+
+    // Verify that we've got the expected numbers of headers in the file!
+    verifyHeaders(*openTargetDb(), 50, 50);
+}
+
+/**
+ * Generate a database with multiple headers and verify that we may
+ * perform full compaction up to one point, then incremental / compactions
+ * moving up to the final point in time and squashing headers as we go
+ */
+TEST_F(CouchstoreCompactTest, PitrCompactionSquashHeaders) {
+    // Create a database with 100 headers where we update a key in
+    // each header
+    auto db = openSourceDb();
+    for (int ii = 0; ii < 100; ++ii) {
+        storeDocument(*db, "PitrCompaction", std::to_string(ii));
+        // use the timestamp as the timestamp for the header
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), ii));
+    }
+
+    // Function to verify that the documents value in the file is correct
+    // in all values of the headers
+    auto verifyHeaders =
+            [](Db& db, uint64_t oldest, int expected_num_headers) -> void {
+        int num_headers = 1;
+        do {
+            auto header = cb::couchstore::getHeader(db);
+            ASSERT_EQ(cb::couchstore::Header::Version::V13, header.version);
+            if (header.timestamp < oldest ||
+                expected_num_headers == num_headers) {
+                EXPECT_EQ(expected_num_headers, num_headers);
+                return;
+            }
+            auto [status, doc] =
+                    cb::couchstore::openDocument(db, "PitrCompaction");
+            ASSERT_EQ(COUCHSTORE_SUCCESS, status);
+            const auto value = std::string{doc->data.buf, doc->data.size};
+            EXPECT_EQ(value, std::to_string(header.timestamp));
+            num_headers++;
+            ASSERT_EQ(COUCHSTORE_SUCCESS,
+                      cb::couchstore::seek(db,
+                                           cb::couchstore::Direction::Backward))
+                    << "There should be more headers (" << num_headers << " < "
+                    << expected_num_headers << ")";
+        } while (true);
+    };
+
+    // Verify that we've got all of the headers and that the document
+    // has the correct value in all versions
+    verifyHeaders(*openSourceDb(), 1, 99);
+
+    // now compact the database up to 50
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::compact(*db,
+                                      targetFilename.c_str(),
+                                      COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                      {},
+                                      {},
+                                      couchstore_get_default_file_ops(),
+                                      50,
+                                      5));
+
+    db = openTargetDb();
+    int num_headers = 1;
+    while (cb::couchstore::seek(*db, cb::couchstore::Direction::Backward) ==
+           COUCHSTORE_SUCCESS) {
+        ++num_headers;
+    }
+    ASSERT_EQ(11, num_headers);
+
+    // Verify that we've got the expected numbers of headers in the file!
+    verifyHeaders(*openTargetDb(), 50, 11);
+}
+
+/**
+ * Generate a database with multiple headers and verify that we may
+ * perform full compaction up to one point, then incremental / compactions
+ * moving up to the final point in time and squashing headers as we go,
+ * but we should NOT move beyond the provided source header.
+ *
+ * The database will have the following input headers
+ *
+ * | 10 | 25 | 30 | 100 | 109 | 170 |
+ *
+ * And we'll run compact with 109 as the "source" database, 30 the oldest
+ * entry to keep, and delta of 75 so we should end up with:
+ *
+ * | 30 | 100 | 109 |
+ */
+TEST_F(CouchstoreCompactTest, PitrCompactionNotLastBlock) {
+    using cb::couchstore::Direction;
+    using cb::couchstore::seek;
+
+    auto db = openSourceDb();
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), 10));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), 25));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), 30));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), 100));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), 109));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), 170));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, seek(*db, Direction::Backward));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::compact(*db,
+                                      targetFilename.c_str(),
+                                      COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                      {},
+                                      {},
+                                      couchstore_get_default_file_ops(),
+                                      30,
+                                      70));
+
+    db = openTargetDb();
+    ASSERT_EQ(109, cb::couchstore::getHeader(*db).timestamp);
+    ASSERT_EQ(COUCHSTORE_SUCCESS, seek(*db, Direction::Backward));
+
+    ASSERT_EQ(100, cb::couchstore::getHeader(*db).timestamp);
+    ASSERT_EQ(COUCHSTORE_SUCCESS, seek(*db, Direction::Backward));
+
+    ASSERT_EQ(30, cb::couchstore::getHeader(*db).timestamp);
+    ASSERT_EQ(COUCHSTORE_ERROR_NO_HEADER, seek(*db, Direction::Backward));
+}

@@ -476,3 +476,282 @@ couchstore_error_t couchstore_set_purge_seq(Db* target, uint64_t purge_seq) {
 
 }
 
+namespace cb::couchstore {
+
+static void locateStartHeader(Db& db, uint64_t timestamp) {
+    cs_off_t prev = couchstore_get_header_position(&db);
+    couchstore_error_t status;
+    do {
+        auto header = getHeader(db);
+        if (header.timestamp < timestamp) {
+            // Too old.. use the previous header
+            if ((status = seek(db, prev)) != COUCHSTORE_SUCCESS) {
+                throw std::runtime_error(
+                        std::string{"locateStartHeader(): Failed to locate "
+                                    "header: "} +
+                        couchstore_strerror(status));
+            }
+            return;
+        }
+        prev = couchstore_get_header_position(&db);
+    } while ((status = seek(db, Direction::Backward)) == COUCHSTORE_SUCCESS);
+
+    if (status == COUCHSTORE_ERROR_NO_HEADER) {
+        return;
+    }
+
+    throw std::runtime_error(
+            std::string{"locateStartHeader(): Failed to locate header: "} +
+            couchstore_strerror(status));
+}
+
+struct Context {
+    cb::couchstore::UniqueDbPtr target;
+    uint64_t highest = 0;
+
+    std::vector<DocInfo*> docInfos;
+    std::vector<Doc*> docs;
+    size_t size = 0;
+
+    const size_t flushThreshold = 100 * 1024 * 1024;
+
+    /**
+     * Spool the document document so that we may flush documents to disk
+     * in batches (as the couchstore api will update the B-tree as part of
+     * adding the document. That would cause additional disk blocks to be
+     * written). If we exceed the flushThreshold the method will flush
+     * the buffered documents to disk.
+     *
+     * The return value for the function is an int to make it easier to
+     * use from the compaction callbacks (as we may simply return the value
+     * from this function from the callback).
+     *
+     * @param info the document info object for the document
+     * @param d the documents value
+     * @return 0 if the document info may be released by the caller
+     *         1 if the ownership of the document info was taken by us
+     */
+    int spool(DocInfo* info, cb::couchstore::UniqueDocPtr d) {
+        docInfos.emplace_back(info);
+        docs.emplace_back(d.release());
+        size += info->physical_size;
+        if (size > flushThreshold) {
+            // flush to avoid eating up too much resources
+            flush();
+            return 0; // we may release the doc info structure as it was nuked
+        }
+        return 1; // keep the doc info structure
+    }
+
+    void flush() {
+        if (docs.empty()) {
+            return;
+        }
+        auto error = couchstore_save_documents(target.get(),
+                                               docs.data(),
+                                               docInfos.data(),
+                                               docs.size(),
+                                               COUCHSTORE_SEQUENCE_AS_IS);
+        for (auto& d : docs) {
+            couchstore_free_document(d);
+        }
+
+        for (auto& d : docInfos) {
+            couchstore_free_docinfo(d);
+        }
+        docs.clear();
+        docInfos.clear();
+        size = 0;
+        if (error != COUCHSTORE_SUCCESS) {
+            throw std::runtime_error(
+                    std::string{"cb::couchstore::Context::flush() Failed to "
+                                "save documents: "} +
+                    couchstore_strerror(error));
+        }
+    }
+};
+
+int couchstore_changes_callback(Db* db, DocInfo* docinfo, void* context) {
+    auto* ctx = reinterpret_cast<Context*>(context);
+    if (docinfo->db_seq > ctx->highest) {
+        ctx->highest = docinfo->db_seq;
+    }
+
+    auto [status, doc] = cb::couchstore::openDocument(*db, *docinfo);
+    if (status != COUCHSTORE_SUCCESS) {
+        throw std::runtime_error(
+                std::string{"couchstore_changes_callback() Failed to "
+                            "open document: "} +
+                couchstore_strerror(status));
+    }
+
+    return ctx->spool(docinfo, std::move(doc));
+}
+
+int couchstore_walk_local_tree_callback(Db* db,
+                                        int,
+                                        const DocInfo* doc_info,
+                                        uint64_t,
+                                        const sized_buf*,
+                                        void* context) {
+    if (doc_info != nullptr) {
+        auto [status, doc] = cb::couchstore::openLocalDocument(*db, *doc_info);
+        if (status == COUCHSTORE_SUCCESS) {
+            auto error = couchstore_save_local_document(
+                    static_cast<Context*>(context)->target.get(), doc.get());
+            if (error != COUCHSTORE_SUCCESS) {
+                throw std::runtime_error(
+                        std::string{"couchstore_walk_local_tree_callback() "
+                                    "Failed to save local document: "} +
+                        couchstore_strerror(error));
+            }
+        } else {
+            throw std::runtime_error(
+                    std::string{"couchstore_walk_local_tree_callback() Failed "
+                                "to open local document: "} +
+                    couchstore_strerror(status));
+        }
+    }
+    return 0;
+}
+
+couchstore_error_t findNextHeader(Db& source,
+                                  cs_off_t maxHeaderPosition,
+                                  uint64_t next) {
+    couchstore_error_t status;
+    auto current = couchstore_get_header_position(&source);
+    const auto start = current;
+    while ((status = cb::couchstore::seek(
+                    source, cb::couchstore::Direction::Forward)) ==
+           COUCHSTORE_SUCCESS) {
+        auto header = cb::couchstore::getHeader(source);
+
+        // Make sure that we don't process beyond the max header!
+        if (header.headerPosition > maxHeaderPosition) {
+            // we need to use the previous header
+            return cb::couchstore::seek(source, current);
+        }
+
+        if (header.timestamp < next) {
+            current = couchstore_get_header_position(&source);
+        } else if (header.timestamp > next && start != current) {
+            // we need to use the previous header
+            return cb::couchstore::seek(source, current);
+        } else {
+            return COUCHSTORE_SUCCESS;
+        }
+    }
+
+    // We reached the end... return success
+    if (status == COUCHSTORE_ERROR_NO_HEADER) {
+        return COUCHSTORE_SUCCESS;
+    }
+
+    return status;
+}
+
+couchstore_error_t compact(Db& source,
+                           const char* target_filename,
+                           couchstore_compact_flags flags,
+                           CompactFilterCallback filterCallback,
+                           CompactRewriteDocInfoCallback rewriteDocInfoCallback,
+                           FileOpsInterface* ops,
+                           uint64_t timestamp,
+                           uint64_t delta) {
+    if (ops == nullptr) {
+        ops = couchstore_get_default_file_ops();
+    }
+
+    auto header = getHeader(source);
+    if (header.timestamp <= timestamp) {
+        // The timestamp of the header in the source is older than the
+        // oldest timestamp we want to keep, so we may perform a full
+        // compaction of the entire database and be done with it!
+        return compact(source,
+                       target_filename,
+                       flags,
+                       filterCallback,
+                       rewriteDocInfoCallback,
+                       ops);
+    }
+
+    // We need to locate the oldest header to use and perform a full
+    // compaction up to that point, before we'll do an incremental
+    // compaction from that point forward.
+    const auto sourceHeaderOffset = header.headerPosition;
+    locateStartHeader(source, timestamp);
+    auto status = cb::couchstore::compact(source,
+                                          target_filename,
+                                          flags,
+                                          filterCallback,
+                                          rewriteDocInfoCallback,
+                                          ops);
+    if (status != COUCHSTORE_SUCCESS) {
+        throw std::runtime_error(
+                std::string{"cb::couchstore::compact() failed: "} +
+                couchstore_strerror(status));
+    }
+
+    Context ctx;
+    header = cb::couchstore::getHeader(source);
+    ctx.highest = header.updateSeqNum;
+
+    // time to move the data over!
+    {
+        auto [status, target] = cb::couchstore::openDatabase(
+                target_filename, COUCHSTORE_OPEN_FLAG_UNBUFFERED);
+        if (status != COUCHSTORE_SUCCESS) {
+            ::remove(target_filename);
+            return status;
+        }
+        ctx.target = std::move(target);
+    }
+
+    size_t ii = 1;
+    while ((status = findNextHeader(
+                    source, sourceHeaderOffset, timestamp + (ii * delta))) ==
+           COUCHSTORE_SUCCESS) {
+        ++ii;
+        header = cb::couchstore::getHeader(source);
+
+        ++ctx.highest;
+        status = couchstore_changes_since(
+                &source, ctx.highest, 0, couchstore_changes_callback, &ctx);
+        if (status != COUCHSTORE_SUCCESS) {
+            throw std::runtime_error(
+                    std::string{"couchstore_changes_since() Failed: "} +
+                    couchstore_strerror(status));
+        }
+
+        ctx.flush();
+
+        status = couchstore_walk_local_tree(
+                &source, nullptr, couchstore_walk_local_tree_callback, &ctx);
+        if (status != COUCHSTORE_SUCCESS) {
+            throw std::runtime_error(
+                    std::string{"couchstore_walk_local_tree() Failed: "} +
+                    couchstore_strerror(status));
+        }
+
+        status = couchstore_commit_ex(ctx.target.get(), header.timestamp);
+        if (status != COUCHSTORE_SUCCESS) {
+            throw std::runtime_error(
+                    std::string{"couchstore_commit_ex() Failed: "} +
+                    couchstore_strerror(status));
+        }
+        if (header.headerPosition == sourceHeaderOffset) {
+            // We're reached the end!
+            break;
+        }
+    }
+
+    if (status != COUCHSTORE_SUCCESS) {
+        ctx.target.reset();
+        ::remove(target_filename);
+        return status;
+    }
+
+    return COUCHSTORE_SUCCESS;
+}
+
+} // namespace cb::couchstore
