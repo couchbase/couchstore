@@ -18,51 +18,42 @@
  * the License.
  **/
 
-#include "couchstore_config.h"
 #include "bitmap.h"
+#include "couchstore_config.h"
 #include <string.h>
 
-#define CHUNK_BITS            (sizeof(unsigned char) * CHAR_BIT)
-#define TOTAL_CHUNKS(map)     sizeof(((map).chunks))
+#define CHUNK_BITS (sizeof(unsigned char) * CHAR_BIT)
+#define TOTAL_CHUNKS(map) sizeof(((map).chunks))
 #define CHUNK_INDEX(map, bit) (TOTAL_CHUNKS(map) - 1 - ((bit) / CHUNK_BITS))
-#define MAP_CHUNK(map, bit)   ((map).chunks)[CHUNK_INDEX(map, bit)]
-#define CHUNK_OFFSET(bit)     ((bit) % CHUNK_BITS)
+#define MAP_CHUNK(map, bit) ((map).chunks)[CHUNK_INDEX(map, bit)]
+#define CHUNK_OFFSET(bit) ((bit) % CHUNK_BITS)
 
-
-int is_bit_set(const bitmap_t *bm, uint16_t bit)
-{
+int is_bit_set(const bitmap_t* bm, uint16_t bit) {
     return (MAP_CHUNK(*bm, bit) & (1 << CHUNK_OFFSET(bit))) != 0;
 }
 
-
-void set_bit(bitmap_t *bm, uint16_t bit)
-{
+void set_bit(bitmap_t* bm, uint16_t bit) {
     (MAP_CHUNK(*bm, bit)) |= (1 << CHUNK_OFFSET(bit));
 }
 
-
-void unset_bit(bitmap_t *bm, uint16_t bit)
-{
+void unset_bit(bitmap_t* bm, uint16_t bit) {
     ((MAP_CHUNK(*bm, bit)) &= ~(1 << CHUNK_OFFSET(bit)));
 }
 
-void union_bitmaps(bitmap_t *dst_bm, const bitmap_t *src_bm)
-{
+void union_bitmaps(bitmap_t* dst_bm, const bitmap_t* src_bm) {
     unsigned int i;
     for (i = 0; i < 1024 / CHUNK_BITS; ++i) {
         dst_bm->chunks[i] |= src_bm->chunks[i];
     }
 }
 
-void intersect_bitmaps(bitmap_t *dst_bm, const bitmap_t *src_bm)
-{
+void intersect_bitmaps(bitmap_t* dst_bm, const bitmap_t* src_bm) {
     unsigned int i;
     for (i = 0; i < 1024 / CHUNK_BITS; ++i) {
         dst_bm->chunks[i] &= src_bm->chunks[i];
     }
 }
 
-int is_equal_bitmap(const bitmap_t *bm1, const bitmap_t *bm2)
-{
+int is_equal_bitmap(const bitmap_t* bm1, const bitmap_t* bm2) {
     return !memcmp(bm1, bm2, sizeof(bitmap_t));
 }

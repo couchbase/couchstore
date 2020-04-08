@@ -87,7 +87,7 @@ SET_PROPERTY(TARGET couchstore_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 # second object library is for the view specific code
 ADD_LIBRARY(couchstore_view_objs OBJECT
-        src/views/bitmap.c
+        src/views/bitmap.cc
         src/views/collate_json.cc
         src/views/file_merger.cc
         src/views/file_sorter.cc
@@ -97,7 +97,7 @@ ADD_LIBRARY(couchstore_view_objs OBJECT
         src/views/mapreduce/mapreduce_c.cc
         src/views/reducers.cc
         src/views/reductions.cc
-        src/views/sorted_list.c
+        src/views/sorted_list.cc
         src/views/spatial.cc
         src/views/spatial_modify.cc
         src/views/util.cc
@@ -278,7 +278,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                        src/file_merger.cc
                        src/file_sorter.cc
                        src/quicksort.c
-                       tests/file_sorter_tests.c)
+                       tests/file_sorter_tests.cc)
 
     SET(MAP_REDUCE_SOURCES
         src/views/mapreduce/mapreduce.cc
@@ -286,18 +286,18 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
 
     M_MAKE_LEGACY_TEST(couchstore_mapreduce-builtin-test
                        ${MAP_REDUCE_SOURCES}
-                       tests/mapreduce/builtin.c)
+                       tests/mapreduce/builtin.cc)
 
     M_MAKE_LEGACY_TEST(couchstore_mapreduce-map-test
                        ${MAP_REDUCE_SOURCES}
-                       tests/mapreduce/map.c)
+                       tests/mapreduce/map.cc)
 
     M_MAKE_LEGACY_TEST(couchstore_mapreduce-reduce-test
                        ${MAP_REDUCE_SOURCES}
-                       tests/mapreduce/reduce.c)
+                       tests/mapreduce/reduce.cc)
 
     ADD_EXECUTABLE(couchstore_testapp
-                   tests/testapp.c
+                   tests/testapp.cc
                    tests/views/tests.cc
                    tests/views/collate_json_test.cc
                    tests/views/index_headers.cc

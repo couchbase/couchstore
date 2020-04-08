@@ -26,61 +26,37 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if __STDC_VERSION__ >=199901L
-#define ASSIGN(x) x =
-#else
-#define ASSIGN(x)
-#endif
+static const mapreduce_json_t key1 = {const_cast<char*>("[1,1]"),
+                                      sizeof("[1,1]") - 1};
+static const mapreduce_json_t value1 = {const_cast<char*>("11"),
+                                        sizeof("11") - 1};
 
-static const mapreduce_json_t key1 = {
-    ASSIGN(.json) "[1,1]",
-    ASSIGN(.length) sizeof("[1,1]") - 1
-};
-static const mapreduce_json_t value1 = {
-    ASSIGN(.json) "11",
-    ASSIGN(.length) sizeof("11") - 1
-};
+static const mapreduce_json_t key2 = {const_cast<char*>("[2,2]"),
+                                      sizeof("[2,2]") - 1};
+static const mapreduce_json_t value2 = {const_cast<char*>("22"),
+                                        sizeof("22") - 1};
 
-static const mapreduce_json_t key2 = {
-    ASSIGN(.json) "[2,2]",
-    ASSIGN(.length) sizeof("[2,2]") - 1
-};
-static const mapreduce_json_t value2 = {
-    ASSIGN(.json) "22",
-    ASSIGN(.length) sizeof("22") - 1
-};
+static const mapreduce_json_t key3 = {const_cast<char*>("[3,3]"),
+                                      sizeof("[3,3]") - 1};
+static const mapreduce_json_t value3 = {const_cast<char*>("33"),
+                                        sizeof("33") - 1};
 
-static const mapreduce_json_t key3 = {
-    ASSIGN(.json) "[3,3]",
-    ASSIGN(.length) sizeof("[3,3]") - 1
-};
-static const mapreduce_json_t value3 = {
-    ASSIGN(.json) "33",
-    ASSIGN(.length) sizeof("33") - 1
-};
+static const mapreduce_json_t key4 = {const_cast<char*>("[4,4]"),
+                                      sizeof("[4,4]") - 1};
+static const mapreduce_json_t value4 = {const_cast<char*>("44"),
+                                        sizeof("44") - 1};
 
-static const mapreduce_json_t key4 = {
-    ASSIGN(.json) "[4,4]",
-    ASSIGN(.length) sizeof("[4,4]") - 1
-};
-static const mapreduce_json_t value4 = {
-    ASSIGN(.json) "44",
-    ASSIGN(.length) sizeof("44") - 1
-};
+static mapreduce_json_list_t* all_keys(void);
+static mapreduce_json_list_t* all_values(void);
+static void free_json_list(mapreduce_json_list_t* list);
 
-static mapreduce_json_list_t *all_keys(void);
-static mapreduce_json_list_t *all_values(void);
-static void free_json_list(mapreduce_json_list_t *list);
-
-static void test_bad_syntax_functions(void)
-{
-    void *context = NULL;
-    char *error_msg = NULL;
+static void test_bad_syntax_functions(void) {
+    void* context = NULL;
+    char* error_msg = NULL;
     mapreduce_error_t ret;
-    const char *functions[] = {
-        "function(key, values, rereduce) { return values.length; }",
-        "function(key, values, rereduce) { return values.length * 2;"
-    };
+    const char* functions[] = {
+            "function(key, values, rereduce) { return values.length; }",
+            "function(key, values, rereduce) { return values.length * 2;"};
 
     ret = mapreduce_start_reduce_context(functions, 2, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SYNTAX_ERROR);
@@ -91,17 +67,15 @@ static void test_bad_syntax_functions(void)
     mapreduce_free_error_msg(error_msg);
 }
 
-static void test_runtime_exception(void)
-{
-    void *context = NULL;
-    char *error_msg = NULL;
+static void test_runtime_exception(void) {
+    void* context = NULL;
+    char* error_msg = NULL;
     mapreduce_error_t ret;
-    const char *functions[] = {
-        "function(key, values, rereduce) { throw('foobar'); }"
-    };
-    mapreduce_json_list_t *result = NULL;
-    mapreduce_json_list_t *keys;
-    mapreduce_json_list_t *values;
+    const char* functions[] = {
+            "function(key, values, rereduce) { throw('foobar'); }"};
+    mapreduce_json_list_t* result = NULL;
+    mapreduce_json_list_t* keys;
+    mapreduce_json_list_t* values;
 
     ret = mapreduce_start_reduce_context(functions, 1, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
@@ -122,19 +96,17 @@ static void test_runtime_exception(void)
     free_json_list(values);
 }
 
-static void test_runtime_error(void)
-{
-    void *context = NULL;
-    char *error_msg = NULL;
+static void test_runtime_error(void) {
+    void* context = NULL;
+    char* error_msg = NULL;
     mapreduce_error_t ret;
-    const char *functions[] = {
-        "function(key, values, rereduce) { return sum(values); }",
-        "function(key, values, rereduce) { return values[0].foo.bar; }"
-    };
-    mapreduce_json_list_t *result = NULL;
-    mapreduce_json_list_t *keys;
-    mapreduce_json_list_t *values;
-    mapreduce_json_t *reduction = NULL;
+    const char* functions[] = {
+            "function(key, values, rereduce) { return sum(values); }",
+            "function(key, values, rereduce) { return values[0].foo.bar; }"};
+    mapreduce_json_list_t* result = NULL;
+    mapreduce_json_list_t* keys;
+    mapreduce_json_list_t* values;
+    mapreduce_json_t* reduction = NULL;
 
     ret = mapreduce_start_reduce_context(functions, 2, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
@@ -149,9 +121,9 @@ static void test_runtime_error(void)
     cb_assert(ret == MAPREDUCE_RUNTIME_ERROR);
     cb_assert(result == NULL);
     cb_assert(error_msg != NULL);
-    cb_assert(strcmp(
-        "TypeError: Cannot read property 'bar' of undefined (line 1:56)",
-        error_msg) == 0);
+    cb_assert(strcmp("TypeError: Cannot read property 'bar' of undefined (line "
+                     "1:56)",
+                     error_msg) == 0);
 
     mapreduce_free_error_msg(error_msg);
     error_msg = NULL;
@@ -162,9 +134,9 @@ static void test_runtime_error(void)
     cb_assert(ret == MAPREDUCE_RUNTIME_ERROR);
     cb_assert(reduction == NULL);
     cb_assert(error_msg != NULL);
-    cb_assert(strcmp(
-        "TypeError: Cannot read property 'bar' of undefined (line 1:56)",
-        error_msg) == 0);
+    cb_assert(strcmp("TypeError: Cannot read property 'bar' of undefined (line "
+                     "1:56)",
+                     error_msg) == 0);
 
     mapreduce_free_error_msg(error_msg);
 
@@ -184,17 +156,16 @@ static void test_runtime_error(void)
     free_json_list(values);
 }
 
-static void test_reduce_emits(void)
-{
-    void *context = NULL;
-    char *error_msg = NULL;
+static void test_reduce_emits(void) {
+    void* context = NULL;
+    char* error_msg = NULL;
     mapreduce_error_t ret;
-    const char *functions[] = {
-        "function(key, values, rereduce) { emit(key, values); return sum(values); }"
-    };
-    mapreduce_json_list_t *result = NULL;
-    mapreduce_json_list_t *keys;
-    mapreduce_json_list_t *values;
+    const char* functions[] = {
+            "function(key, values, rereduce) { emit(key, values); return "
+            "sum(values); }"};
+    mapreduce_json_list_t* result = NULL;
+    mapreduce_json_list_t* keys;
+    mapreduce_json_list_t* values;
 
     ret = mapreduce_start_reduce_context(functions, 1, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
@@ -218,32 +189,29 @@ static void test_reduce_emits(void)
     free_json_list(values);
 }
 
-
-static void test_reduce_and_rereduce_success(void)
-{
-    void *context = NULL;
-    char *error_msg = NULL;
+static void test_reduce_and_rereduce_success(void) {
+    void* context = NULL;
+    char* error_msg = NULL;
     mapreduce_error_t ret;
-    const char *functions[] = {
-        "function(key, values, rereduce) {"
-        "  if (rereduce) {"
-        "    return sum(values);"
-        "  } else {"
-        "    return values.length;"
-        "  }"
-        "}",
-        "function(key, values, rereduce) {"
-        "  if (rereduce) {"
-        "    return values[values.length - 1];"
-        "  } else {"
-        "    return values[0];"
-        "  }"
-        "}"
-    };
-    mapreduce_json_list_t *result = NULL;
-    mapreduce_json_list_t *keys = NULL;
-    mapreduce_json_list_t *values = NULL;
-    mapreduce_json_t *reduction = NULL;
+    const char* functions[] = {
+            "function(key, values, rereduce) {"
+            "  if (rereduce) {"
+            "    return sum(values);"
+            "  } else {"
+            "    return values.length;"
+            "  }"
+            "}",
+            "function(key, values, rereduce) {"
+            "  if (rereduce) {"
+            "    return values[values.length - 1];"
+            "  } else {"
+            "    return values[0];"
+            "  }"
+            "}"};
+    mapreduce_json_list_t* result = NULL;
+    mapreduce_json_list_t* keys = NULL;
+    mapreduce_json_list_t* values = NULL;
+    mapreduce_json_t* reduction = NULL;
 
     ret = mapreduce_start_reduce_context(functions, 2, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
@@ -318,25 +286,23 @@ static void test_reduce_and_rereduce_success(void)
     free_json_list(values);
 }
 
-static void test_timeout(void)
-{
-    void *context = NULL;
-    char *error_msg = NULL;
+static void test_timeout(void) {
+    void* context = NULL;
+    char* error_msg = NULL;
     mapreduce_error_t ret;
-    const char *functions[] = {
-        "function(key, values, rereduce) {"
-        "  if (rereduce) {"
-        "    return sum(values);"
-        "  } else {"
-        "    while (true) { };"
-        "    return values.length;"
-        "  }"
-        "}"
-    };
-    mapreduce_json_list_t *result = NULL;
-    mapreduce_json_list_t *keys = NULL;
-    mapreduce_json_list_t *values = NULL;
-    mapreduce_json_t *reduction = NULL;
+    const char* functions[] = {
+            "function(key, values, rereduce) {"
+            "  if (rereduce) {"
+            "    return sum(values);"
+            "  } else {"
+            "    while (true) { };"
+            "    return values.length;"
+            "  }"
+            "}"};
+    mapreduce_json_list_t* result = NULL;
+    mapreduce_json_list_t* keys = NULL;
+    mapreduce_json_list_t* values = NULL;
+    mapreduce_json_t* reduction = NULL;
 
     ret = mapreduce_start_reduce_context(functions, 1, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
@@ -370,13 +336,14 @@ static void test_timeout(void)
     free_json_list(values);
 }
 
-static mapreduce_json_list_t *all_keys(void)
-{
-    mapreduce_json_list_t *ret = (mapreduce_json_list_t *) cb_malloc(sizeof(*ret));
+static mapreduce_json_list_t* all_keys(void) {
+    mapreduce_json_list_t* ret =
+            (mapreduce_json_list_t*)cb_malloc(sizeof(*ret));
 
     cb_assert(ret != NULL);
     ret->length = 4;
-    ret->values = (mapreduce_json_t *) cb_malloc(sizeof(mapreduce_json_t) * ret->length);
+    ret->values = (mapreduce_json_t*)cb_malloc(sizeof(mapreduce_json_t) *
+                                               ret->length);
     cb_assert(ret->values != NULL);
     ret->values[0] = key1;
     ret->values[1] = key2;
@@ -386,13 +353,14 @@ static mapreduce_json_list_t *all_keys(void)
     return ret;
 }
 
-static mapreduce_json_list_t *all_values(void)
-{
-    mapreduce_json_list_t *ret = (mapreduce_json_list_t *) cb_malloc(sizeof(*ret));
+static mapreduce_json_list_t* all_values(void) {
+    mapreduce_json_list_t* ret =
+            (mapreduce_json_list_t*)cb_malloc(sizeof(*ret));
 
     cb_assert(ret != NULL);
     ret->length = 4;
-    ret->values = (mapreduce_json_t *) cb_malloc(sizeof(mapreduce_json_t) * ret->length);
+    ret->values = (mapreduce_json_t*)cb_malloc(sizeof(mapreduce_json_t) *
+                                               ret->length);
     cb_assert(ret->values != NULL);
     ret->values[0] = value1;
     ret->values[1] = value2;
@@ -402,14 +370,12 @@ static mapreduce_json_list_t *all_values(void)
     return ret;
 }
 
-static void free_json_list(mapreduce_json_list_t *list)
-{
+static void free_json_list(mapreduce_json_list_t* list) {
     cb_free(list->values);
     cb_free(list);
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     fprintf(stderr, "Running reduce tests\n");
     mapreduce_init(argv[1]);
 
