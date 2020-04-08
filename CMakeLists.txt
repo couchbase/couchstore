@@ -71,7 +71,6 @@ ADD_LIBRARY(couchstore_objs OBJECT
         src/crc32.cc
         src/db_compact.cc
         src/file_merger.cc
-        src/file_name_utils.c
         src/file_sorter.cc
         src/iobuffer.cc
         src/llmsort.cc
@@ -112,7 +111,7 @@ SET_PROPERTY(TARGET couchstore_view_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 # libcouchstore, core couchstore library
 ADD_LIBRARY(couchstore SHARED $<TARGET_OBJECTS:couchstore_objs>)
-SET(COUCHSTORE_LIBS cbcompress platform phosphor)
+SET(COUCHSTORE_LIBS cbcompress dirutils platform phosphor)
 TARGET_LINK_LIBRARIES(couchstore ${COUCHSTORE_LIBS})
 
 GENERATE_EXPORT_HEADER(couchstore
@@ -277,7 +276,6 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
 
     M_MAKE_LEGACY_TEST(couchstore_file-sorter-test
                        src/file_merger.cc
-                       src/file_name_utils.c
                        src/file_sorter.cc
                        src/quicksort.c
                        tests/file_sorter_tests.c)

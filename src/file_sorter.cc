@@ -19,10 +19,10 @@
  **/
 
 #include "file_sorter.h"
-#include "file_name_utils.h"
 #include "quicksort.h"
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
+#include <platform/dirutils.h>
 
 #include <strings.h>
 #include <condition_variable>
@@ -46,7 +46,7 @@ typedef struct {
 typedef struct {
     const char                   *tmp_dir;
     const char                   *source_file;
-    char                         *tmp_file_prefix;
+    std::string tmp_file_prefix;
     unsigned                      num_tmp_files;
     unsigned                      max_buffer_size;
     file_merger_read_record_t     read_record;
@@ -172,8 +172,9 @@ file_sorter_error_t sort_file(const char *source_file,
         return FILE_SORTER_ERROR_BAD_ARG;
     }
 
-    ctx.tmp_file_prefix = file_basename(source_file);
-    if (ctx.tmp_file_prefix == NULL) {
+    try {
+        ctx.tmp_file_prefix = cb::io::basename(source_file);
+    } catch (const std::bad_alloc&) {
         return FILE_SORTER_ERROR_TMP_FILE_BASENAME;
     }
 
@@ -196,7 +197,6 @@ file_sorter_error_t sort_file(const char *source_file,
 
     ctx.f = fopen(source_file, "rb");
     if (ctx.f == NULL) {
-        cb_free(ctx.tmp_file_prefix);
         return FILE_SORTER_ERROR_OPEN_FILE;
     }
 
@@ -204,7 +204,6 @@ file_sorter_error_t sort_file(const char *source_file,
 
     if (ctx.tmp_files == NULL) {
         fclose(ctx.f);
-        cb_free(ctx.tmp_file_prefix);
         return FILE_SORTER_ERROR_ALLOC;
     }
 
@@ -225,7 +224,6 @@ file_sorter_error_t sort_file(const char *source_file,
         }
     }
     cb_free(ctx.tmp_files);
-    cb_free(ctx.tmp_file_prefix);
 
     return ret;
 }
@@ -618,8 +616,8 @@ static tmp_file_t *create_tmp_file(file_sort_ctx_t *ctx)
     cb_assert(ctx->tmp_files[i].name == NULL);
     cb_assert(ctx->tmp_files[i].level == 0);
 
-    ctx->tmp_files[i].name = sorter_tmp_file_path(ctx->tmp_dir,
-        ctx->tmp_file_prefix);
+    ctx->tmp_files[i].name =
+            sorter_tmp_file_path(ctx->tmp_dir, ctx->tmp_file_prefix.c_str());
     if (ctx->tmp_files[i].name == NULL) {
         return NULL;
     }
@@ -733,7 +731,7 @@ static file_sorter_error_t merge_tmp_files(file_sort_ctx_t *ctx,
         feed_record = ctx->feed_record;
     } else {
         dest_tmp_file = sorter_tmp_file_path(ctx->tmp_dir,
-            ctx->tmp_file_prefix);
+                                             ctx->tmp_file_prefix.c_str());
         if (dest_tmp_file == NULL) {
             cb_free(files);
             return FILE_SORTER_ERROR_MK_TMP_FILE;
