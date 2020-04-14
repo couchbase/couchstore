@@ -22,6 +22,7 @@
 #include <libcouchstore/file_ops.h>
 
 #include <nlohmann/json_fwd.hpp>
+#include <functional>
 #include <optional>
 
 extern "C" {
@@ -891,10 +892,7 @@ extern "C" {
         COUCHSTORE_COMPACT_NEED_BODY = 2
     };
 
-    typedef int (*couchstore_compact_hook)(Db* target,
-                                           DocInfo *docinfo,
-                                           sized_buf item, // is {nullptr, 0}
-                                           void *ctx);
+    using couchstore_compact_hook = int (*)(Db*, DocInfo*, sized_buf, void*);
 
     /**
      * Callback to rewrite the DocInfo as part of compaction
@@ -903,8 +901,7 @@ extern "C" {
      * @return 0 no modifications happened to the data
      *         1 the data was changed
      */
-    typedef int (*couchstore_docinfo_hook)(DocInfo** docinfo,
-                                           const sized_buf* value);
+    using couchstore_docinfo_hook = int (*)(DocInfo**, const sized_buf*);
 
     /**
      * Set purge sequence number.
@@ -1165,6 +1162,53 @@ struct LIBCOUCHSTORE_API Header {
  */
 LIBCOUCHSTORE_API
 Header getHeader(Db& db);
+
+/**
+ * The compact filter is called with the target database as the first
+ * parameter, then the DocumentInfo as the second parameter (set to
+ * nullptr in the callback after all documents was processed) and the
+ * documents value in the sized_buf. If sized_buf is nullptr you should return
+ * COUCHSTORE_COMPACT_NEED_BODY and the system will load the value and
+ * provide it again.
+ *
+ * The method should return one of:
+ *     COUCHSTORE_COMPACT_KEEP_ITEM
+ *     COUCHSTORE_COMPACT_DROP_ITEM
+ *     COUCHSTORE_COMPACT_NEED_BODY
+ * or any of the couchstore error codes to abort compaction
+ */
+using CompactFilterCallback = std::function<int(Db&, DocInfo*, sized_buf)>;
+
+/**
+ * The rewrite callback is used to change the metadata for the DocInfo
+ * as part of the compaction. The first parameter is an in/out parameter
+ * containing the document info (may be reallocated in the callback with
+ * cb_realloc()) the second parameter contains the documents value.
+ */
+using CompactRewriteDocInfoCallback = std::function<int(DocInfo*&, sized_buf)>;
+
+/**
+ * Compact a Couchstore file
+ *
+ * @param source The source database to compact
+ * @param target_filename The name of the target database
+ * @param flags Extra flags to open the database with
+ * @param filterCallback The filter callback to call for each item to check
+ *                       if the document should be part of the compacted
+ *                       database or not
+ * @param rewriteDocInfoCallback The rewrite callback which is called for
+ *                       each DocInfo to be put into the new database (to
+ *                       allow upgrading the metadata section in the DocInfo)
+ * @param ops The File operations to use
+ * @return Couchstore error code
+ */
+LIBCOUCHSTORE_API
+couchstore_error_t compact(Db& source,
+                           const char* target_filename,
+                           couchstore_compact_flags flags,
+                           CompactFilterCallback filterCallback,
+                           CompactRewriteDocInfoCallback rewriteDocInfoCallback,
+                           FileOpsInterface* ops);
 
 } // namespace couchstore
 } // namespace cb
