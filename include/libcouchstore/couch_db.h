@@ -1,5 +1,19 @@
-/* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-#ifndef COUCHSTORE_COUCH_DB_H
+/*
+ *     Copyright 2020 Couchbase, Inc.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ */
+#pragma once
 #define COUCHSTORE_COUCH_DB_H
 
 #include "couch_common.h"
@@ -7,12 +21,10 @@
 #include <libcouchstore/error.h>
 #include <libcouchstore/file_ops.h>
 
-#ifdef __cplusplus
 #include <nlohmann/json_fwd.hpp>
 #include <optional>
 
 extern "C" {
-#endif
 
     /*///////////////////  OPENING/CLOSING DATABASES: */
 
@@ -238,7 +250,6 @@ extern "C" {
     LIBCOUCHSTORE_API
     const char* couchstore_get_db_filename(Db *db);
 
-#ifdef __cplusplus
     /**
      * Return file handle statistics of the database's underlying file handle.
      *
@@ -248,7 +259,6 @@ extern "C" {
      */
     LIBCOUCHSTORE_API
     FileOpsInterface::FHStats* couchstore_get_db_filestats(Db* db);
-#endif
 
     /**
      * Get the position in the file of the mostly recently written
@@ -989,8 +999,6 @@ extern "C" {
                                                  uint64_t min_seq,
                                                  uint64_t max_seq,
                                                  uint64_t *count);
-
-#ifdef __cplusplus
 }
 
 namespace cb {
@@ -1160,6 +1168,3 @@ Header getHeader(Db& db);
 
 } // namespace couchstore
 } // namespace cb
-
-#endif
-#endif
