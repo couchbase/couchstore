@@ -370,8 +370,7 @@ void init_terminator_thread()
     terminator_timeout = 5;
     try {
         cv = std::unique_ptr<std::condition_variable>(new std::condition_variable());
-    }
-    catch (std::bad_alloc) {
+    } catch (const std::bad_alloc&) {
         std::cerr << "Error creating conditional variable: " << std::endl;
         exit(1);
     }
