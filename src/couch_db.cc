@@ -643,11 +643,6 @@ couchstore_error_t couchstore_free_db(Db* db)
     cb_free(db->header.by_id_root);
     cb_free(db->header.by_seq_root);
     cb_free(db->header.local_docs_root);
-    db->header.by_id_root = NULL;
-    db->header.by_seq_root = NULL;
-    db->header.local_docs_root = NULL;
-
-    memset(db, 0xa5, sizeof(*db));
     cb_free(db);
 
     return COUCHSTORE_SUCCESS;
