@@ -303,7 +303,7 @@ static couchstore_error_t create_header(Db *db)
     db->header.purge_ptr = 0;
     db->header.position = 0;
     db->header.timestamp =
-            std::chrono::steady_clock::now().time_since_epoch().count();
+            std::chrono::system_clock::now().time_since_epoch().count();
     return db_write_header(db);
 }
 
@@ -350,7 +350,7 @@ couchstore_error_t precommit(Db *db)
 
 couchstore_error_t couchstore_commit(Db* db) {
     return couchstore_commit_ex(
-            db, std::chrono::steady_clock::now().time_since_epoch().count());
+            db, std::chrono::system_clock::now().time_since_epoch().count());
 }
 
 couchstore_error_t couchstore_commit_ex(Db* db, uint64_t timestamp) {

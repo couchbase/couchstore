@@ -196,7 +196,7 @@ TEST_F(CouchstoreCxxTest, CommitTimestamp) {
     // When we created the database in SetUp we did a commit which added
     // the current time as the header...
     EXPECT_NE(0, header.timestamp);
-    EXPECT_GT(std::chrono::steady_clock::now().time_since_epoch().count(),
+    EXPECT_GT(std::chrono::system_clock::now().time_since_epoch().count(),
               header.timestamp);
     couchstore_commit_ex(db.get(), 0xdeadbeef);
     header = cb::couchstore::getHeader(*db);
