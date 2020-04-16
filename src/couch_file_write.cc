@@ -47,7 +47,7 @@ static ssize_t raw_write(tree_file *file, const sized_buf *buf, cs_off_t pos)
 {
     cs_off_t write_pos = pos;
     size_t buf_pos = 0;
-    char blockprefix = 0;
+    const auto diskBlockType = DiskBlockType::Data;
     ssize_t written;
     size_t block_remain;
 
@@ -61,7 +61,7 @@ static ssize_t raw_write(tree_file *file, const sized_buf *buf, cs_off_t pos)
         }
 
         if (write_pos % COUCH_BLOCK_SIZE == 0) {
-            written = write_entire_buffer(file, &blockprefix, 1, write_pos);
+            written = write_entire_buffer(file, &diskBlockType, 1, write_pos);
             if (written < 0) {
                 return written;
             }
@@ -87,12 +87,12 @@ couchstore_error_t write_header(tree_file *file, sized_buf *buf, cs_off_t *pos)
     uint32_t crc32 = htonl(get_checksum(reinterpret_cast<uint8_t*>(buf->buf),
                                         buf->size,
                                         file->crc_mode));
-    char headerbuf[1 + 4 + 4];
+    uint8_t headerbuf[1 + 4 + 4];
 
     *pos = write_pos;
 
     // Write the header's block header
-    headerbuf[0] = 1;
+    headerbuf[0] = uint8_t(DiskBlockType::Header);
     memcpy(&headerbuf[1], &size, 4);
     memcpy(&headerbuf[5], &crc32, 4);
 

@@ -144,6 +144,21 @@ couchstore_error_t cb::couchstore::compact(
 
     ctx.target = target;
     target->file.pos = 1;
+    {
+        // MB-38788:
+        // couchstore_open_db_ex created a new header block at file offset 0
+        // and we want to get rid of that block as part of compaction (that's
+        // why we set target->file.pos = 1 above. But we need to change
+        // the block magic to reflect this change!!!
+        DiskBlockType magic = DiskBlockType::Data;
+        error_unless(target->file.ops->pwrite(&target->file.lastError,
+                                              target->file.handle,
+                                              &magic,
+                                              1,
+                                              0) == 1,
+                     COUCHSTORE_ERROR_WRITE);
+    }
+
     target->header.update_seq = source.header.update_seq;
     if (flags & COUCHSTORE_COMPACT_FLAG_DROP_DELETES) {
         //Count the number of times purge has happened

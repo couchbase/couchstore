@@ -131,6 +131,12 @@ extern "C" {
     };
 
     /**
+     * This is the on-disk representation of the legal disk block types
+     * stored at the 4k offsets within the file.
+     */
+    enum class DiskBlockType : uint8_t { Data = 0x00, Header = 0x01 };
+
+    /**
      * Returns a newed FileOpsInterface implementation
      * instance.
      *

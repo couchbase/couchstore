@@ -118,6 +118,49 @@ TEST_F(CouchstoreCompactTest, NormalCompaction) {
 }
 
 /**
+ * Compaction removed the initial header block created automatically
+ * as part of couchstore_open_db_ex, but not set the block magic to Data
+ */
+TEST_F(CouchstoreCompactTest, MB38788_IncorrectBlockSize) {
+    auto db = openSourceDb();
+
+    const std::string value = "This is a small value";
+    for (auto ii = 0; ii < 10; ii++) {
+        ASSERT_EQ(cb::couchstore::getDiskBlockSize(*db) * ii,
+                  couchstore_get_header_position(db.get()))
+                << "Unexpected header location";
+        storeDocument(*db, std::to_string(ii), value);
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
+    }
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_compact_db(db.get(), targetFilename.c_str()));
+
+    db = openTargetDb();
+    EXPECT_EQ(cb::couchstore::getDiskBlockSize(*db),
+              couchstore_get_header_position(db.get()));
+
+    // Validate that we can fetch all of documents (none was lost or corrupted)
+    for (auto ii = 0; ii < 10; ii++) {
+        auto [status, doc] =
+                cb::couchstore::openDocument(*db, std::to_string(ii));
+        EXPECT_EQ(status, COUCHSTORE_SUCCESS)
+                << "Failed to get \"" << std::to_string(ii) << "\"";
+        EXPECT_EQ(value, std::string(doc->data.buf, doc->data.size));
+    }
+
+    // Compaction removes the header block located at the beginning
+    // of the file so we should have only 1 header in the file.
+    // Before MB38788 seek would fail with checksum error as it found something
+    // it thought was a header (due to the magic), but with invalid content
+    db = openTargetDb();
+    EXPECT_EQ(COUCHSTORE_ERROR_NO_HEADER,
+              cb::couchstore::seek(*db, cb::couchstore::Direction::Backward));
+    EXPECT_EQ(COUCHSTORE_ERROR_NO_HEADER,
+              cb::couchstore::seek(*db, cb::couchstore::Direction::Forward));
+}
+
+/**
  * Run the same test as NormalCompactionEx, but use the _ex version of compact
  * and provide the callback methods
  */

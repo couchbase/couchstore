@@ -107,18 +107,18 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
     } header_buf = { NULL };
     int header_size = 0;
 
-    uint8_t buf[2];
+    DiskBlockType diskBlockType;
     ssize_t readsize;
     {
         // Speculative read looking for header, mark as Empty.
         ScopedFileTag tag(db->file.ops, db->file.handle, FileTag::Empty);
         readsize = db->file.ops->pread(
-                &db->file.lastError, db->file.handle, buf, 2, pos);
+                &db->file.lastError, db->file.handle, &diskBlockType, 1, pos);
     }
-    error_unless(readsize == 2, COUCHSTORE_ERROR_READ);
-    if (buf[0] == 0) {
+    error_unless(readsize == 1, COUCHSTORE_ERROR_READ);
+    if (diskBlockType == DiskBlockType::Data) {
         return COUCHSTORE_ERROR_NO_HEADER;
-    } else if (buf[0] != 1) {
+    } else if (diskBlockType != DiskBlockType::Header) {
         return COUCHSTORE_ERROR_CORRUPT;
     }
 
