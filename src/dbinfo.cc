@@ -17,8 +17,10 @@
 #include <getopt.h>
 #include <inttypes.h>
 #include <libcouchstore/couch_db.h>
+#include <memcached/isotime.h>
 #include <platform/cbassert.h>
 #include <platform/string_hex.h>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -26,6 +28,8 @@
 #include <optional>
 
 #include "internal.h"
+
+static bool format_timestamp = false;
 
 static char *size_str(double size)
 {
@@ -84,6 +88,20 @@ next_header:
     printf("   update_seq: %" PRIu64 "\n", db->header.update_seq);
     printf("   purge_seq: %" PRIu64 "\n", db->header.purge_seq);
 
+    if (db->header.disk_version >= COUCH_DISK_VERSION_13) {
+        if (format_timestamp) {
+            std::chrono::nanoseconds ns{db->header.timestamp};
+            auto seconds = std::chrono::duration_cast<std::chrono::seconds>(ns);
+            auto usec = std::chrono::duration_cast<std::chrono::microseconds>(
+                    ns - seconds);
+            auto dest =
+                    ISOTime::generatetimestamp(seconds.count(), usec.count());
+            printf("   timestamp: %s\n", dest.c_str());
+        } else {
+            printf("   timestamp: %" PRIu64 "\n", db->header.timestamp);
+        }
+    }
+
     print_db_info(db.get());
     const auto id_tree_size =
             db->header.by_id_root ? db->header.by_id_root->subtreesize : 0;
@@ -118,6 +136,9 @@ Options:
    -o / --header-offset <offset>
       Specify the offset of the header to use (may be combined with
       --iterate-header to iterate a subset of the file).
+   -l / --localtime
+      Assume that the timestamp in the headers is the number of ns
+      since epoch and print it as a human readable form (local time)
 
 Note:
 Unless --header-offset is specified the program selects the last
@@ -140,10 +161,11 @@ int main(int argc, char **argv)
     struct option long_options[] = {
             {"header-offset", required_argument, nullptr, 'o'},
             {"iterate-headers", optional_argument, nullptr, 'i'},
+            {"localtime", no_argument, nullptr, 'l'},
             {"help", no_argument, nullptr, '?'},
             {nullptr, 0, nullptr, 0}};
 
-    while ((cmd = getopt_long(argc, argv, "io:", long_options, nullptr)) !=
+    while ((cmd = getopt_long(argc, argv, "io:l", long_options, nullptr)) !=
            EOF) {
         switch (cmd) {
         case 'i':
@@ -174,6 +196,9 @@ int main(int argc, char **argv)
             } else {
                 header_offset.emplace(std::atoi(optarg));
             }
+            break;
+        case 'l':
+            format_timestamp = true;
             break;
         default:
             usage();
