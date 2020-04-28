@@ -627,7 +627,7 @@ couchstore_error_t findNextHeader(Db& source,
         auto header = cb::couchstore::getHeader(source);
 
         // Make sure that we don't process beyond the max header!
-        if (header.headerPosition > maxHeaderPosition) {
+        if (cs_off_t(header.headerPosition) > maxHeaderPosition) {
             // we need to use the previous header
             return cb::couchstore::seek(source, current);
         }
