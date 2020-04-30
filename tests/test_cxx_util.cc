@@ -213,8 +213,15 @@ TEST_F(CouchstoreCxxTest, GetHeaderJson) {
     couchstore_commit_ex(db.get(), 0xdeadbeef);
     auto header = cb::couchstore::getHeader(*db);
     ASSERT_EQ(Header::Version::V13, header.version);
-    EXPECT_EQ(
-            "{\"header_position\":\"0x0000000000015000\",\"purge_seq\":0,"
-            "\"timestamp\":3735928559,\"update_seq\":10,\"version\":13}",
-            header.to_json().dump());
+    auto json = header.to_json();
+    EXPECT_EQ(13, json["version"]);
+    EXPECT_EQ("0x0000000000015000", json["header_position"]);
+    EXPECT_EQ(3735928559, json["timestamp"]);
+    EXPECT_EQ(0, json["purge_seq"]);
+    EXPECT_EQ(10, json["doc_count"]);
+    EXPECT_NE("", json["filename"]);
+    EXPECT_EQ(0, json["deleted_count"]);
+    EXPECT_EQ(86103, json["file_size"]);
+    EXPECT_EQ(41369, json["space_used"]);
+    EXPECT_EQ(10, json["update_seq"]);
 }

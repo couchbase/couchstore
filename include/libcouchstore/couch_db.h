@@ -1150,6 +1150,17 @@ struct LIBCOUCHSTORE_API Header {
     uint64_t purgeSeqNum;
     /// The offset in the database file for the location of the header
     uint64_t headerPosition;
+    /// Filesystem path (the file name is only valid as long as the
+    /// database instance is valid!).
+    const char* filename;
+    /// Total number of (non-deleted) documents
+    uint64_t docCount;
+    /// Total number of deleted documents
+    uint64_t deletedCount;
+    /// Disk space actively used by docs
+    uint64_t spaceUsed;
+    /// Total disk space used by database
+    uint64_t fileSize;
 
     nlohmann::json to_json() const;
 };

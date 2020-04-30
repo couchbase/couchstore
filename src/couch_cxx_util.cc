@@ -123,6 +123,11 @@ nlohmann::json Header::to_json() const {
     ret["purge_seq"] = purgeSeqNum;
     ret["header_position"] = cb::to_hex(headerPosition);
     ret["timestamp"] = timestamp;
+    ret["filename"] = filename;
+    ret["doc_count"] = docCount;
+    ret["deleted_count"] = deletedCount;
+    ret["space_used"] = spaceUsed;
+    ret["file_size"] = fileSize;
     return ret;
 }
 
@@ -133,6 +138,13 @@ Header getHeader(Db& db) {
     ret.purgeSeqNum = db.header.purge_seq;
     ret.timestamp = db.header.timestamp;
     ret.headerPosition = db.header.position;
+    DbInfo info;
+    couchstore_db_info(&db, &info);
+    ret.filename = info.filename;
+    ret.docCount = info.doc_count;
+    ret.deletedCount = info.deleted_count;
+    ret.spaceUsed = info.space_used;
+    ret.fileSize = info.file_size;
     return ret;
 }
 
