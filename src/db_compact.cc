@@ -662,6 +662,11 @@ couchstore_error_t compact(Db& source,
         ops = couchstore_get_default_file_ops();
     }
 
+    if (delta == 0) {
+        throw std::invalid_argument(
+                "cb::couchstore::compact: delta can't be 0");
+    }
+
     auto header = getHeader(source);
     if (header.timestamp <= timestamp) {
         // The timestamp of the header in the source is older than the
@@ -707,9 +712,8 @@ couchstore_error_t compact(Db& source,
         ctx.target = std::move(target);
     }
 
-    size_t ii = 1;
-    while ((status = findNextHeader(
-                    source, sourceHeaderOffset, timestamp + (ii * delta))) ==
+    size_t ii = (timestamp / delta) + 1;
+    while ((status = findNextHeader(source, sourceHeaderOffset, ii * delta)) ==
            COUCHSTORE_SUCCESS) {
         ++ii;
         header = cb::couchstore::getHeader(source);

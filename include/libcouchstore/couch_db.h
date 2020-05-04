@@ -1232,6 +1232,13 @@ couchstore_error_t compact(Db& source,
  * many of the intermediate headers as possible but leave the header closest
  * to the requested interval.
  *
+ * The intended use case for this is to allow for the system to keep the
+ * history around for some period of time (a sliding windows with "full"
+ * history so that a backup client may be able to roll back to a given time).
+ * The delta used as an offset based off "epoch" to make sure that the headers
+ * always align to the same position no matter what the oldest is. (and we can
+ * calculate the closest boundary by using: now -= now % granularity)
+ *
  * NOTE: This is currently experimental and subject to change. Currently it'll
  *       throw exceptions in some of the error paths (these needs to be cleaned
  *       up and changed to couchstore_error etc).
@@ -1249,8 +1256,8 @@ couchstore_error_t compact(Db& source,
  *            couchstore_get_default_file_ops if set to nullptr)
  * @param timestamp The timestamp for the oldest revision to use (The header
  *                  _before_ this value is chosen if no exact match is found)
- * @param delta The delta to add to the timestamp to find the next header
- *              to keep.
+ * @param delta The delta to add to the between each timestamp to keep
+ *              in the database.
  * @return Couchstore error code
  * @throws std::runtime_error
  */
