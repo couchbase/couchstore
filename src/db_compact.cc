@@ -712,11 +712,11 @@ couchstore_error_t compact(Db& source,
         ctx.target = std::move(target);
     }
 
-    size_t ii = (timestamp / delta) + 1;
-    while ((status = findNextHeader(source, sourceHeaderOffset, ii * delta)) ==
+    uint64_t next = header.timestamp - (header.timestamp % delta) + delta;
+    while ((status = findNextHeader(source, sourceHeaderOffset, next)) ==
            COUCHSTORE_SUCCESS) {
-        ++ii;
         header = cb::couchstore::getHeader(source);
+        next = header.timestamp - (header.timestamp % delta) + delta;
 
         ++ctx.highest;
         status = couchstore_changes_since(
