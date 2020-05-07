@@ -1743,5 +1743,79 @@ couchstore_error_t seek(Db& db, Direction direction) {
     return errorcode;
 }
 
+couchstore_error_t seekFirstHeaderContaining(Db& db,
+                                             uint64_t seqno,
+                                             uint64_t granularity) {
+    if (granularity == 0) {
+        throw std::invalid_argument(
+                "cb::couchstore::seekFirstHeaderContaining: granularity can't "
+                "be 0");
+    }
+
+    auto header = getHeader(db);
+    const auto tipOffset = header.headerPosition;
+
+    // We need to roll back to find out where the startSeqno was introduced
+    // and give you data from there!
+    while (header.updateSeqNum > seqno) {
+        const auto prev = header.headerPosition;
+        auto status = seek(db, Direction::Backward);
+        if (status == COUCHSTORE_ERROR_NO_HEADER) {
+            // We've moved back to the first header we got so we got to
+            // give the user everything from this one going forward!
+            break;
+        }
+
+        if (status != COUCHSTORE_SUCCESS) {
+            seek(db, tipOffset);
+            return status;
+        }
+
+        header = getHeader(db);
+        if (header.updateSeqNum < seqno) {
+            // we went too far... jump back
+            status = seek(db, prev);
+            if (status != COUCHSTORE_SUCCESS) {
+                seek(db, tipOffset);
+                return status;
+            }
+            header = getHeader(db);
+            break;
+        }
+    }
+
+    if (header.headerPosition == tipOffset || granularity == 1) {
+        // This is the newest header so we can't fast forward
+        return COUCHSTORE_SUCCESS;
+    }
+
+    // We may have a finer granularity "on disk" than the user requested
+    // Try to "fast forward" to the requested boundary
+    const auto next =
+            header.timestamp - (header.timestamp % granularity) + granularity;
+    if (header.timestamp < next) {
+        // Inspect all blocks up to the tip of the file
+        while (header.headerPosition < tipOffset) {
+            const auto prev = header.headerPosition;
+            auto status = seek(db, Direction::Forward);
+            if (status != COUCHSTORE_SUCCESS) {
+                seek(db, tipOffset);
+                return status;
+            }
+            header = getHeader(db);
+            if (header.timestamp >= next) {
+                // this one is too new... jump back
+                status = seek(db, prev);
+                if (status != COUCHSTORE_SUCCESS) {
+                    seek(db, tipOffset);
+                }
+                return status;
+            }
+        }
+    }
+
+    return COUCHSTORE_SUCCESS;
+}
+
 } // namespace couchstore
 } // namespace cb

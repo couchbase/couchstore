@@ -1044,6 +1044,27 @@ LIBCOUCHSTORE_API
 couchstore_error_t seek(Db& db, Direction direction);
 
 /**
+ * Find the first header containing the requested sequence number (aligned
+ * to the provided granularity).
+ *
+ * The method rewinds the database instance to locate the first occurrence
+ * of the provided sequence number, then it'll move forward until it meets
+ * the boundary for timestamps with the provided granularity). This allows
+ * for "deduplication" when trying to locate all changes as part of Point
+ * in Time Recovery. If you want the first header the change was introduced
+ * in, supply 1 as the granularity.
+ *
+ * @param db The database instance to use
+ * @param seqno The sequence number to search for
+ * @param granularity The granularity used for deduplication (cannot be 0)
+ * @return The status of the operation
+ */
+LIBCOUCHSTORE_API
+couchstore_error_t seekFirstHeaderContaining(Db& db,
+                                             uint64_t seqno,
+                                             uint64_t granularity);
+
+/**
  * Helper method to wrap the C api to open a local document
  *
  * @param db the database to use

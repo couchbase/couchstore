@@ -329,6 +329,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                    tests/test_compact.cc
                    tests/test_cxx_util.cc
                    tests/test_fileops.cc
+                   tests/test_seek.cc
                    src/node_types.cc
                    src/crc32.cc
                    ${COUCHSTORE_FILE_OPS})
