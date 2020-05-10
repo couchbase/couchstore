@@ -207,9 +207,6 @@ static couchstore_error_t update_indexes(Db* db,
 
         idacts[ii].setType(ACTION_FETCH_INSERT);
         idacts[ii].data = &idvals[isorted];
-        // Allow the by_id building to find the by_seqno for each id.
-        // The save_callback method passes back id and seqno to the caller.
-        idacts[ii].seq = &seqs[isorted];
         idacts[ii].setKey(&ids[isorted]);
     }
 

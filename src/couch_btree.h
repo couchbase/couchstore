@@ -118,7 +118,6 @@
         // key
         folly::PackedSyncPtr<sized_buf> packedKeyPtr;
         sized_buf* data;
-        sized_buf* seq;
     } couchfile_modify_action;
 
     /* Guided purge related constants */
