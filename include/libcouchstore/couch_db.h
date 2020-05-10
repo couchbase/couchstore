@@ -342,15 +342,19 @@ extern "C" {
                                                  couchstore_save_options options);
 
     /**
-     * callback type for couchstore_save_documents_and_callback.
+     * Callback type for couchstore_save_documents_and_callback.
      * For each input key into couchstore_save_documents_and_callback the
      * callback is invoked with DocInfo for the new and maybe old.
-     * - If the document is being replaced than oldInfo is not null
-     * - If the document is being added than oldInfo is null
+     *
+     * @param oldInfo Old doc, expected to be nullptr if callback for an insert
+     * @param newInfo New doc
+     * @param ctx
+     * @param userReq Pointer to the user request
      */
     typedef void (*save_callback_fn)(const DocInfo* oldInfo,
                                      const DocInfo* newInfo,
-                                     void* ctx);
+                                     void* ctx,
+                                     void* userReq);
 
     /**
      * Save array of docs to db and optionally get called back about how the key
@@ -372,13 +376,15 @@ extern "C" {
      *        callback containing the key its updated_how value and the
      *        save_cb_ctx.
      * @param save_cb_ctx optional void* context for the save_cb
+     * @param userReqs Array of pointers to the user requests
      * @return COUCHSTORE_SUCCESS upon success
      */
     LIBCOUCHSTORE_API
     couchstore_error_t couchstore_save_documents_and_callback(
             Db* db,
-            Doc* const docs[],
-            DocInfo* infos[],
+            const Doc* const docs[],
+            DocInfo* const infos[],
+            void* const userReqs[],
             unsigned numDocs,
             couchstore_save_options options,
             save_callback_fn save_cb,

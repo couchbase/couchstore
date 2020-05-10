@@ -69,6 +69,8 @@ public:
 
     DocInfo** getDocInfos();
 
+    void** getUserReqs();
+
     Doc* getDoc(int index);
 
     DocInfo* getDocInfo(int index);
@@ -159,6 +161,7 @@ private:
     // Documents private data.
     std::vector<Doc*> docs;
     std::vector<DocInfo*> docInfos;
+    std::vector<void*> userReqs;
     std::vector<Document> documents;
     std::set<std::string> documentMap;
 

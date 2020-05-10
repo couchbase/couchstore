@@ -28,12 +28,13 @@ std::string to_string(sized_buf buf) {
 }
 
 Documents::Documents(int n_docs)
-  : docs(n_docs),
-    docInfos(n_docs),
-    documents(n_docs),
-    deleted(0),
-    callbacks(0),
-    position(0) {
+    : docs(n_docs),
+      docInfos(n_docs),
+      userReqs(n_docs),
+      documents(n_docs),
+      deleted(0),
+      callbacks(0),
+      position(0) {
 }
 
 void Documents::setDoc(int index, const std::string& id, const std::string& data) {
@@ -86,6 +87,10 @@ Doc** Documents::getDocs() {
 
 DocInfo** Documents::getDocInfos() {
     return docInfos.data();
+}
+
+void** Documents::getUserReqs() {
+    return userReqs.data();
 }
 
 Doc* Documents::getDoc(int index) {

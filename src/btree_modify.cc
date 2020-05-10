@@ -418,7 +418,8 @@ static couchstore_error_t maybe_purgekp(couchfile_modify_request *rq, node_point
 static void do_save_callback(couchfile_modify_request* rq,
                              const sized_buf* key,
                              const sized_buf* valueOld,
-                             const sized_buf* valueNew) {
+                             const sized_buf* valueNew,
+                             void* userReq) {
     DocInfo* infoNew = nullptr;
     DocInfo* infoOld = nullptr;
 
@@ -428,7 +429,7 @@ static void do_save_callback(couchfile_modify_request* rq,
         (*rq->docinfo_callback)(&infoOld, key, valueOld);
     }
 
-    (*rq->save_callback)(infoOld, infoNew, rq->save_callback_ctx);
+    (*rq->save_callback)(infoOld, infoNew, rq->save_callback_ctx, userReq);
 
     couchstore_free_docinfo(infoNew);
     couchstore_free_docinfo(infoOld);
@@ -498,7 +499,8 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                             do_save_callback(rq,
                                              rq->actions[start].getKey(),
                                              nullptr,
-                                             rq->actions[start].data);
+                                             rq->actions[start].data,
+                                             rq->actions[start].userReq);
                         }
                         break;
 
@@ -537,7 +539,8 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                             do_save_callback(rq,
                                              rq->actions[start].getKey(),
                                              &val_buf,
-                                             rq->actions[start].data);
+                                             rq->actions[start].data,
+                                             rq->actions[start].userReq);
                         }
                         break;
 
@@ -581,7 +584,8 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                     do_save_callback(rq,
                                      rq->actions[start].getKey(),
                                      nullptr,
-                                     rq->actions[start].data);
+                                     rq->actions[start].data,
+                                     rq->actions[start].userReq);
                 }
                 break;
 

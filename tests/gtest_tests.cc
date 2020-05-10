@@ -1635,6 +1635,7 @@ public:
                 couchstore_save_documents_and_callback(db,
                                                        documents.getDocs(),
                                                        documents.getDocInfos(),
+                                                       documents.getUserReqs(),
                                                        documents.getDocsCount(),
                                                        options,
                                                        &update_callback,
@@ -1668,7 +1669,8 @@ public:
 
     static void update_callback(const DocInfo* oldInfo,
                                 const DocInfo* newInfo,
-                                void* ctx) {
+                                void* ctx,
+                                void* userReq) {
         SaveCallbackTest* addedAndReplaced =
                 reinterpret_cast<SaveCallbackTest*>(ctx);
         ASSERT_NE(nullptr, newInfo);

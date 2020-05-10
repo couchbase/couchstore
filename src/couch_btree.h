@@ -118,6 +118,9 @@
         // key
         folly::PackedSyncPtr<sized_buf> packedKeyPtr;
         sized_buf* data;
+
+        // Pointer to the user request
+        void* userReq = nullptr;
     } couchfile_modify_action;
 
     /* Guided purge related constants */
