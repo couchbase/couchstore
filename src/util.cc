@@ -42,6 +42,10 @@ int seq_cmp(const sized_buf *k1, const sized_buf *k2)
     return (e1val < e2val ? -1 : 1);
 }
 
+void cb::couchstore::FatbufDeletor::operator()(fatbuf* fb) {
+    fatbuf_free(fb);
+}
+
 fatbuf *fatbuf_alloc(size_t bytes)
 {
     fatbuf *fb = (fatbuf *) cb_malloc(sizeof(fatbuf) + bytes);
