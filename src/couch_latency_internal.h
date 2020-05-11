@@ -150,4 +150,4 @@ private:
         /* Latency collector is disabled. */                          \
         CL_item_ptr.store(nullptr);                                   \
     }                                                                 \
-    CouchLatencyTimer CL_timer(CL_item_ptr);
+    CouchLatencyTimer CL_timer(CL_item_ptr)
