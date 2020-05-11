@@ -1,19 +1,30 @@
-/* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/*
+ *     Copyright 2020 Couchbase, Inc.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ */
 #include "couchstore_config.h"
 
-#include <platform/cb_malloc.h>
-#include <string.h>
-#include <stddef.h>
-#include <stdlib.h>
-
+#include "couch_btree.h"
+#include "couch_latency_internal.h"
 #include "internal.h"
 #include "node_types.h"
-#include "util.h"
 #include "reduces.h"
-#include "couch_btree.h"
-
-#include "couch_latency_internal.h"
-
+#include "util.h"
+#include <platform/cb_malloc.h>
+#include <cstddef>
+#include <cstdlib>
+#include <cstring>
 
 #define SEQ_INDEX_RAW_VALUE_SIZE(doc_info) \
     (sizeof(raw_seq_index_value) + (doc_info).id.size + (doc_info).rev_meta.size)
@@ -23,11 +34,10 @@
 
 #define RAW_SEQ_SIZE sizeof(raw_48)
 
-
 static size_t assemble_seq_index_value(DocInfo *docinfo, char *dst)
 {
     char* const start = dst;
-    raw_seq_index_value *raw = (raw_seq_index_value*)dst;
+    auto* raw = reinterpret_cast<raw_seq_index_value*>(dst);
     raw->sizes = encode_kv_length(docinfo->id.size, docinfo->physical_size);
     encode_raw48(docinfo->bp | (docinfo->deleted ? 1LL<<47 : 0), &raw->bp);
     raw->content_meta = encode_raw08(docinfo->content_meta);
@@ -46,7 +56,7 @@ static size_t assemble_seq_index_value(DocInfo *docinfo, char *dst)
 static size_t assemble_id_index_value(DocInfo *docinfo, char *dst)
 {
     char* const start = dst;
-    raw_id_index_value *raw = (raw_id_index_value*)dst;
+    auto* raw = reinterpret_cast<raw_id_index_value*>(dst);
     encode_raw48(docinfo->db_seq, &raw->db_seq);
     raw->physical_size = encode_raw32((uint32_t)docinfo->physical_size);
     encode_raw48(docinfo->bp | (docinfo->deleted ? 1LL<<47 : 0), &raw->bp);
@@ -74,10 +84,9 @@ static couchstore_error_t write_doc(Db *db, const Doc *doc, uint64_t *bp,
     return errcode;
 }
 
-static int ebin_ptr_compare(const void *a, const void *b)
-{
-    const sized_buf* const* buf1 = static_cast<const sized_buf* const *>(a);
-    const sized_buf* const* buf2 = static_cast<const sized_buf* const *>(b);
+static int ebin_ptr_compare(const void* a, const void* b) {
+    const auto* const* buf1 = static_cast<const sized_buf* const*>(a);
+    const auto* const* buf2 = static_cast<const sized_buf* const*>(b);
     return ebin_cmp(*buf1, *buf2);
 }
 
@@ -110,42 +119,38 @@ static int seq_action_compare(const void *actv1, const void *actv2)
     return 0;
 }
 
-typedef struct _idxupdatectx {
-    couchfile_modify_action *seqacts;
-    int actpos;
+struct index_update_ctx {
+    index_update_ctx(couchfile_modify_action* seqacts, fatbuf& deltermbuf)
+        : seqacts(seqacts), deltermbuf(deltermbuf) {
+    }
+    couchfile_modify_action* seqacts = nullptr;
+    int actpos = 0;
+    int valpos = 0;
+    fatbuf& deltermbuf;
+};
 
-    sized_buf **seqs;
-    sized_buf **seqvals;
-    int valpos;
-
-    fatbuf *deltermbuf;
-} index_update_ctx;
-
-static void idfetch_update_cb(couchfile_modify_request *rq,
-                              sized_buf *k, sized_buf *v, void *arg)
-{
-    (void)k;
-    (void)rq;
-    //v contains a seq we need to remove ( {Seq,_,_,_,_} )
-    uint64_t oldseq;
-    sized_buf *delbuf = NULL;
-    index_update_ctx *ctx = (index_update_ctx *) arg;
-
-    if (v == NULL) { //Doc not found
+static void idfetch_update_cb(couchfile_modify_request*,
+                              sized_buf*,
+                              sized_buf* v,
+                              void* arg) {
+    if (v == nullptr) { // Doc not found
         return;
     }
 
+    // v contains a seq we need to remove ( {Seq,_,_,_,_} )
+    auto* ctx = static_cast<index_update_ctx*>(arg);
     const raw_id_index_value *raw = (raw_id_index_value*) v->buf;
-    oldseq = decode_raw48(raw->db_seq);
+    uint64_t oldseq = decode_raw48(raw->db_seq);
 
-    delbuf = (sized_buf *) fatbuf_get(ctx->deltermbuf, sizeof(sized_buf));
-    delbuf->buf = (char *) fatbuf_get(ctx->deltermbuf, 6);
+    auto* delbuf = static_cast<sized_buf*>(
+            fatbuf_get(&ctx->deltermbuf, sizeof(sized_buf)));
+    delbuf->buf = static_cast<char*>(fatbuf_get(&ctx->deltermbuf, 6));
     delbuf->size = 6;
     memset(delbuf->buf, 0, 6);
     encode_raw48(oldseq, (raw_48*)delbuf->buf);
 
     ctx->seqacts[ctx->actpos].setType(ACTION_REMOVE);
-    ctx->seqacts[ctx->actpos].data = NULL;
+    ctx->seqacts[ctx->actpos].data = nullptr;
     ctx->seqacts[ctx->actpos].setKey(delbuf);
 
     ctx->actpos++;
@@ -159,18 +164,6 @@ static couchstore_error_t update_indexes(Db* db,
                                          int numdocs,
                                          save_callback_fn save_callback,
                                          void* save_callback_ctx) {
-    couchfile_modify_action *idacts;
-    couchfile_modify_action *seqacts;
-    const sized_buf **sorted_ids = NULL;
-    size_t size;
-    fatbuf *actbuf;
-    node_pointer *new_id_root;
-    node_pointer *new_seq_root;
-    couchstore_error_t errcode;
-    couchstore_error_t err;
-    couchfile_modify_request seqrq, idrq;
-    int ii;
-    index_update_ctx fetcharg;
 
     /**
      * Buffer size breakdown (per item) by use order:
@@ -184,36 +177,32 @@ static couchstore_error_t update_indexes(Db* db,
      * 1 x 6 bytes for the seqno of the item to remove from the seq tree pointed
      *     to by the delbuf created in idfetch_update_cb
      */
-    size = 2 * sizeof(couchfile_modify_action) + sizeof(sized_buf) + 6;
+    const size_t size =
+            2 * sizeof(couchfile_modify_action) + sizeof(sized_buf) + 6;
 
-    actbuf = fatbuf_alloc(numdocs * size);
-    error_unless(actbuf, COUCHSTORE_ERROR_ALLOC_FAIL);
+    cb::couchstore::unique_fatbuf_ptr actbuf(fatbuf_alloc(numdocs * size));
+    if (!actbuf) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
 
-    seqacts = static_cast<couchfile_modify_action*>(
-            fatbuf_get(actbuf, numdocs * sizeof(couchfile_modify_action)));
-    idacts = static_cast<couchfile_modify_action*>(
-            fatbuf_get(actbuf, numdocs * sizeof(couchfile_modify_action)));
-    error_unless(idacts && seqacts, COUCHSTORE_ERROR_ALLOC_FAIL);
-
-    memset(&fetcharg, 0, sizeof(fetcharg));
-    fetcharg.seqacts = seqacts;
-    fetcharg.actpos = 0;
-    fetcharg.seqs = &seqs;
-    fetcharg.seqvals = &seqvals;
-    fetcharg.valpos = 0;
-    fetcharg.deltermbuf = actbuf;
+    auto* seqacts = static_cast<couchfile_modify_action*>(fatbuf_get(
+            actbuf.get(), numdocs * sizeof(couchfile_modify_action)));
+    auto* idacts = static_cast<couchfile_modify_action*>(fatbuf_get(
+            actbuf.get(), numdocs * sizeof(couchfile_modify_action)));
+    if (!idacts || !seqacts) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
 
     // Sort the array indexes of ids[] by ascending id. Since we can't pass context info to qsort,
     // actually sort an array of pointers to the elements of ids[], rather than the array indexes.
-    sorted_ids = static_cast<const sized_buf**>(cb_malloc(numdocs * sizeof(sized_buf*)));
-    error_unless(sorted_ids, COUCHSTORE_ERROR_ALLOC_FAIL);
-    for (ii = 0; ii < numdocs; ++ii) {
+    std::vector<sized_buf*> sorted_ids(numdocs);
+    for (int ii = 0; ii < numdocs; ++ii) {
         sorted_ids[ii] = &ids[ii];
     }
-    qsort(sorted_ids, numdocs, sizeof(sorted_ids[0]), &ebin_ptr_compare);
+    qsort(sorted_ids.data(), numdocs, sizeof(sorted_ids[0]), &ebin_ptr_compare);
 
     // Assemble idacts[] array, in sorted order by id:
-    for (ii = 0; ii < numdocs; ii++) {
+    for (int ii = 0; ii < numdocs; ii++) {
         ptrdiff_t isorted = sorted_ids[ii] - ids;   // recover index of ii'th id in sort order
 
         idacts[ii].setType(ACTION_FETCH_INSERT);
@@ -225,6 +214,8 @@ static couchstore_error_t update_indexes(Db* db,
     }
 
     // Update the by id index
+    index_update_ctx fetcharg(seqacts, *actbuf);
+    couchfile_modify_request idrq;
     idrq.cmp.compare = ebin_cmp;
     idrq.file = &db->file;
     idrq.actions = idacts;
@@ -235,16 +226,19 @@ static couchstore_error_t update_indexes(Db* db,
     idrq.fetch_callback_ctx = &fetcharg;
     idrq.compacting = 0;
     idrq.enable_purging = false;
-    idrq.purge_kp = NULL;
-    idrq.purge_kv = NULL;
+    idrq.purge_kp = nullptr;
+    idrq.purge_kv = nullptr;
     idrq.kv_chunk_threshold = db->file.options.kv_nodesize;
     idrq.kp_chunk_threshold = db->file.options.kp_nodesize;
     idrq.save_callback = save_callback;
     idrq.save_callback_ctx = save_callback_ctx;
     idrq.docinfo_callback = by_id_read_docinfo;
 
-    new_id_root = modify_btree(&idrq, db->header.by_id_root, &err);
-    error_pass(err);
+    couchstore_error_t errcode;
+    auto* new_id_root = modify_btree(&idrq, db->header.by_id_root, &errcode);
+    if (errcode != COUCHSTORE_SUCCESS) {
+        return errcode;
+    }
 
     // Append our seqno index updates from the last action added to seqacts. If
     // we have added anything to seqacts then this will overrun the memory that
@@ -262,6 +256,7 @@ static couchstore_error_t update_indexes(Db* db,
           seq_action_compare);
 
     // Update the by seqno index
+    couchfile_modify_request seqrq;
     seqrq.cmp.compare = seq_cmp;
     seqrq.actions = seqacts;
     seqrq.num_actions = fetcharg.actpos;
@@ -270,15 +265,15 @@ static couchstore_error_t update_indexes(Db* db,
     seqrq.file = &db->file;
     seqrq.compacting = 0;
     seqrq.enable_purging = false;
-    seqrq.purge_kp = NULL;
-    seqrq.purge_kv = NULL;
+    seqrq.purge_kp = nullptr;
+    seqrq.purge_kv = nullptr;
     seqrq.kv_chunk_threshold = db->file.options.kv_nodesize;
     seqrq.kp_chunk_threshold = db->file.options.kp_nodesize;
 
-    new_seq_root = modify_btree(&seqrq, db->header.by_seq_root, &errcode);
+    auto* new_seq_root = modify_btree(&seqrq, db->header.by_seq_root, &errcode);
     if (errcode != COUCHSTORE_SUCCESS) {
         cb_free(new_id_root);
-        error_pass(errcode);
+        return errcode;
     }
 
     if (db->header.by_id_root != new_id_root) {
@@ -291,10 +286,7 @@ static couchstore_error_t update_indexes(Db* db,
         db->header.by_seq_root = new_seq_root;
     }
 
-cleanup:
-    cb_free(sorted_ids);
-    fatbuf_free(actbuf);
-    return errcode;
+    return COUCHSTORE_SUCCESS;
 }
 
 static couchstore_error_t add_doc_to_update_list(Db *db,
