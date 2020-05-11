@@ -1,18 +1,29 @@
-/* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/*
+ *     Copyright 2020 Couchbase, Inc.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ */
 #include "couchstore_config.h"
 
-#include <platform/cb_malloc.h>
-#include <phosphor/phosphor.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <libcouchstore/couch_db.h>
-#include <platform/compress.h>
-
-#include "internal.h"
 #include "crc32.h"
+#include "internal.h"
 #include "util.h"
+
+#include <libcouchstore/couch_db.h>
+#include <phosphor/phosphor.h>
+#include <platform/compress.h>
+#include <sys/types.h>
+#include <cstdint>
 
 static ssize_t write_entire_buffer(tree_file *file, const void* buf,
                                    size_t nbytes, cs_off_t offset) {
@@ -43,17 +54,16 @@ static ssize_t write_entire_buffer(tree_file *file, const void* buf,
     return (ssize_t)nbytes;
 }
 
-static ssize_t raw_write(tree_file *file, const sized_buf *buf, cs_off_t pos)
-{
+static ssize_t raw_write(const DiskBlockType diskBlockType,
+                         tree_file* file,
+                         const sized_buf* buf,
+                         cs_off_t pos) {
     cs_off_t write_pos = pos;
     size_t buf_pos = 0;
-    const auto diskBlockType = DiskBlockType::Data;
     ssize_t written;
     size_t block_remain;
 
-    /*
-    break up the write buffer into blocks adding the block prefix "0" as needed
-    */
+    // break up the write buffer into blocks adding the block prefix as needed
     while (buf_pos < buf->size) {
         block_remain = COUCH_BLOCK_SIZE - (write_pos % COUCH_BLOCK_SIZE);
         if (block_remain > (buf->size - buf_pos)) {
@@ -107,7 +117,7 @@ couchstore_error_t write_header(tree_file *file, sized_buf *buf, cs_off_t *pos)
     write_pos += written;
 
     //Write actual header
-    written = raw_write(file, buf, write_pos);
+    written = raw_write(DiskBlockType::Header, file, buf, write_pos);
     if (written < 0) {
         return (couchstore_error_t)written;
     }
@@ -142,14 +152,14 @@ int db_write_buf(tree_file *file, const sized_buf *buf, cs_off_t *pos, size_t *d
     }
 
     sized_buf sized_headerbuf = { headerbuf, 8 };
-    written = raw_write(file, &sized_headerbuf, end_pos);
+    written = raw_write(DiskBlockType::Data, file, &sized_headerbuf, end_pos);
     if (written < 0) {
         return (int)written;
     }
     end_pos += written;
 
     // Write actual buffer:
-    written = raw_write(file, buf, end_pos);
+    written = raw_write(DiskBlockType::Data, file, buf, end_pos);
     if (written < 0) {
         return (int)written;
     }
