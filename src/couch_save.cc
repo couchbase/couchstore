@@ -359,20 +359,14 @@ couchstore_error_t couchstore_save_documents_and_callback(
         couchstore_save_options options,
         save_callback_fn save_cb,
         void* save_cb_ctx) {
+    if (db->dropped) {
+        return COUCHSTORE_ERROR_FILE_CLOSED;
+    }
+
     COLLECT_LATENCY();
 
-    couchstore_error_t errcode = COUCHSTORE_SUCCESS;
-    unsigned ii;
-    sized_buf *seqklist, *idklist, *seqvlist, *idvlist;
     size_t term_meta_size = 0;
-    const Doc *curdoc;
-    uint64_t seq = db->header.update_seq;
-
-    fatbuf *fb;
-
-    error_unless(!db->dropped, COUCHSTORE_ERROR_FILE_CLOSED);
-
-    for (ii = 0; ii < numdocs; ii++) {
+    for (unsigned ii = 0; ii < numdocs; ii++) {
         // Get additional size for terms to be inserted into indexes
         // IMPORTANT: This must match the sizes of the fatbuf_get calls in add_doc_to_update_list!
         term_meta_size += RAW_SEQ_SIZE;
@@ -380,20 +374,27 @@ couchstore_error_t couchstore_save_documents_and_callback(
         term_meta_size += ID_INDEX_RAW_VALUE_SIZE(*infos[ii]);
     }
 
-    fb = fatbuf_alloc(term_meta_size +
-                      numdocs * (sizeof(sized_buf) * 4)); //seq/id key and value lists
+    cb::couchstore::unique_fatbuf_ptr fb(fatbuf_alloc(
+            term_meta_size +
+            numdocs * (sizeof(sized_buf) * 4))); // seq/id key and value lists
 
-    if (fb == NULL) {
+    if (!fb) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
 
+    auto* seqklist = static_cast<sized_buf*>(
+            fatbuf_get(fb.get(), numdocs * sizeof(sized_buf)));
+    auto* idklist = static_cast<sized_buf*>(
+            fatbuf_get(fb.get(), numdocs * sizeof(sized_buf)));
+    auto* seqvlist = static_cast<sized_buf*>(
+            fatbuf_get(fb.get(), numdocs * sizeof(sized_buf)));
+    auto* idvlist = static_cast<sized_buf*>(
+            fatbuf_get(fb.get(), numdocs * sizeof(sized_buf)));
 
-    seqklist = static_cast<sized_buf*>(fatbuf_get(fb, numdocs * sizeof(sized_buf)));
-    idklist = static_cast<sized_buf*>(fatbuf_get(fb, numdocs * sizeof(sized_buf)));
-    seqvlist = static_cast<sized_buf*>(fatbuf_get(fb, numdocs * sizeof(sized_buf)));
-    idvlist = static_cast<sized_buf*>(fatbuf_get(fb, numdocs * sizeof(sized_buf)));
+    uint64_t seq = db->header.update_seq;
+    for (unsigned ii = 0; ii < numdocs; ii++) {
+        const Doc* curdoc;
 
-    for (ii = 0; ii < numdocs; ii++) {
         if(options & COUCHSTORE_SEQUENCE_AS_IS) {
             seq = infos[ii]->db_seq;
         } else {
@@ -403,51 +404,56 @@ couchstore_error_t couchstore_save_documents_and_callback(
         if (docs) {
             curdoc = docs[ii];
         } else {
-            curdoc = NULL;
+            curdoc = nullptr;
         }
 
-        errcode = add_doc_to_update_list(db, curdoc, infos[ii], fb,
-                                         &seqklist[ii], &idklist[ii],
-                                         &seqvlist[ii], &idvlist[ii],
-                                         seq, options);
+        const auto errcode = add_doc_to_update_list(db,
+                                                    curdoc,
+                                                    infos[ii],
+                                                    fb.get(),
+                                                    &seqklist[ii],
+                                                    &idklist[ii],
+                                                    &seqvlist[ii],
+                                                    &idvlist[ii],
+                                                    seq,
+                                                    options);
         if (errcode != COUCHSTORE_SUCCESS) {
-            break;
+            return errcode;
         }
     }
 
-    if (errcode == COUCHSTORE_SUCCESS) {
-        errcode = update_indexes(db,
-                                 seqklist,
-                                 seqvlist,
-                                 idklist,
-                                 idvlist,
-                                 numdocs,
-                                 save_cb,
-                                 save_cb_ctx);
+    const auto errcode = update_indexes(db,
+                                        seqklist,
+                                        seqvlist,
+                                        idklist,
+                                        idvlist,
+                                        numdocs,
+                                        save_cb,
+                                        save_cb_ctx);
+
+    if (errcode != COUCHSTORE_SUCCESS) {
+        return errcode;
     }
 
-    fatbuf_free(fb);
-    if (errcode == COUCHSTORE_SUCCESS) {
-        if(options & COUCHSTORE_SEQUENCE_AS_IS) {
-            // Sequences are passed as-is, make sure update_seq is >= the highest.
-            seq = db->header.update_seq;
-            for(ii = 0; ii < numdocs; ii++) {
-                if(infos[ii]->db_seq >= seq) {
-                    seq = infos[ii]->db_seq;
-                }
+    if (options & COUCHSTORE_SEQUENCE_AS_IS) {
+        // Sequences are passed as-is, make sure update_seq is >= the highest.
+        seq = db->header.update_seq;
+        for (unsigned ii = 0; ii < numdocs; ii++) {
+            if (infos[ii]->db_seq >= seq) {
+                seq = infos[ii]->db_seq;
             }
-            db->header.update_seq = seq;
-        } else {
-            // Fill in the assigned sequence numbers for caller's later use:
-            seq = db->header.update_seq;
-            for (ii = 0; ii < numdocs; ii++) {
-                infos[ii]->db_seq = ++seq;
-            }
-            db->header.update_seq = seq;
         }
+        db->header.update_seq = seq;
+    } else {
+        // Fill in the assigned sequence numbers for caller's later use:
+        seq = db->header.update_seq;
+        for (unsigned ii = 0; ii < numdocs; ii++) {
+            infos[ii]->db_seq = ++seq;
+        }
+        db->header.update_seq = seq;
     }
- cleanup:
-    return errcode;
+
+    return COUCHSTORE_SUCCESS;
 }
 
 couchstore_error_t couchstore_save_documents(Db* db,
