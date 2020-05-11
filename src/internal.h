@@ -127,7 +127,6 @@ extern "C" {
         tree_file file;
         db_header header;
         int dropped;
-        void *userdata;
     };
 
     /**
