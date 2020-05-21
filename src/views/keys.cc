@@ -12,6 +12,27 @@
 
 static void enc_uint16(uint16_t u, char **buf);
 
+couchstore_error_t decode_view_btree_json_key(const char* bytes,
+                                              size_t len,
+                                              sized_buf& key) {
+    uint16_t sz;
+    cb_assert(len >= 2);
+    sz = dec_uint16(bytes);
+
+    bytes += 2;
+    len -= 2;
+
+    key.size = sz;
+    key.buf = (char*)cb_malloc(sz);
+
+    if (key.buf == NULL) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
+
+    cb_assert(len >= sz);
+    memcpy(key.buf, bytes, sz);
+    return COUCHSTORE_SUCCESS;
+}
 
 couchstore_error_t decode_view_btree_key(const char *bytes,
                                          size_t len,

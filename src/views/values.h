@@ -3,21 +3,19 @@
 #define _VALUES_H
 
 #include "couchstore_config.h"
-#include <stdint.h>
-#include <libcouchstore/visibility.h>
-#include <libcouchstore/couch_db.h>
 #include <libcouchstore/couch_common.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <libcouchstore/couch_db.h>
+#include <libcouchstore/visibility.h>
+#include <stdint.h>
+#include <utility>
+#include <vector>
 
 typedef struct {
     uint16_t        partition;
     uint16_t        num_values;
     sized_buf       *values;
+    std::vector<char> values_buf;
 } view_btree_value_t;
-
 
 typedef struct {
     uint8_t     view_id;
@@ -31,29 +29,32 @@ typedef struct {
     view_keys_mapping_t *view_keys_map;
 } view_id_btree_value_t;
 
-
-couchstore_error_t decode_view_btree_value(const char *bytes,
+couchstore_error_t decode_view_btree_value(const char* bytes,
                                            size_t len,
-                                           view_btree_value_t **value);
+                                           view_btree_value_t& value);
+
+struct partition_and_value_info {
+    uint16_t partition{0};
+    uint16_t num_values{0};
+    size_t total_sizeof_values{0};
+};
+partition_and_value_info decode_view_btree_partition_and_num_values(
+        const char* bytes, size_t len);
 
 couchstore_error_t encode_view_btree_value(const view_btree_value_t *value,
                                            char **buffer,
                                            size_t *buffer_size);
 
-void free_view_btree_value(view_btree_value_t *value);
-
-couchstore_error_t decode_view_id_btree_value(const char *bytes,
+couchstore_error_t decode_view_id_btree_value(const char* bytes,
                                               size_t len,
-                                              view_id_btree_value_t **value);
+                                              view_id_btree_value_t** value);
+
+void free_view_id_btree_value(view_id_btree_value_t *value);
 
 couchstore_error_t encode_view_id_btree_value(const view_id_btree_value_t *value,
                                               char **buffer,
                                               size_t *buffer_size);
 
-void free_view_id_btree_value(view_id_btree_value_t *value);
-
-#ifdef __cplusplus
-}
-#endif
+uint16_t decode_view_btree_partition(const char* bytes, size_t len);
 
 #endif

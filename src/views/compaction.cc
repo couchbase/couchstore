@@ -26,41 +26,11 @@
 int view_id_btree_filter(const sized_buf *k, const sized_buf *v,
                                              const bitmap_t *bm)
 {
-    int ret = 0;
-    couchstore_error_t errcode = COUCHSTORE_SUCCESS;
-    view_id_btree_value_t *val = NULL;
-    (void) k;
-
-    errcode = decode_view_id_btree_value(v->buf, v->size, &val);
-    if (errcode != COUCHSTORE_SUCCESS) {
-        ret = (int) errcode;
-        goto cleanup;
-    }
-
-    ret = is_bit_set(bm, val->partition);
-
-cleanup:
-    free_view_id_btree_value(val);
-    return ret;
+    return is_bit_set(bm, decode_view_btree_partition(v->buf, v->size));
 }
 
 int view_btree_filter(const sized_buf *k, const sized_buf *v,
                                           const bitmap_t *bm)
 {
-    int ret = 0;
-    couchstore_error_t errcode = COUCHSTORE_SUCCESS;
-    view_btree_value_t *val = NULL;
-    (void) k;
-
-    errcode = decode_view_btree_value(v->buf, v->size, &val);
-    if (errcode != COUCHSTORE_SUCCESS) {
-        ret = (int) errcode;
-        goto cleanup;
-    }
-
-    ret = is_bit_set(bm, val->partition);
-
-cleanup:
-    free_view_btree_value(val);
-    return ret;
+    return is_bit_set(bm, decode_view_btree_partition(v->buf, v->size));
 }
