@@ -23,6 +23,11 @@ typedef struct {
     sized_buf               doc_id;
 } view_id_btree_key_t;
 
+/// Decode the json_key from bytes/len into the given sized_buf
+/// caller must free key.buf
+couchstore_error_t decode_view_btree_json_key(const char* bytes,
+                                              size_t len,
+                                              sized_buf& key);
 
 couchstore_error_t decode_view_btree_key(const char *bytes,
                                          size_t len,

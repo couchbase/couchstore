@@ -16,6 +16,12 @@ static view_btree_key_t *test_view_btree_key_decoding(const char *key_bin, size_
     cb_assert(k->doc_id.size == 12);
     cb_assert(memcmp(k->doc_id.buf, "doc_00000023", k->doc_id.size) == 0);
 
+    sized_buf json_key{};
+    cb_assert(decode_view_btree_json_key(key_bin, len, json_key) ==
+              COUCHSTORE_SUCCESS);
+    cb_assert(json_key.size == 4);
+    cb_assert(memcmp(json_key.buf, "\"23\"", json_key.size) == 0);
+    cb_free(json_key.buf);
     return k;
 }
 

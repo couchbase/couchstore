@@ -67,25 +67,13 @@ static int view_purgekp_action(bitmap_t *clearbm, bitmap_t *redbm,
 int view_id_btree_purge_kv(const sized_buf *key, const sized_buf *val,
                                                  void *ctx)
 {
-    int action;
-    couchstore_error_t errcode = COUCHSTORE_SUCCESS;
     view_purger_ctx_t *purge_ctx = (view_purger_ctx_t *) ctx;
-    view_id_btree_value_t *v = NULL;
     (void) key;
 
-    errcode = decode_view_id_btree_value(val->buf, val->size, &v);
-    if (errcode != COUCHSTORE_SUCCESS) {
-        action = (int) errcode;
-        goto cleanup;
-    }
-
-    action = view_purgekv_action(&purge_ctx->cbitmask, v->partition,
-                                                       1,
-                                                       purge_ctx);
-
-cleanup:
-    free_view_id_btree_value(v);
-    return action;
+    return view_purgekv_action(&purge_ctx->cbitmask,
+                               decode_view_btree_partition(val->buf, val->size),
+                               1,
+                               purge_ctx);
 }
 
 int view_id_btree_purge_kp(const node_pointer *ptr, void *ctx)
@@ -112,26 +100,14 @@ cleanup:
 
 int view_btree_purge_kv(const sized_buf *key, const sized_buf *val, void *ctx)
 {
-    int action;
-    couchstore_error_t errcode = COUCHSTORE_SUCCESS;
     view_purger_ctx_t *purge_ctx = (view_purger_ctx_t *) ctx;
-    view_btree_value_t *v = NULL;
     (void) key;
 
-    errcode = decode_view_btree_value(val->buf, val->size, &v);
-    if (errcode != COUCHSTORE_SUCCESS) {
-        action = (int) errcode;
-        goto cleanup;
-    }
+    auto [partition, num_values] =
+            decode_view_btree_partition_and_num_values(val->buf, val->size);
 
-    action = view_purgekv_action(&purge_ctx->cbitmask, v->partition,
-                                                       v->num_values,
-                                                       purge_ctx);
-
-cleanup:
-    free_view_btree_value(v);
-
-    return action;
+    return view_purgekv_action(
+            &purge_ctx->cbitmask, partition, num_values, purge_ctx);
 }
 
 int view_btree_purge_kp(const node_pointer *ptr, void *ctx)

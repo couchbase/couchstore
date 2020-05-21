@@ -5,21 +5,19 @@
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
 
-static view_btree_value_t *test_view_btree_value_decoding(const char *value_bin,
-                                                          size_t len)
-{
-    view_btree_value_t *v = NULL;
+static view_btree_value_t test_view_btree_value_decoding(const char* value_bin,
+                                                         size_t len) {
+    view_btree_value_t v{};
 
-    cb_assert(decode_view_btree_value(value_bin, len, &v) == COUCHSTORE_SUCCESS);
-    cb_assert(v != NULL);
+    cb_assert(decode_view_btree_value(value_bin, len, v) == COUCHSTORE_SUCCESS);
+    cb_assert(v.partition == 10);
+    cb_assert(v.num_values == 2);
+    cb_assert(v.values_buf.data() != nullptr);
 
-    cb_assert(v->partition == 10);
-    cb_assert(v->num_values == 2);
-
-    cb_assert(v->values[0].size == 4);
-    cb_assert(memcmp(v->values[0].buf, "6155", v->values[0].size) == 0);
-    cb_assert(v->values[1].size == 4);
-    cb_assert(memcmp(v->values[1].buf, "6154", v->values[0].size) == 0);
+    cb_assert(v.values[0].size == 4);
+    cb_assert(memcmp(v.values[0].buf, "6155", v.values[0].size) == 0);
+    cb_assert(v.values[1].size == 4);
+    cb_assert(memcmp(v.values[1].buf, "6154", v.values[0].size) == 0);
 
     return v;
 }
@@ -86,9 +84,7 @@ void test_values()
         0,67,0,0,2,0,14,91,49,50,51,44,34,102,111,111,98,97,114,
         34,93,0,4,45,51,50,49,1,0,1,0,7,91,53,44,54,44,55,93
     };
-    view_btree_value_t *v;
     view_id_btree_value_t *id_btree_v;
-    view_btree_value_t *v2;
     view_id_btree_value_t *id_btree_v2;
     char *v_bin2 = NULL;
     size_t v_bin2_size = 0;
@@ -100,14 +96,14 @@ void test_values()
     size_t id_btree_v_bin3_size = 0;
 
     fprintf(stderr, "Decoding a view btree value ...\n");
-    v = test_view_btree_value_decoding(value_bin, sizeof(value_bin));
+    auto v = test_view_btree_value_decoding(value_bin, sizeof(value_bin));
 
     fprintf(stderr, "Decoding a view id btree value ...\n");
     id_btree_v = test_view_id_btree_value_decoding(id_btree_value_bin,
                                                    sizeof(id_btree_value_bin));
 
     fprintf(stderr, "Encoding the previously decoded view btree value ...\n");
-    test_view_btree_value_encoding(v, &v_bin2, &v_bin2_size);
+    test_view_btree_value_encoding(&v, &v_bin2, &v_bin2_size);
 
     cb_assert(v_bin2_size == sizeof(value_bin));
     cb_assert(memcmp(v_bin2, value_bin, v_bin2_size) == 0);
@@ -119,14 +115,14 @@ void test_values()
     cb_assert(memcmp(id_btree_v_bin2, id_btree_value_bin, id_btree_v_bin2_size) == 0);
 
     fprintf(stderr, "Decoding the previously encoded view btree value ...\n");
-    v2 = test_view_btree_value_decoding(v_bin2, v_bin2_size);
+    auto v2 = test_view_btree_value_decoding(v_bin2, v_bin2_size);
 
     fprintf(stderr, "Decoding the previously encoded view id btree value ...\n");
     id_btree_v2 = test_view_id_btree_value_decoding(id_btree_v_bin2,
                                                     id_btree_v_bin2_size);
 
     fprintf(stderr, "Encoding the previously decoded view btree value ...\n");
-    test_view_btree_value_encoding(v2, &v_bin3, &v_bin3_size);
+    test_view_btree_value_encoding(&v2, &v_bin3, &v_bin3_size);
 
     cb_assert(v_bin3_size == sizeof(value_bin));
     cb_assert(memcmp(v_bin3, value_bin, v_bin3_size) == 0);
@@ -137,8 +133,6 @@ void test_values()
     cb_assert(id_btree_v_bin3_size == sizeof(id_btree_value_bin));
     cb_assert(memcmp(id_btree_v_bin3, id_btree_value_bin, id_btree_v_bin3_size) == 0);
 
-    free_view_btree_value(v);
-    free_view_btree_value(v2);
     cb_free(v_bin2);
     cb_free(v_bin3);
 

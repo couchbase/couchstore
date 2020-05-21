@@ -16,41 +16,33 @@
 static void enc_uint16(uint16_t u, char **buf);
 static void enc_raw24(uint32_t u, char **buf);
 
-
-couchstore_error_t decode_view_btree_value(const char *bytes,
+couchstore_error_t decode_view_btree_value(const char* bytes,
                                            size_t len,
-                                           view_btree_value_t **value)
-{
-    view_btree_value_t *v = NULL;
-    uint16_t  i, j;
+                                           view_btree_value_t& v) {
     uint32_t  sz;
-    const char    *bs;
+    const char* bs;
     size_t length;
 
-    v = (view_btree_value_t *) cb_malloc(sizeof(view_btree_value_t));
-    if (v == NULL) {
-        goto alloc_error;
-    }
-
-    v->values = NULL;
+    v.values = NULL;
 
     cb_assert(len >= 2);
-    v->partition = dec_uint16(bytes);
+    v.partition = dec_uint16(bytes);
     bytes += 2;
     len -= 2;
 
     // No values to decode
     if (len == 0) {
-        *value = v;
         return COUCHSTORE_SUCCESS;
     }
 
     bs = bytes;
     length = len;
 
-    v->num_values = 0;
+    v.num_values = 0;
+    size_t buffer_size = 0;
+    // scan the input bytes and figure out how many values and the accumulative
+    // size of them
     while (len > 0) {
-
         cb_assert(len >= 3);
         sz = dec_raw24(bs);
         bs += 3;
@@ -59,54 +51,75 @@ couchstore_error_t decode_view_btree_value(const char *bytes,
         cb_assert(len >= sz);
         bs += sz;
         len -= sz;
-        v->num_values++;
+        v.num_values++;
+        buffer_size += sz;
     }
 
-    if (len > 0) {
-        free_view_btree_value(v);
-        return COUCHSTORE_ERROR_CORRUPT;
+    // One allocation to use for all the data which will be split into two.
+    // First area is an array of sized_buf and then each sized_buf points
+    // into the second area for its data. Only size if we need more for this
+    // decode.
+    if (v.values_buf.size() <
+        buffer_size + (v.num_values * sizeof(sized_buf))) {
+        v.values_buf.resize(buffer_size + v.num_values * sizeof(sized_buf));
     }
 
-    v->values = (sized_buf *) cb_malloc(v->num_values * sizeof(sized_buf));
+    v.values = reinterpret_cast<sized_buf*>(v.values_buf.data());
 
-    if (v->values == NULL) {
-        goto alloc_error;
-    }
-
-    for (j = 0; j< v->num_values; ++j) {
-        v->values[j].buf = NULL;
-    }
-
-    i = 0;
     len = length;
+    int i = 0;
+    auto* sized_buf_area =
+            v.values_buf.data() + (v.num_values * sizeof(sized_buf));
     while (len > 0) {
-
         sz = dec_raw24(bytes);
         bytes += 3;
         len -= 3;
 
-        v->values[i].size = sz;
-        v->values[i].buf = (char *) cb_malloc(sz);
+        v.values[i].size = sz;
+        v.values[i].buf = (char*)sized_buf_area;
+        sized_buf_area += sz;
 
-        if (v->values[i].buf == NULL) {
-            goto alloc_error;
-        }
-
-        memcpy(v->values[i].buf, bytes, sz);
+        memcpy(v.values[i].buf, bytes, sz);
         bytes += sz;
         len -= sz;
         i++;
     }
 
-    *value = v;
-
     return COUCHSTORE_SUCCESS;
-
- alloc_error:
-    free_view_btree_value(v);
-    return COUCHSTORE_ERROR_ALLOC_FAIL;
 }
 
+uint16_t decode_view_btree_partition(const char* bytes, size_t len) {
+    cb_assert(len >= 2);
+    return dec_uint16(bytes);
+}
+
+std::pair<uint16_t, uint16_t> decode_view_btree_partition_and_num_values(
+        const char* bytes, size_t len) {
+    uint16_t partition = decode_view_btree_partition(bytes, len);
+    bytes += 2;
+    len -= 2;
+
+    // No values to decode
+    if (len == 0) {
+        return {partition, 0};
+    }
+
+    uint16_t num_values = 0;
+    // scan the input bytes and figure out how many values and the accumulative
+    // size of them
+    while (len > 0) {
+        cb_assert(len >= 3);
+        auto sz = dec_raw24(bytes);
+        bytes += 3;
+        len -= 3;
+
+        cb_assert(len >= sz);
+        bytes += sz;
+        len -= sz;
+        num_values++;
+    }
+    return {partition, num_values};
+}
 
 couchstore_error_t encode_view_btree_value(const view_btree_value_t *value,
                                            char **buffer,
@@ -148,25 +161,6 @@ couchstore_error_t encode_view_btree_value(const view_btree_value_t *value,
     *buffer_size = 0;
     return COUCHSTORE_ERROR_ALLOC_FAIL;
 }
-
-
-void free_view_btree_value(view_btree_value_t *value)
-{
-    int i;
-    if (value == NULL) {
-        return;
-    }
-
-    if (value->values != NULL){
-        for (i = 0; i < value->num_values; ++i) {
-            cb_free(value->values[i].buf);
-        }
-        cb_free(value->values);
-    }
-
-    cb_free(value);
-}
-
 
 couchstore_error_t decode_view_id_btree_value(const char *bytes,
                                               size_t len,
