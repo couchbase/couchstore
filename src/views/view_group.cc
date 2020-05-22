@@ -940,23 +940,17 @@ cleanup:
 
 static couchstore_error_t view_bitmask(const node_pointer *root, bitmap_t *bm)
 {
-    view_btree_reduction_t *r = NULL;
-    couchstore_error_t errcode;
     if (root == NULL) {
         return COUCHSTORE_SUCCESS;
     }
 
-    errcode = decode_view_btree_reduction(root->reduce_value.buf,
-                                          root->reduce_value.size, &r);
-    if (errcode != COUCHSTORE_SUCCESS) {
-        goto cleanup;
-    }
+    bitmap_t partitions_bitmap;
+    decode_view_btree_reduction_partitions_bitmap(
+            root->reduce_value.buf, root->reduce_value.size, partitions_bitmap);
 
-    union_bitmaps(bm, &r->partitions_bitmap);
+    union_bitmaps(bm, &partitions_bitmap);
 
-cleanup:
-    free_view_btree_reduction(r);
-    return errcode;
+    return COUCHSTORE_SUCCESS;
 }
 
 
