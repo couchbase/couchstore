@@ -701,7 +701,6 @@ couchstore_error_t view_btree_reduce(char *dst,
     return ret;
 }
 
-
 couchstore_error_t view_btree_rereduce(char *dst,
                                        size_t *size_r,
                                        const nodelist *leaflist,
@@ -712,97 +711,65 @@ couchstore_error_t view_btree_rereduce(char *dst,
     reducer_private_t *priv = (reducer_private_t *) red_ctx->priv;
     unsigned i;
     reducer_fn_t reducer;
-    view_btree_reduction_t *red = NULL;
     const nodelist *n;
     int c;
     couchstore_error_t ret = COUCHSTORE_SUCCESS;
-    mapreduce_json_list_t *value_list = NULL;
-    view_btree_reduction_t **reductions = NULL;
 
-    reductions = (view_btree_reduction_t **) cb_calloc(count, sizeof(view_btree_reduction_t *));
-    red = (view_btree_reduction_t *) cb_calloc(1, sizeof(*red));
 
-    if (reductions == NULL || red == NULL) {
-        ret = COUCHSTORE_ERROR_ALLOC_FAIL;
-        goto out;
-    }
+    view_btree_reduction_t red{};
+    red.num_values = priv->num_reducers;
+    red.buffer.resize(red.num_values * sizeof(sized_buf));
+    red.reduce_values = reinterpret_cast<sized_buf*>(red.buffer.data());
 
-    red->num_values = priv->num_reducers;
-    red->reduce_values = (sized_buf *) cb_calloc(red->num_values, sizeof(sized_buf));
-    value_list = (mapreduce_json_list_t *) cb_calloc(1, sizeof(*value_list));
+    // Setup the value_list values to use a vector large enough to hold count
+    // values, the value_list.length is set as actual  json values are assigned
+    // further down.
+    std::vector<mapreduce_json_t> json_values_list(count);
+    mapreduce_json_list_t value_list{};
+    value_list.values = json_values_list.data();
 
-    if (red->reduce_values == NULL || value_list == NULL) {
-        ret = COUCHSTORE_ERROR_ALLOC_FAIL;
-        goto out;
-    }
-
+    std::vector<view_btree_reduction_t> reductions(count);
     for (n = leaflist, c = 0; n != NULL && c < count; n = n->next, ++c) {
-        view_btree_reduction_t *r = NULL;
-
         ret = decode_view_btree_reduction(n->pointer->reduce_value.buf,
-                                          n->pointer->reduce_value.size, &r);
+                                          n->pointer->reduce_value.size,
+                                          reductions[c]);
         if (ret != COUCHSTORE_SUCCESS) {
-            goto out;
+            return ret;
         }
 
-        union_bitmaps(&red->partitions_bitmap, &r->partitions_bitmap);
-        cb_assert(r->num_values == priv->num_reducers);
-        red->kv_count += r->kv_count;
-        reductions[c] = r;
+        union_bitmaps(&red.partitions_bitmap, &reductions[c].partitions_bitmap);
+        cb_assert(reductions[c].num_values == priv->num_reducers);
+        red.kv_count += reductions[c].kv_count;
     }
 
-    if (priv->num_reducers > 0) {
-        value_list->values = (mapreduce_json_t *) cb_calloc(count,
-                                                         sizeof(mapreduce_json_t));
-        if (value_list->values == NULL) {
-            ret = COUCHSTORE_ERROR_ALLOC_FAIL;
-            goto out;
-        }
-    }
-
-    for (i = 0; i < priv->num_reducers; ++i) {
-        sized_buf buf;
+    for (i = 0; i < red.num_values; ++i) {
+        sized_buf buf{};
 
         for (n = leaflist, c = 0; n != NULL && c < count; n = n->next, ++c) {
-            view_btree_reduction_t *r = reductions[c];
+            view_btree_reduction_t& r = reductions[c];
 
-            value_list->values[value_list->length].json = r->reduce_values[i].buf;
-            value_list->values[value_list->length].length = r->reduce_values[i].size;
-            value_list->length++;
+            value_list.values[value_list.length].json = r.reduce_values[i].buf;
+            value_list.values[value_list.length].length =
+                    r.reduce_values[i].size;
+            // Increase the length for each assigned pointer
+            value_list.length++;
         }
 
         reducer = priv->reducers[i];
-        ret = (*reducer)(NULL, value_list, &priv->reducer_contexts[i], &buf);
+        ret = (*reducer)(NULL, &value_list, &priv->reducer_contexts[i], &buf);
         if (ret != COUCHSTORE_SUCCESS) {
             add_error_message(red_ctx, 1);
-            goto out;
+            return ret;
         }
 
-        value_list->length = 0;
-        red->reduce_values[i] = buf;
+        value_list.length = 0;
+        red.reduce_values[i] = buf;
     }
 
-    ret = encode_view_btree_reduction(red, dst, size_r);
+    ret = encode_view_btree_reduction(&red, dst, size_r);
 
- out:
-    if (red != NULL) {
-        if (red->reduce_values != NULL) {
-            for (i = 0; i < red->num_values; ++i) {
-                cb_free(red->reduce_values[i].buf);
-            }
-            cb_free(red->reduce_values);
-        }
-        cb_free(red);
-    }
-    if (reductions != NULL) {
-        for (c = 0; c < count; ++c) {
-            free_view_btree_reduction(reductions[c]);
-        }
-        cb_free(reductions);
-    }
-    if (value_list != NULL) {
-        cb_free(value_list->values);
-        cb_free(value_list);
+    for (i = 0; i < red.num_values; ++i) {
+        cb_free(red.reduce_values[i].buf);
     }
 
     return ret;

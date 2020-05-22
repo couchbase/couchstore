@@ -112,24 +112,11 @@ int view_btree_purge_kv(const sized_buf *key, const sized_buf *val, void *ctx)
 
 int view_btree_purge_kp(const node_pointer *ptr, void *ctx)
 {
-    int action;
-    couchstore_error_t errcode = COUCHSTORE_SUCCESS;
     view_purger_ctx_t *purge_ctx = (view_purger_ctx_t *) ctx;
-    view_btree_reduction_t *r = NULL;
+    bitmap_t partitions_bitmap;
+    auto kv_count = decode_view_btree_reduction_partitions_bitmap(
+            ptr->reduce_value.buf, ptr->reduce_value.size, partitions_bitmap);
 
-    errcode = decode_view_btree_reduction(ptr->reduce_value.buf,
-                                          ptr->reduce_value.size,
-                                          &r);
-    if (errcode != COUCHSTORE_SUCCESS) {
-        action = (int) errcode;
-        goto cleanup;
-    }
-
-    action = view_purgekp_action(&purge_ctx->cbitmask, &r->partitions_bitmap,
-                                                       r->kv_count,
-                                                       purge_ctx);
-
-cleanup:
-    free_view_btree_reduction(r);
-    return action;
+    return view_purgekp_action(
+            &purge_ctx->cbitmask, &partitions_bitmap, kv_count, purge_ctx);
 }

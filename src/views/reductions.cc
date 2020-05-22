@@ -20,36 +20,37 @@ static void enc_uint16(uint16_t u, char **buf);
 
 static void enc_raw40(uint64_t u, char **buf);
 
+uint64_t decode_view_btree_reduction_partitions_bitmap(
+        const char* bytes, size_t len, bitmap_t& partitions_bitmap) {
+    cb_assert(len >= 5);
+    uint64_t kv_count = dec_uint40(bytes);
+    bytes += 5;
+    len -= 5;
 
-couchstore_error_t decode_view_btree_reduction(const char *bytes,
+    cb_assert(len >= BITMASK_BYTE_SIZE);
+    memcpy(&partitions_bitmap, bytes, BITMASK_BYTE_SIZE);
+    return kv_count;
+}
+
+couchstore_error_t decode_view_btree_reduction(const char* bytes,
                                                size_t len,
-                                               view_btree_reduction_t **reduction)
-{
-    view_btree_reduction_t *r = NULL;
+                                               view_btree_reduction_t& r) {
     uint8_t  i, j;
     uint16_t sz;
     const char *bs;
     size_t length;
 
-    r = (view_btree_reduction_t *) cb_malloc(sizeof(view_btree_reduction_t));
-    if (r == NULL) {
-        goto alloc_error;
-    }
-
-    cb_assert(len >= 5);
-    r->kv_count = dec_uint40(bytes);
-    bytes += 5;
-    len -= 5;
-
-    cb_assert(len >= BITMASK_BYTE_SIZE);
-    memcpy(&r->partitions_bitmap, bytes, BITMASK_BYTE_SIZE);
-    bytes += BITMASK_BYTE_SIZE;
-    len -= BITMASK_BYTE_SIZE;
+    // Get the count and bitmap and advance bytes
+    r.kv_count = decode_view_btree_reduction_partitions_bitmap(
+            bytes, len, r.partitions_bitmap);
+    bytes += (5 + BITMASK_BYTE_SIZE);
+    len -= (5 + BITMASK_BYTE_SIZE);
 
     bs = bytes;
     length = len;
 
-    r->num_values = 0;
+    r.num_values = 0;
+    size_t buffer_size = 0;
     while (len > 0) {
 
         cb_assert(len >= 2);
@@ -60,58 +61,46 @@ couchstore_error_t decode_view_btree_reduction(const char *bytes,
         cb_assert(len >= sz);
         bs += sz;
         len -= sz;
-        r->num_values++;
+        r.num_values++;
+        buffer_size += sz;
     }
 
-
     if (len > 0) {
-        free_view_btree_reduction(r);
         return COUCHSTORE_ERROR_CORRUPT;
     }
 
-    if (r->num_values > 0) {
-        r->reduce_values = (sized_buf *) cb_malloc(r->num_values * sizeof(sized_buf));
-        if (r->reduce_values == NULL) {
-            goto alloc_error;
-        }
+    if (r.num_values > 0) {
+        r.buffer.resize((r.num_values * sizeof(sized_buf)) + buffer_size);
+        r.reduce_values = reinterpret_cast<sized_buf*>(r.buffer.data());
     } else {
-        r->reduce_values = NULL;
+        return COUCHSTORE_SUCCESS;
     }
 
-    for (j = 0; j< r->num_values; ++j) {
-        r->reduce_values[j].buf = NULL;
+    for (j = 0; j < r.num_values; ++j) {
+        r.reduce_values[j].buf = NULL;
     }
 
     i = 0;
     len = length;
+    char* currentBuffer = r.buffer.data() + (r.num_values * sizeof(sized_buf));
     while (len > 0) {
 
         sz = dec_uint16(bytes);
         bytes += 2;
         len -= 2;
 
-        r->reduce_values[i].size = sz;
-        r->reduce_values[i].buf = (char *) cb_malloc(sz);
+        r.reduce_values[i].size = sz;
+        r.reduce_values[i].buf = currentBuffer;
 
-        if (r->reduce_values[i].buf == NULL) {
-            goto alloc_error;
-        }
-
-        memcpy(r->reduce_values[i].buf, bytes, sz);
+        memcpy(r.reduce_values[i].buf, bytes, sz);
         bytes += sz;
         len -= sz;
         i++;
+        currentBuffer += sz;
     }
 
-    *reduction = r;
-
     return COUCHSTORE_SUCCESS;
-
- alloc_error:
-    free_view_btree_reduction(r);
-    return COUCHSTORE_ERROR_ALLOC_FAIL;
 }
-
 
 couchstore_error_t encode_view_btree_reduction(const view_btree_reduction_t *reduction,
                                                char *buffer,

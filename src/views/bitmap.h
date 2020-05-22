@@ -32,7 +32,7 @@ struct bitmap_t {
     /* Big endian format.
      * chunk[0] msb contains msb of the 1024 bits bitmap.
      */
-    unsigned char chunks[1024 / (sizeof(unsigned char) * CHAR_BIT)];
+    unsigned char chunks[1024 / (sizeof(unsigned char) * CHAR_BIT)]{};
 };
 
 int  is_bit_set(const bitmap_t *bm, uint16_t bit);
