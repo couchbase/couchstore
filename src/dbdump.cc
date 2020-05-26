@@ -646,6 +646,7 @@ static couchstore_error_t read_collection_flatbuffer_collections(
     // indent_step < 0: no indent and no newlines, external tools can format
     idlOptions.strict_json = true;
     idlOptions.indent_step = -1;
+    idlOptions.output_default_scalars_in_json = true;
     flatbuffers::Parser parser(idlOptions);
     parser.Parse(collections_kvstore_schema.c_str());
     parser.SetRootType(rootType.c_str());
