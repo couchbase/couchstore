@@ -61,47 +61,35 @@ struct time_purge_ctx {
 
 /* Configurations for an open file */
 struct tree_file_options {
-    tree_file_options()
-        : buf_io_enabled(true),
-          buf_io_read_unit_size(READ_BUFFER_CAPACITY),
-          buf_io_read_buffers(MAX_READ_BUFFERS),
-          kp_nodesize(0),
-          kv_nodesize(0),
-          periodic_sync_bytes(0),
-          tracing_enabled(false),
-          write_validation_enabled(false),
-          mprotect_enabled(false) {
-    }
-
     // Flag indicating whether or not buffered IO is enabled.
-    bool buf_io_enabled;
+    bool buf_io_enabled{true};
     // Read buffer capacity, if buffered IO is enabled.
     // Set to zero for the default value.
-    uint32_t buf_io_read_unit_size;
+    uint32_t buf_io_read_unit_size{READ_BUFFER_CAPACITY};
     // Max count of read buffers, if buffered IO is enabled.
     // Set to zero for the default value.
-    uint32_t buf_io_read_buffers;
+    uint32_t buf_io_read_buffers{MAX_READ_BUFFERS};
     // Threshold of key-pointer (intermediate) node size.
-    uint32_t kp_nodesize;
+    uint32_t kp_nodesize{0};
     // Threshold of key-value (leaf) node size.
-    uint32_t kv_nodesize;
+    uint32_t kv_nodesize{0};
     // Automatically issue an sync() operation after every N bytes written.
     // 0 means don't automatically sync.
-    uint64_t periodic_sync_bytes;
+    uint64_t periodic_sync_bytes{0};
     /* tracing and validation options  */
-    bool tracing_enabled;
-    bool write_validation_enabled;
-    bool mprotect_enabled;
+    bool tracing_enabled{false};
+    bool write_validation_enabled{false};
+    bool mprotect_enabled{false};
 };
 
 /* Structure representing an open file; "superclass" of Db */
 struct tree_file {
-    uint64_t pos;
-    FileOpsInterface* ops;
-    couch_file_handle handle;
-    const char* path;
-    couchstore_error_info_t lastError;
-    crc_mode_e crc_mode;
+    uint64_t pos{0};
+    FileOpsInterface* ops{nullptr};
+    couch_file_handle handle{nullptr};
+    const char* path{nullptr};
+    couchstore_error_info_t lastError{COUCHSTORE_SUCCESS};
+    crc_mode_e crc_mode{CRC_UNKNOWN};
     tree_file_options options;
 };
 

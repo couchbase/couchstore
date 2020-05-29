@@ -34,11 +34,9 @@ couchstore_error_t tree_file_open(tree_file* file,
 
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
 
-    memset(file, 0, sizeof(*file));
-
+    *file = {};
     file->crc_mode = crc_mode;
     file->options = file_options;
-
     file->path = (const char *) cb_strdup(filename);
     error_unless(file->path, COUCHSTORE_ERROR_ALLOC_FAIL);
 
