@@ -49,7 +49,6 @@ static int view_purgekp_action(bitmap_t *clearbm, bitmap_t *redbm,
 {
     int action = PURGE_PARTIAL;
     bitmap_t emptybm, dstbm = *clearbm;
-    memset(&emptybm, 0, sizeof(emptybm));
 
     if (is_equal_bitmap(redbm, clearbm)) {
         action = PURGE_ITEM;

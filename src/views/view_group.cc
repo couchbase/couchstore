@@ -1074,7 +1074,6 @@ couchstore_error_t couchstore_cleanup_view_group(view_group_info_t *info,
     bitmap_t bm_cleanup;
     int i;
 
-    memset(&bm_cleanup, 0, sizeof(bm_cleanup));
     error_info->view_name = NULL;
     error_info->error_msg = NULL;
     index_file.handle = NULL;
@@ -1209,8 +1208,6 @@ static couchstore_error_t update_btree(const char *source_file,
     bitmap_t empty_bm;
     int max_actions = MAX_ACTIONS_SIZE /
                 (sizeof(couchfile_modify_action) + 2 * sizeof(sized_buf));
-
-    memset(&empty_bm, 0, sizeof(empty_bm));
 
     if (transient_arena == NULL) {
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;
@@ -1436,8 +1433,6 @@ couchstore_error_t couchstore_update_view_group(view_group_info_t *info,
     if (ret < 0) {
         goto cleanup;
     }
-
-    memset(&bm_cleanup, 0, sizeof(bm_cleanup));
 
     error_info->view_name = NULL;
     error_info->error_msg = NULL;
@@ -1799,7 +1794,6 @@ couchstore_error_t couchstore_compact_view_group(view_group_info_t *info,
     bitmap_t emptybm;
     int i;
 
-    memset(&emptybm, 0, sizeof(bitmap_t));
     error_info->view_name = NULL;
     error_info->error_msg = NULL;
     index_file.handle = NULL;
