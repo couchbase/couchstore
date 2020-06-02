@@ -1,6 +1,5 @@
-/* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- *     Copyright 2016 Couchbase, Inc
+ *     Copyright 2020 Couchbase, Inc
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -16,56 +15,27 @@
  */
 #pragma once
 
-#include <stdint.h>
-#include <sys/types.h>
-
-#ifdef WIN32
-// We use this in some C places so undefine min and max because MSVC will pull
-// in Windows.h automatically for C objects.
-#ifdef min
-#undef min
-#endif
-
-#ifdef max
-#undef max
-#endif
-
-// Use WIN32_LEAN_AND_MEAN to avoid pulling in any socket or crpytography stuff.
-#ifndef WIN32_LEAN_AND_MEAN
-#define DO_UNDEF_WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-// Need DWORD from Windows.h
+#include <folly/portability/SysTypes.h>
 #include <folly/portability/Windows.h>
-#ifdef DO_UNDEF_WIN32_LEAN_AND_MEAN
-#undef WIN32_LEAN_AND_MEAN
-#endif
-
-// We can't just grab folly's SysTypes.h because we use this header for C
-// objects.
-typedef SSIZE_T ssize_t;
-#endif
+#include <cstdint>
 
 #include "couch_common.h"
 
-    /**
-     * Abstract file handle. Implementations can use it for anything
-     * they want, whether a pointer to an allocated data structure, or
-     * an integer such as a Unix file descriptor.
-     */
-    typedef struct couch_file_handle_opaque* couch_file_handle;
+/**
+ * Abstract file handle. Implementations can use it for anything
+ * they want, whether a pointer to an allocated data structure, or
+ * an integer such as a Unix file descriptor.
+ */
+using couch_file_handle = struct couch_file_handle_opaque*;
 
-    typedef struct {
+struct couchstore_error_info_t {
 #ifdef WIN32
-        DWORD error;
+    DWORD error;
 #else
-        int error;
+    int error;
 #endif
-    } couchstore_error_info_t;
+};
 
-
-
-#ifdef __cplusplus
 /**
  * An abstract base class that defines the interface of the file
  * I/O primitives used by CouchStore. Passed to couchstore_open_db_ex().
@@ -103,7 +73,7 @@ public:
     /**
      * Virtual destructor used for optional cleanup
      */
-    virtual ~FileOpsInterface() {}
+    virtual ~FileOpsInterface() = default;
 
     /**
      * Initialize state (e.g. allocate memory) for a file handle
@@ -290,11 +260,3 @@ private:
     FileOpsInterface* ops;
     couch_file_handle handle;
 };
-
-#else
-    /**
-     * Opaque reference to a FileOpsInterface instance
-     */
-    typedef struct couch_file_ops_opaque* FileOpsInterface;
-
-#endif
