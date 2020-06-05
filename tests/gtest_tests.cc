@@ -352,8 +352,7 @@ TEST_F(CouchstoreTest, dump_empty_db)
     EXPECT_EQ(0ll, info.header_position);
 }
 
-TEST_F(CouchstoreTest, local_docs)
-{
+TEST_F(CouchstoreTest, local_doc) {
     LocalDoc lDocWrite;
     LocalDoc *lDocRead = NULL;
 
@@ -375,6 +374,100 @@ TEST_F(CouchstoreTest, local_docs)
 
     EXPECT_EQ(0, memcmp(lDocRead->json.buf, "{\"test\":true}", 13));
     couchstore_free_local_document(lDocRead);
+}
+
+TEST_F(CouchstoreTest, local_docs_write_read_delete_read) {
+    // Note: 11 documents is important to cover a failure when the
+    // couchstore_save_local_documents wasn't sorting the input
+    // lexicographically, having this input sequence was enough to fail at read.
+    // This isn't necessarily the smallest input set to generate the failure
+    // but good enough.
+    const int docs = 11;
+    std::vector<LocalDoc> localDocuments(docs);
+    std::vector<std::reference_wrapper<LocalDoc>> localDocRefs;
+    localDocRefs.reserve(docs);
+    std::vector<std::string> ids(docs);
+    std::vector<std::string> values(docs);
+
+    // Generate keys and values for the test
+    int ii = 0;
+    for (auto& doc : localDocuments) {
+        ids[ii] = "_local/" + std::to_string(ii);
+        values[ii] = "{\"test\":" + std::to_string(ii) + "}";
+        doc.id.buf = const_cast<char*>(ids[ii].data());
+        doc.id.size = ids[ii].size();
+        doc.json.buf = const_cast<char*>(values[ii].data());
+        doc.json.size = values[ii].size();
+        doc.deleted = 0;
+        localDocRefs.push_back(doc);
+        ii++;
+    }
+
+    // 1) Write all of the documents using couchstore_save_local_documents
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(
+                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::saveLocalDocuments(*db, localDocRefs));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+
+    // 2) Iterate and read back and compare values
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ii = 0;
+    for (auto& id : ids) {
+        LocalDoc* lDocRead{};
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_open_local_document(
+                          db, id.data(), id.size(), &lDocRead))
+                << id;
+        ASSERT_NE(nullptr, lDocRead);
+        EXPECT_EQ(ids[ii], std::string(lDocRead->id.buf, lDocRead->id.size));
+        EXPECT_EQ(values[ii],
+                  std::string(lDocRead->json.buf, lDocRead->json.size));
+        couchstore_free_local_document(lDocRead);
+        ii++;
+    }
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+
+    // 3) Now re-write 100% - with delete 50%
+    ii = 0;
+    for (auto& doc : localDocuments) {
+        doc.deleted = (ii & 1) == 1;
+        localDocRefs[ii] = doc;
+        ii++;
+    }
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::saveLocalDocuments(*db, localDocRefs));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+
+    // 4)  Iterate and read back and compare values
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ii = 0;
+    for (auto& id : ids) {
+        LocalDoc* lDocRead;
+        auto expected = (ii & 1) == 1 ? COUCHSTORE_ERROR_DOC_NOT_FOUND
+                                      : COUCHSTORE_SUCCESS;
+        ASSERT_EQ(expected,
+                  couchstore_open_local_document(
+                          db, id.data(), id.size(), &lDocRead))
+                << id;
+        if (expected == COUCHSTORE_SUCCESS) {
+            ASSERT_NE(nullptr, lDocRead);
+            EXPECT_EQ(ids[ii],
+                      std::string(lDocRead->id.buf, lDocRead->id.size));
+            EXPECT_EQ(values[ii],
+                      std::string(lDocRead->json.buf, lDocRead->json.size));
+            couchstore_free_local_document(lDocRead);
+        }
+        ii++;
+    }
 }
 
 TEST_F(CouchstoreTest, open_file_error)

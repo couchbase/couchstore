@@ -1516,6 +1516,51 @@ cleanup:
     return errcode;
 }
 
+couchstore_error_t cb::couchstore::saveLocalDocuments(
+        Db& db, std::vector<std::reference_wrapper<LocalDoc>>& documents) {
+    if (db.dropped) {
+        return COUCHSTORE_ERROR_FILE_CLOSED;
+    }
+
+    // Must sort the input keys before writing
+    std::sort(documents.begin(),
+              documents.end(),
+              [](LocalDoc& ld1, LocalDoc& ld2) {
+                  return ebin_cmp(&ld1.id, &ld2.id) < 0;
+              });
+
+    int ii = 0;
+    std::vector<couchfile_modify_action> actions(documents.size());
+    for (const auto& doc : documents) {
+        if (doc.get().deleted) {
+            actions[ii].setType(ACTION_REMOVE);
+        } else {
+            actions[ii].setType(ACTION_INSERT);
+        }
+
+        actions[ii].setKey(const_cast<sized_buf*>(&doc.get().id));
+        actions[ii].data = const_cast<sized_buf*>(&doc.get().json);
+        ii++;
+    }
+
+    couchfile_modify_request rq{};
+    rq.cmp.compare = ebin_cmp;
+    rq.num_actions = actions.size();
+    rq.actions = actions.data();
+    rq.file = &db.file;
+    rq.kv_chunk_threshold = db.file.options.kv_nodesize;
+    rq.kp_chunk_threshold = db.file.options.kp_nodesize;
+
+    couchstore_error_t errcode = COUCHSTORE_SUCCESS;
+    auto* nroot = modify_btree(&rq, db.header.local_docs_root, &errcode);
+    if (errcode == COUCHSTORE_SUCCESS && nroot != db.header.local_docs_root) {
+        cb_free(db.header.local_docs_root);
+        db.header.local_docs_root = nroot;
+    }
+
+    return errcode;
+}
+
 void couchstore_free_local_document(LocalDoc *lDoc)
 {
     if (lDoc) {

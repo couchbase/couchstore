@@ -1291,5 +1291,19 @@ couchstore_error_t compact(Db& source,
                            FileOpsInterface* ops,
                            uint64_t timestamp,
                            uint64_t delta);
+
+/**
+ * Save multiple local docs to the db. see couchstore_save_local_document. The
+ * vector of documents can include deletes.
+ *
+ * @param db the database to store the documents in
+ * @param documents the documents to store/delete. The function will modify the
+ *        vector by sorting lexicographically by key.
+ * @return COUCHSTORE_SUCCESS on success
+ */
+LIBCOUCHSTORE_API
+couchstore_error_t saveLocalDocuments(
+        Db& db, std::vector<std::reference_wrapper<LocalDoc>>& documents);
+
 } // namespace couchstore
 } // namespace cb
