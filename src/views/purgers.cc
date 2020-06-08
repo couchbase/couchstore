@@ -102,11 +102,10 @@ int view_btree_purge_kv(const sized_buf *key, const sized_buf *val, void *ctx)
     view_purger_ctx_t *purge_ctx = (view_purger_ctx_t *) ctx;
     (void) key;
 
-    auto [partition, num_values] =
-            decode_view_btree_partition_and_num_values(val->buf, val->size);
+    auto info = decode_view_btree_partition_and_num_values(val->buf, val->size);
 
     return view_purgekv_action(
-            &purge_ctx->cbitmask, partition, num_values, purge_ctx);
+            &purge_ctx->cbitmask, info.partition, info.num_values, purge_ctx);
 }
 
 int view_btree_purge_kp(const node_pointer *ptr, void *ctx)

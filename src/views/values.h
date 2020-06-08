@@ -8,6 +8,7 @@
 #include <libcouchstore/visibility.h>
 #include <stdint.h>
 #include <utility>
+#include <vector>
 
 typedef struct {
     uint16_t        partition;
@@ -32,7 +33,12 @@ couchstore_error_t decode_view_btree_value(const char* bytes,
                                            size_t len,
                                            view_btree_value_t& value);
 
-std::pair<uint16_t, uint16_t> decode_view_btree_partition_and_num_values(
+struct partition_and_value_info {
+    uint16_t partition{0};
+    uint16_t num_values{0};
+    size_t total_sizeof_values{0};
+};
+partition_and_value_info decode_view_btree_partition_and_num_values(
         const char* bytes, size_t len);
 
 couchstore_error_t encode_view_btree_value(const view_btree_value_t *value,

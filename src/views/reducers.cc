@@ -590,7 +590,12 @@ couchstore_error_t view_btree_reduce(char *dst,
     cb_assert(count > 0);
     cb_assert(leaflist != NULL);
 
-    std::vector<view_btree_value_t> values(count);
+    std::vector<view_btree_value_t> values;
+    try {
+        values.resize(count);
+    } catch (const std::bad_alloc&) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
     view_btree_reduction_t red{};
     mapreduce_json_list_t key_list{};
     mapreduce_json_list_t value_list{};
@@ -688,20 +693,25 @@ couchstore_error_t view_btree_rereduce(char *dst,
     int c;
     couchstore_error_t ret = COUCHSTORE_SUCCESS;
 
-
+    std::vector<mapreduce_json_t> json_values_list;
+    std::vector<view_btree_reduction_t> reductions;
     view_btree_reduction_t red{};
     red.num_values = priv->num_reducers;
-    red.buffer.resize(red.num_values * sizeof(sized_buf));
+    try {
+        red.buffer.resize(red.num_values * sizeof(sized_buf));
+        json_values_list.resize(count);
+        reductions.resize(count);
+    } catch (const std::bad_alloc&) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
     red.reduce_values = reinterpret_cast<sized_buf*>(red.buffer.data());
 
-    // Setup the value_list values to use a vector large enough to hold count
-    // values, the value_list.length is set as actual  json values are assigned
-    // further down.
-    std::vector<mapreduce_json_t> json_values_list(count);
+    // The json_values_list vector is large enough to hold count values, the
+    // value_list.length is updated as actual json values are assigned further
+    // down.
     mapreduce_json_list_t value_list{};
     value_list.values = json_values_list.data();
 
-    std::vector<view_btree_reduction_t> reductions(count);
     for (n = leaflist, c = 0; n != NULL && c < count; n = n->next, ++c) {
         ret = decode_view_btree_reduction(n->pointer->reduce_value.buf,
                                           n->pointer->reduce_value.size,

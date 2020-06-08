@@ -19,59 +19,36 @@ static void enc_raw24(uint32_t u, char **buf);
 couchstore_error_t decode_view_btree_value(const char* bytes,
                                            size_t len,
                                            view_btree_value_t& v) {
-    uint32_t  sz;
-    const char* bs;
-    size_t length;
+    auto info = decode_view_btree_partition_and_num_values(bytes, len);
+    v.values = nullptr;
+    v.partition = info.partition;
+    v.num_values = info.num_values;
 
-    v.values = NULL;
-
-    cb_assert(len >= 2);
-    v.partition = dec_uint16(bytes);
+    // advance bytes past the partition which is no longer needed.
     bytes += 2;
     len -= 2;
-
-    // No values to decode
-    if (len == 0) {
-        return COUCHSTORE_SUCCESS;
-    }
-
-    bs = bytes;
-    length = len;
-
-    v.num_values = 0;
-    size_t buffer_size = 0;
-    // scan the input bytes and figure out how many values and the accumulative
-    // size of them
-    while (len > 0) {
-        cb_assert(len >= 3);
-        sz = dec_raw24(bs);
-        bs += 3;
-        len -= 3;
-
-        cb_assert(len >= sz);
-        bs += sz;
-        len -= sz;
-        v.num_values++;
-        buffer_size += sz;
-    }
 
     // One allocation to use for all the data which will be split into two.
     // First area is an array of sized_buf and then each sized_buf points
     // into the second area for its data. Only size if we need more for this
     // decode.
     if (v.values_buf.size() <
-        buffer_size + (v.num_values * sizeof(sized_buf))) {
-        v.values_buf.resize(buffer_size + v.num_values * sizeof(sized_buf));
+        info.total_sizeof_values + (v.num_values * sizeof(sized_buf))) {
+        try {
+            v.values_buf.resize(info.total_sizeof_values +
+                                v.num_values * sizeof(sized_buf));
+        } catch (const std::bad_alloc&) {
+            return COUCHSTORE_ERROR_ALLOC_FAIL;
+        }
     }
 
     v.values = reinterpret_cast<sized_buf*>(v.values_buf.data());
 
-    len = length;
     int i = 0;
     auto* sized_buf_area =
             v.values_buf.data() + (v.num_values * sizeof(sized_buf));
     while (len > 0) {
-        sz = dec_raw24(bytes);
+        uint32_t sz = dec_raw24(bytes);
         bytes += 3;
         len -= 3;
 
@@ -93,7 +70,7 @@ uint16_t decode_view_btree_partition(const char* bytes, size_t len) {
     return dec_uint16(bytes);
 }
 
-std::pair<uint16_t, uint16_t> decode_view_btree_partition_and_num_values(
+partition_and_value_info decode_view_btree_partition_and_num_values(
         const char* bytes, size_t len) {
     uint16_t partition = decode_view_btree_partition(bytes, len);
     bytes += 2;
@@ -105,6 +82,7 @@ std::pair<uint16_t, uint16_t> decode_view_btree_partition_and_num_values(
     }
 
     uint16_t num_values = 0;
+    size_t total_value_size = 0;
     // scan the input bytes and figure out how many values and the accumulative
     // size of them
     while (len > 0) {
@@ -117,8 +95,10 @@ std::pair<uint16_t, uint16_t> decode_view_btree_partition_and_num_values(
         bytes += sz;
         len -= sz;
         num_values++;
+        total_value_size += sz;
     }
-    return {partition, num_values};
+
+    return {partition, num_values, total_value_size};
 }
 
 couchstore_error_t encode_view_btree_value(const view_btree_value_t *value,

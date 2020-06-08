@@ -9,6 +9,8 @@
 #include <libcouchstore/couch_common.h>
 #include "bitmap.h"
 
+#include <vector>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -70,7 +70,11 @@ couchstore_error_t decode_view_btree_reduction(const char* bytes,
     }
 
     if (r.num_values > 0) {
-        r.buffer.resize((r.num_values * sizeof(sized_buf)) + buffer_size);
+        try {
+            r.buffer.resize((r.num_values * sizeof(sized_buf)) + buffer_size);
+        } catch (const std::bad_alloc&) {
+            return COUCHSTORE_ERROR_ALLOC_FAIL;
+        }
         r.reduce_values = reinterpret_cast<sized_buf*>(r.buffer.data());
     } else {
         return COUCHSTORE_SUCCESS;
