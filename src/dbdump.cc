@@ -729,6 +729,8 @@ static couchstore_error_t local_doc_print(couchfile_lookup_request *rq,
 
     printf("Value: ");
     printsb(&value);
+    printf("Value size: %" PRIu64, uint64_t(v->size));
+
     printf("\n");
 
     return COUCHSTORE_SUCCESS;
