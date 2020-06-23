@@ -231,9 +231,8 @@ static std::string getNamespaceString(uint32_t ns) {
 static void printDocId(const char* prefix, const sized_buf* sb) {
     if (decodeNamespace && sb->size >= sizeof(uint32_t)) {
         // Decode the collection-ID of the key
-        auto decoded =
-            cb::mcbp::decode_unsigned_leb128<uint32_t>
-                ({reinterpret_cast<uint8_t*>(sb->buf), sb->size});
+        auto decoded = cb::mcbp::unsigned_leb128<uint32_t>::decode(
+                {reinterpret_cast<uint8_t*>(sb->buf), sb->size});
 
         // Load the key
         std::string key(reinterpret_cast<const char*>(decoded.second.data()),
@@ -245,7 +244,7 @@ static void printDocId(const char* prefix, const sized_buf* sb) {
             // Synchronous Replication 'Prepare' namespace prefix.
             // Decode again.
             decoded =
-                    cb::mcbp::decode_unsigned_leb128<uint32_t>(decoded.second);
+                    cb::mcbp::unsigned_leb128<uint32_t>::decode(decoded.second);
             key = std::string(reinterpret_cast<const char*>(decoded.second.data()),
                             decoded.second.size());
             name = name + getNamespaceString(decoded.first);
@@ -264,7 +263,7 @@ static void printDocId(const char* prefix, const sized_buf* sb) {
                               key.begin())
                         .first == collectionsPrefix.end()) {
                 uint32_t affectedCid =
-                        cb::mcbp::decode_unsigned_leb128<uint32_t>(
+                        cb::mcbp::unsigned_leb128<uint32_t>::decode(
                                 {reinterpret_cast<const uint8_t*>(
                                          decoded.second.data() +
                                          collectionsPrefix.size()),
@@ -279,7 +278,7 @@ static void printDocId(const char* prefix, const sized_buf* sb) {
                                      key.begin())
                                .first == scopePrefix.end()) {
                 uint32_t affectedSid =
-                        cb::mcbp::decode_unsigned_leb128<uint32_t>(
+                        cb::mcbp::unsigned_leb128<uint32_t>::decode(
                                 {reinterpret_cast<const uint8_t*>(
                                          decoded.second.data() +
                                          scopePrefix.size()),
@@ -660,12 +659,12 @@ static couchstore_error_t read_collection_leb128_metadata(const sized_buf* v,
     uint64_t count = 0;
     uint64_t seqno = 0;
 
-    auto decoded1 = cb::mcbp::decode_unsigned_leb128<uint64_t>(
+    auto decoded1 = cb::mcbp::unsigned_leb128<uint64_t>::decode(
             {reinterpret_cast<uint8_t*>(v->buf), v->size});
     count = decoded1.first;
 
     if (decoded1.second.size()) {
-        seqno = cb::mcbp::decode_unsigned_leb128<uint64_t>(decoded1.second)
+        seqno = cb::mcbp::unsigned_leb128<uint64_t>::decode(decoded1.second)
                         .first;
     }
 
