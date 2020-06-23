@@ -658,18 +658,25 @@ static couchstore_error_t read_collection_leb128_metadata(const sized_buf* v,
                                                           std::string& out) {
     uint64_t count = 0;
     uint64_t seqno = 0;
+    uint64_t diskSize = 0;
 
     auto decoded1 = cb::mcbp::unsigned_leb128<uint64_t>::decode(
             {reinterpret_cast<uint8_t*>(v->buf), v->size});
     count = decoded1.first;
 
     if (decoded1.second.size()) {
-        seqno = cb::mcbp::unsigned_leb128<uint64_t>::decode(decoded1.second)
-                        .first;
+        decoded1 = cb::mcbp::unsigned_leb128<uint64_t>::decode(decoded1.second);
+        seqno = decoded1.first;
+    }
+
+    if (decoded1.second.size()) {
+        decoded1 = cb::mcbp::unsigned_leb128<uint64_t>::decode(decoded1.second);
+        diskSize = decoded1.first;
     }
 
     std::stringstream ss;
-    ss << R"({"item_count":)" << count << R"(, "high_seqno":)" << seqno << "}";
+    ss << R"({"item_count":)" << count << R"(, "high_seqno":)" << seqno
+       << R"(, "disk_size":)" << diskSize << "}";
     out = ss.str();
 
     return COUCHSTORE_SUCCESS;
