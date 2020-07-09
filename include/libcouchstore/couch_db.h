@@ -1293,6 +1293,18 @@ couchstore_error_t compact(Db& source,
                            uint64_t delta);
 
 /**
+ * Replay mutations (with PiTR compaction) from the current header in the
+ * source database to the target database by using the specified delta
+ * as the granularity for the number of headers to deduplicate. Stop
+ * when we reach the provided sourceHeaderEndOffset
+ */
+LIBCOUCHSTORE_API
+couchstore_error_t replay(Db& source,
+                          Db& target,
+                          uint64_t delta,
+                          uint64_t sourceHeaderEndOffset);
+
+/**
  * Save multiple local docs to the db. see couchstore_save_local_document. The
  * vector of documents can include deletes.
  *

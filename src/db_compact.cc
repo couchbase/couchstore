@@ -506,7 +506,7 @@ static void locateStartHeader(Db& db, uint64_t timestamp) {
 }
 
 struct Context {
-    cb::couchstore::UniqueDbPtr target;
+    Db* target;
     uint64_t highest = 0;
 
     std::vector<DocInfo*> docInfos;
@@ -547,7 +547,7 @@ struct Context {
         if (docs.empty()) {
             return;
         }
-        auto error = couchstore_save_documents(target.get(),
+        auto error = couchstore_save_documents(target,
                                                docs.data(),
                                                docInfos.data(),
                                                docs.size(),
@@ -598,7 +598,7 @@ int couchstore_walk_local_tree_callback(Db* db,
         auto [status, doc] = cb::couchstore::openLocalDocument(*db, *doc_info);
         if (status == COUCHSTORE_SUCCESS) {
             auto error = couchstore_save_local_document(
-                    static_cast<Context*>(context)->target.get(), doc.get());
+                    static_cast<Context*>(context)->target, doc.get());
             if (error != COUCHSTORE_SUCCESS) {
                 throw std::runtime_error(
                         std::string{"couchstore_walk_local_tree_callback() "
@@ -697,9 +697,7 @@ couchstore_error_t compact(Db& source,
                 couchstore_strerror(status));
     }
 
-    Context ctx;
-    header = cb::couchstore::getHeader(source);
-    ctx.highest = header.updateSeqNum;
+    cb::couchstore::UniqueDbPtr targetDbHolder;
 
     // time to move the data over!
     {
@@ -709,11 +707,33 @@ couchstore_error_t compact(Db& source,
             ::remove(target_filename);
             return status;
         }
-        ctx.target = std::move(target);
+        targetDbHolder = std::move(target);
     }
 
+    status = replay(source, *targetDbHolder, delta, sourceHeaderOffset);
+    if (status != COUCHSTORE_SUCCESS) {
+        // need to close the file before I can remove it
+        targetDbHolder.reset();
+        ::remove(target_filename);
+        return status;
+    }
+
+    return COUCHSTORE_SUCCESS;
+}
+
+LIBCOUCHSTORE_API
+couchstore_error_t replay(Db& source,
+                          Db& target,
+                          uint64_t delta,
+                          uint64_t sourceHeaderEndOffset) {
+    Context ctx;
+    auto header = cb::couchstore::getHeader(source);
+    ctx.highest = header.updateSeqNum;
+    ctx.target = &target;
+    couchstore_error_t status;
+
     uint64_t next = header.timestamp - (header.timestamp % delta) + delta;
-    while ((status = findNextHeader(source, sourceHeaderOffset, next)) ==
+    while ((status = findNextHeader(source, sourceHeaderEndOffset, next)) ==
            COUCHSTORE_SUCCESS) {
         header = cb::couchstore::getHeader(source);
         next = header.timestamp - (header.timestamp % delta) + delta;
@@ -737,25 +757,19 @@ couchstore_error_t compact(Db& source,
                     couchstore_strerror(status));
         }
 
-        status = couchstore_commit_ex(ctx.target.get(), header.timestamp);
+        status = couchstore_commit_ex(ctx.target, header.timestamp);
         if (status != COUCHSTORE_SUCCESS) {
             throw std::runtime_error(
                     std::string{"couchstore_commit_ex() Failed: "} +
                     couchstore_strerror(status));
         }
-        if (header.headerPosition == sourceHeaderOffset) {
+        if (header.headerPosition == sourceHeaderEndOffset) {
             // We're reached the end!
             break;
         }
     }
 
-    if (status != COUCHSTORE_SUCCESS) {
-        ctx.target.reset();
-        ::remove(target_filename);
-        return status;
-    }
-
-    return COUCHSTORE_SUCCESS;
+    return status;
 }
 
 } // namespace cb::couchstore
