@@ -38,7 +38,8 @@ couchstore_error_t couchstore_compact_db_ex(Db* source, const char* target_filen
                                             couchstore_compact_hook hook,
                                             couchstore_docinfo_hook dhook,
                                             void* hook_ctx,
-                                            FileOpsInterface* ops)
+                                            FileOpsInterface* ops,
+                                            PrecommitHook precommitHook)
 {
     COLLECT_LATENCY();
 
@@ -123,6 +124,11 @@ couchstore_error_t couchstore_compact_db_ex(Db* source, const char* target_filen
                                                      {},
                                                      ctx.hook_ctx)));
     }
+
+    if (precommitHook) {
+        error_pass(precommitHook(*target));
+    }
+
     error_pass(couchstore_commit(target));
 cleanup:
     TreeWriterFree(ctx.tree_writer);

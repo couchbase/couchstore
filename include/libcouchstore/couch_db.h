@@ -8,6 +8,7 @@
 #include <libcouchstore/file_ops.h>
 
 #ifdef __cplusplus
+#include <functional>
 extern "C" {
 #endif
 
@@ -845,6 +846,9 @@ extern "C" {
     LIBCOUCHSTORE_API
     couchstore_error_t couchstore_set_purge_seq(Db* target, uint64_t purge_seq);
 
+#ifdef __cplusplus
+    using PrecommitHook = std::function<couchstore_error_t(Db& db)>;
+
     /**
      * Compact a database. This creates a new DB file with the same data as the
      * source db, omitting data that is no longer needed.
@@ -858,14 +862,18 @@ extern "C" {
      * @param hook_ctx compaction_ctx struct
      * @param ops Pointer to the FileOpsInterface implementation
      *            you want the library to use.
+     * @param precommitHook Before calling commit on the compacted file the
+     *                      precommot hook is called to allow the caller to
+     *                      do modifications to the database before commit
      * @return COUCHSTORE_SUCCESS on success
      */
     LIBCOUCHSTORE_API
     couchstore_error_t couchstore_compact_db_ex(Db* source, const char* target_filename, uint64_t flags,
                                                 couchstore_compact_hook hook,
                                                 couchstore_docinfo_hook dhook, void* hook_ctx,
-                                                FileOpsInterface* ops);
-
+                                                FileOpsInterface* ops,
+                                                PrecommitHook precommitHook = {});
+#endif
 
     /*////////////////////  MISC: */
 
