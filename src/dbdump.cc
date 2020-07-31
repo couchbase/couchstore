@@ -12,24 +12,21 @@
 #include "views/util.h"
 #include "views/view_group.h"
 #include <collections/kvstore_generated.h>
-#include <inttypes.h>
 #include <libcouchstore/couch_db.h>
 #include <mcbp/protocol/unsigned_leb128.h>
 #include <memcached/protocol_binary.h>
 #include <nlohmann/json.hpp>
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
-#include <platform/sized_buffer.h>
 #include <snappy-c.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include <cinttypes>
+
+#include <platform/string_hex.h>
 #include <xattr/blob.h>
 #include <xattr/utils.h>
-#include <platform/string_hex.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #include <iostream>
 #include <optional>
@@ -231,68 +228,59 @@ static std::string getNamespaceString(uint32_t ns) {
 static void printDocId(const char* prefix, const sized_buf* sb) {
     if (decodeNamespace && sb->size >= sizeof(uint32_t)) {
         // Decode the collection-ID of the key
-        auto decoded = cb::mcbp::unsigned_leb128<uint32_t>::decode(
+        auto [cid, rawKey] = cb::mcbp::unsigned_leb128<uint32_t>::decode(
                 {reinterpret_cast<uint8_t*>(sb->buf), sb->size});
 
-        // Load the key
-        std::string key(reinterpret_cast<const char*>(decoded.second.data()),
-                        decoded.second.size());
+        auto collectionInfo = getNamespaceString(cid);
 
-        auto name = getNamespaceString(decoded.first);
-
-        if (decoded.first == 2) {
+        if (cid == 2) {
             // Synchronous Replication 'Prepare' namespace prefix.
             // Decode again.
-            decoded =
-                    cb::mcbp::unsigned_leb128<uint32_t>::decode(decoded.second);
-            key = std::string(reinterpret_cast<const char*>(decoded.second.data()),
-                            decoded.second.size());
-            name = name + getNamespaceString(decoded.first);
+            auto [newCid, newRawKey] =
+                    cb::mcbp::unsigned_leb128<uint32_t>::decode(rawKey);
+            cid = newCid;
+            rawKey = newRawKey;
+            collectionInfo += getNamespaceString(cid);
         }
 
         // Some keys in the system event namespace have a format we can decode:
         // \1_collection:<affected collection-id leb128>
         // \1_scope:<affected scope-id leb128>
-        std::string collectionsPrefix("_collection:");
-        std::string scopePrefix("_scope:");
+        std::string collectionsPrefix("_collection");
+        std::string scopePrefix("_scope");
+        std::string key{reinterpret_cast<const char*>(rawKey.data()),
+                        rawKey.size()};
+        if (cid == 1) {
+            auto [systemType, systemKey] =
+                    cb::mcbp::unsigned_leb128<uint32_t>::decode(
+                            {reinterpret_cast<const uint8_t*>(rawKey.data()),
+                             rawKey.size()});
 
-        if (decoded.first == 1) {
             // System event namespace
-            if (std::mismatch(collectionsPrefix.begin(),
-                              collectionsPrefix.end(),
-                              key.begin())
-                        .first == collectionsPrefix.end()) {
-                uint32_t affectedCid =
-                        cb::mcbp::unsigned_leb128<uint32_t>::decode(
-                                {reinterpret_cast<const uint8_t*>(
-                                         decoded.second.data() +
-                                         collectionsPrefix.size()),
-                                 decoded.second.size() -
-                                         collectionsPrefix.size()})
-                                .first;
+            if (systemType == 0 &&
+                key.find(collectionsPrefix) != std::string::npos) {
+                auto [affectedCid, keyRemainder] =
+                        cb::mcbp::unsigned_leb128<uint32_t>::decode(systemKey);
+                key = std::string{
+                        reinterpret_cast<const char*>(keyRemainder.data()),
+                        keyRemainder.size()};
                 std::stringstream ss;
-                ss << name << "collection:0x" << std::hex << affectedCid;
-                name = ss.str();
-            } else if (std::mismatch(scopePrefix.begin(),
-                                     scopePrefix.end(),
-                                     key.begin())
-                               .first == scopePrefix.end()) {
-                uint32_t affectedSid =
-                        cb::mcbp::unsigned_leb128<uint32_t>::decode(
-                                {reinterpret_cast<const uint8_t*>(
-                                         decoded.second.data() +
-                                         scopePrefix.size()),
-                                 decoded.second.size() - scopePrefix.size()})
-                                .first;
+                ss << collectionInfo << "collection:0x" << std::hex
+                   << affectedCid;
+                collectionInfo = ss.str();
+            } else if (systemType == 1 &&
+                       key.find(scopePrefix) != std::string::npos) {
+                auto [affectedSid, keyRemainder] =
+                        cb::mcbp::unsigned_leb128<uint32_t>::decode(systemKey);
+                key = std::string{
+                        reinterpret_cast<const char*>(keyRemainder.data()),
+                        keyRemainder.size()};
                 std::stringstream ss;
-                ss << name << "scope:0x" << std::hex << affectedSid;
-                name = ss.str();
+                ss << collectionInfo << "scope:0x" << std::hex << affectedSid;
+                collectionInfo = ss.str();
             }
         }
-        printf("%s(%s) %s\n",
-               prefix,
-               name.c_str(),
-               key.c_str());
+        printf("%s(%s) %s\n", prefix, collectionInfo.c_str(), key.c_str());
     } else {
         printf("%s%.*s\n", prefix, (int)sb->size, sb->buf);
     }
