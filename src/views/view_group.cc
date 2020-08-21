@@ -1421,7 +1421,8 @@ couchstore_error_t couchstore_update_view_group(view_group_info_t *info,
                                                view_error_t *error_info)
 {
     couchstore_error_t ret;
-    tree_file index_file = {0, NULL, NULL, NULL, {-1}, CRC32};
+    tree_file index_file = {
+            0, NULL, NULL, NULL, {-1}, CRC32, tree_file_options{}};
     index_header_t *header = NULL;
     node_pointer *id_root = NULL;
     node_pointer **view_roots = NULL;

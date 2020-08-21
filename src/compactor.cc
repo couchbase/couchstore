@@ -71,7 +71,7 @@ static int time_purge_hook(Db* target, DocInfo* info, sized_buf, void* ctx_p) {
 int main(int argc, char** argv) {
     Db* source;
     couchstore_error_t errcode;
-    time_purge_ctx timepurge = {0, 0};
+    time_purge_ctx timepurge = {0, 0, 0};
     couchstore_compact_hook hook = nullptr;
     couchstore_docinfo_hook dhook = nullptr;
     void* hook_ctx = nullptr;
