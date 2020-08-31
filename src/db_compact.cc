@@ -48,7 +48,8 @@ couchstore_error_t couchstore_compact_db_ex(Db* source,
                                             couchstore_compact_hook hook,
                                             couchstore_docinfo_hook dhook,
                                             void* hook_ctx,
-                                            FileOpsInterface* ops) {
+                                            FileOpsInterface* ops,
+                                            PrecommitHook precommitHook) {
     return cb::couchstore::compact(
             *source,
             target_filename,
@@ -65,7 +66,8 @@ couchstore_error_t couchstore_compact_db_ex(Db* source,
                 }
                 return dhook(&docInfo, &body);
             },
-            ops);
+            ops,
+            precommitHook);
 }
 
 couchstore_error_t couchstore_compact_db(Db* source,
@@ -86,7 +88,8 @@ couchstore_error_t cb::couchstore::compact(
         couchstore_compact_flags flags,
         CompactFilterCallback filterCallback,
         CompactRewriteDocInfoCallback rewriteDocInfoCallback,
-        FileOpsInterface* ops) {
+        FileOpsInterface* ops,
+        PrecommitHook precommitHook) {
     COLLECT_LATENCY();
 
     if (!filterCallback && rewriteDocInfoCallback) {
@@ -197,7 +200,13 @@ couchstore_error_t cb::couchstore::compact(
                                    nullptr, // docinfo
                                    {})));
     }
+
+    if (precommitHook) {
+        error_pass(precommitHook(*target));
+    }
+
     error_pass(couchstore_commit_ex(target, source.header.timestamp));
+
 cleanup:
     TreeWriterFree(ctx.tree_writer);
     delete_arena(ctx.transient_arena);
@@ -656,6 +665,7 @@ couchstore_error_t compact(Db& source,
                            CompactFilterCallback filterCallback,
                            CompactRewriteDocInfoCallback rewriteDocInfoCallback,
                            FileOpsInterface* ops,
+                           PrecommitHook precommitHook,
                            uint64_t timestamp,
                            uint64_t delta) {
     if (ops == nullptr) {
@@ -677,7 +687,8 @@ couchstore_error_t compact(Db& source,
                        flags,
                        filterCallback,
                        rewriteDocInfoCallback,
-                       ops);
+                       ops,
+                       precommitHook);
     }
 
     // We need to locate the oldest header to use and perform a full
@@ -690,7 +701,8 @@ couchstore_error_t compact(Db& source,
                                           flags,
                                           filterCallback,
                                           rewriteDocInfoCallback,
-                                          ops);
+                                          ops,
+                                          precommitHook);
     if (status != COUCHSTORE_SUCCESS) {
         throw std::runtime_error(
                 std::string{"cb::couchstore::compact() failed: "} +

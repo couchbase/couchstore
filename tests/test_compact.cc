@@ -466,6 +466,7 @@ TEST_F(CouchstoreCompactTest, PitrCompaction) {
                                       {},
                                       {},
                                       couchstore_get_default_file_ops(),
+                                      {},
                                       50,
                                       1));
 
@@ -535,6 +536,7 @@ TEST_F(CouchstoreCompactTest, PitrCompactionSquashHeaders) {
                                       {},
                                       {},
                                       couchstore_get_default_file_ops(),
+                                      {},
                                       50,
                                       5));
 
@@ -585,6 +587,7 @@ TEST_F(CouchstoreCompactTest, PitrCompactionNotLastBlock) {
                                       {},
                                       {},
                                       couchstore_get_default_file_ops(),
+                                      {},
                                       30,
                                       70));
 
@@ -634,6 +637,7 @@ TEST_F(CouchstoreCompactTest, CheckMultipleMissingInBeginning) {
                     {},
                     {},
                     couchstore_get_default_file_ops(),
+                    {},
                     now - std::chrono::duration_cast<std::chrono::nanoseconds>(
                                   std::chrono::hours(1))
                                     .count(),

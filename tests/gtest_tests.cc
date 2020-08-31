@@ -978,6 +978,60 @@ TEST_F(CouchstoreTest, crc_upgrade2) {
     ASSERT_EQ(0, remove(target.c_str()));
 }
 
+TEST_F(CouchstoreTest, MB40415_precommit_hook) {
+    const size_t docCount = 10;
+    Documents documents(docCount);
+    documents.generateDocs();
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(
+                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_save_documents(db,
+                                        documents.getDocs(),
+                                        documents.getDocInfos(),
+                                        docCount,
+                                        0));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    std::string target("compacted.couch");
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_compact_db_ex(
+                      db,
+                      target.c_str(),
+                      0,
+                      nullptr,
+                      nullptr,
+                      nullptr,
+                      couchstore_get_default_file_ops(),
+                      [](Db& mdb) -> couchstore_error_t {
+                          LocalDoc ldoc;
+                          ldoc.id.buf = const_cast<char*>("_local/mb-40415");
+                          ldoc.id.size = 15;
+                          ldoc.json.buf = const_cast<char*>("{\"test\":true}");
+                          ldoc.json.size = 13;
+                          ldoc.deleted = 0;
+                          return couchstore_save_local_document(&mdb, &ldoc);
+                      }));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+
+    // Open target and verify there is a single header in the file and
+    // the local doc is present
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(target.c_str(), 0, &db));
+
+    LocalDoc* ldoc;
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_local_document(db, "_local/mb-40415", 15, &ldoc));
+    couchstore_free_local_document(ldoc);
+
+    // There should not be any previous header
+    ASSERT_EQ(COUCHSTORE_ERROR_DB_NO_LONGER_VALID,
+              couchstore_rewind_db_header(db));
+    ASSERT_EQ(0, remove(target.c_str()));
+    db = nullptr;
+}
+
 // Parameters for MT_save_worker.
 struct MT_save_args {
     size_t worker_id;

@@ -917,6 +917,8 @@ extern "C" {
     LIBCOUCHSTORE_API
     couchstore_error_t couchstore_set_purge_seq(Db* target, uint64_t purge_seq);
 
+    using PrecommitHook = std::function<couchstore_error_t(Db& db)>;
+
     /**
      * Compact a database.
      *
@@ -935,16 +937,21 @@ extern "C" {
      *                 ctx parameter
      * @param ops Pointer to the FileOpsInterface implementation
      *            you want the library to use.
+     * @param precommitHook Before calling commit on the compacted file the
+     *                      precommot hook is called to allow the caller to
+     *                      do modifications to the database before commit
      * @return COUCHSTORE_SUCCESS on success
      */
     LIBCOUCHSTORE_API
-    couchstore_error_t couchstore_compact_db_ex(Db* source,
-                                                const char* target_filename,
-                                                couchstore_compact_flags flags,
-                                                couchstore_compact_hook hook,
-                                                couchstore_docinfo_hook dhook,
-                                                void* hook_ctx,
-                                                FileOpsInterface* ops);
+    couchstore_error_t couchstore_compact_db_ex(
+            Db* source,
+            const char* target_filename,
+            couchstore_compact_flags flags,
+            couchstore_compact_hook hook,
+            couchstore_docinfo_hook dhook,
+            void* hook_ctx,
+            FileOpsInterface* ops,
+            PrecommitHook precommitHook = {});
 
     /*////////////////////  MISC: */
 
@@ -1240,7 +1247,8 @@ couchstore_error_t compact(Db& source,
                            couchstore_compact_flags flags,
                            CompactFilterCallback filterCallback,
                            CompactRewriteDocInfoCallback rewriteDocInfoCallback,
-                           FileOpsInterface* ops);
+                           FileOpsInterface* ops,
+                           PrecommitHook precommitHook = {});
 
 /**
  * Compact a Couchstore file with support for Point in Time Recovery (PiTR)
@@ -1289,8 +1297,33 @@ couchstore_error_t compact(Db& source,
                            CompactFilterCallback filterCallback,
                            CompactRewriteDocInfoCallback rewriteDocInfoCallback,
                            FileOpsInterface* ops,
+                           PrecommitHook precommitHook,
                            uint64_t timestamp,
                            uint64_t delta);
+
+// ep-engine currently use the compact method without a precommit hook.
+// To ease the merge let's add a fallback method for now so that we can merge
+// without dependencies (and remove this method when we've merged a
+// fix in kv-engine)
+inline couchstore_error_t compact(
+        Db& source,
+        const char* target_filename,
+        couchstore_compact_flags flags,
+        CompactFilterCallback filterCallback,
+        CompactRewriteDocInfoCallback rewriteDocInfoCallback,
+        FileOpsInterface* ops,
+        uint64_t timestamp,
+        uint64_t delta) {
+    return compact(source,
+                   target_filename,
+                   flags,
+                   filterCallback,
+                   rewriteDocInfoCallback,
+                   ops,
+                   {},
+                   timestamp,
+                   delta);
+}
 
 /**
  * Replay mutations (with PiTR compaction) from the current header in the
