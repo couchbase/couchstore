@@ -722,7 +722,8 @@ couchstore_error_t compact(Db& source,
         targetDbHolder = std::move(target);
     }
 
-    status = replay(source, *targetDbHolder, delta, sourceHeaderOffset);
+    status = replay(
+            source, *targetDbHolder, delta, sourceHeaderOffset, precommitHook);
     if (status != COUCHSTORE_SUCCESS) {
         // need to close the file before I can remove it
         targetDbHolder.reset();
@@ -737,7 +738,8 @@ LIBCOUCHSTORE_API
 couchstore_error_t replay(Db& source,
                           Db& target,
                           uint64_t delta,
-                          uint64_t sourceHeaderEndOffset) {
+                          uint64_t sourceHeaderEndOffset,
+                          PrecommitHook precommitHook) {
     Context ctx;
     auto header = cb::couchstore::getHeader(source);
     ctx.highest = header.updateSeqNum;
@@ -767,6 +769,16 @@ couchstore_error_t replay(Db& source,
             throw std::runtime_error(
                     std::string{"couchstore_walk_local_tree() Failed: "} +
                     couchstore_strerror(status));
+        }
+
+        if (precommitHook) {
+            status = precommitHook(*ctx.target);
+            if (status != COUCHSTORE_SUCCESS) {
+                throw std::runtime_error(
+                        std::string{"cb::couchstore::replay() - precommit hook "
+                                    "Failed: "} +
+                        couchstore_strerror(status));
+            }
         }
 
         status = couchstore_commit_ex(ctx.target, header.timestamp);

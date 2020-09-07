@@ -1329,13 +1329,15 @@ inline couchstore_error_t compact(
  * Replay mutations (with PiTR compaction) from the current header in the
  * source database to the target database by using the specified delta
  * as the granularity for the number of headers to deduplicate. Stop
- * when we reach the provided sourceHeaderEndOffset
+ * when we reach the provided sourceHeaderEndOffset. The precommit hook
+ * will be called for each commit in the destination database
  */
 LIBCOUCHSTORE_API
 couchstore_error_t replay(Db& source,
                           Db& target,
                           uint64_t delta,
-                          uint64_t sourceHeaderEndOffset);
+                          uint64_t sourceHeaderEndOffset,
+                          PrecommitHook precommitHook = {});
 
 /**
  * Save multiple local docs to the db. see couchstore_save_local_document. The
