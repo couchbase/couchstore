@@ -1250,6 +1250,14 @@ couchstore_error_t compact(Db& source,
                            FileOpsInterface* ops,
                            PrecommitHook precommitHook = {});
 
+/// A callback the user may provide to a PointInTime compaction which gets
+/// called before the compaction starts with the database header representing
+/// the database header it'll perform a full compaction up to (may be used
+/// by the user to fetch the highest sequence number for instance)
+/// If the callback returns anthing else than COUCHSTORE_SUCCESS compaction
+/// will fail with the returned value
+using PreCompactionCallback = std::function<couchstore_error_t(Db&)>;
+
 /**
  * Compact a Couchstore file with support for Point in Time Recovery (PiTR)
  *
@@ -1287,6 +1295,11 @@ couchstore_error_t compact(Db& source,
  *                  _before_ this value is chosen if no exact match is found)
  * @param delta The delta to add to the between each timestamp to keep
  *              in the database.
+ * @param preCompactionCallback A callback which is called when the oldest
+ *                              database is located, but _before_ compaction
+ *                              start. You may use this callback to look at
+ *                              the header fields (or for instance look at
+ *                              the _local documents)
  * @return Couchstore error code
  * @throws std::runtime_error
  */
@@ -1299,31 +1312,8 @@ couchstore_error_t compact(Db& source,
                            FileOpsInterface* ops,
                            PrecommitHook precommitHook,
                            uint64_t timestamp,
-                           uint64_t delta);
-
-// ep-engine currently use the compact method without a precommit hook.
-// To ease the merge let's add a fallback method for now so that we can merge
-// without dependencies (and remove this method when we've merged a
-// fix in kv-engine)
-inline couchstore_error_t compact(
-        Db& source,
-        const char* target_filename,
-        couchstore_compact_flags flags,
-        CompactFilterCallback filterCallback,
-        CompactRewriteDocInfoCallback rewriteDocInfoCallback,
-        FileOpsInterface* ops,
-        uint64_t timestamp,
-        uint64_t delta) {
-    return compact(source,
-                   target_filename,
-                   flags,
-                   filterCallback,
-                   rewriteDocInfoCallback,
-                   ops,
-                   {},
-                   timestamp,
-                   delta);
-}
+                           uint64_t delta,
+                           PreCompactionCallback preCompactionCallback = {});
 
 /**
  * Replay mutations (with PiTR compaction) from the current header in the

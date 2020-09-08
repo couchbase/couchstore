@@ -554,7 +554,8 @@ TEST_F(CouchstoreCompactTest, PitrCompactionSquashHeaders) {
 
 /**
  * Generate a database with multiple headers and verify that we may
- * perform full compaction up to one point, then incremental / compactions
+ * perform full compaction up to one point (and that the expected header
+ * is provided in the preCompactionCallback), then incremental / compactions
  * moving up to the final point in time and squashing headers as we go,
  * but we should NOT move beyond the provided source header.
  *
@@ -580,6 +581,28 @@ TEST_F(CouchstoreCompactTest, PitrCompactionNotLastBlock) {
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), 109));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), 170));
     ASSERT_EQ(COUCHSTORE_SUCCESS, seek(*db, Direction::Backward));
+
+    // verify that cancel works for pre-compaction callback as we'll be using
+    // that functionality in the real compaction
+    auto db2 = openSourceDb();
+    ASSERT_EQ(COUCHSTORE_ERROR_CANCEL,
+              cb::couchstore::compact(*db2,
+                                      targetFilename.c_str(),
+                                      COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                      {},
+                                      {},
+                                      couchstore_get_default_file_ops(),
+                                      {},
+                                      30,
+                                      70,
+                                      [](Db&) {
+                                            return COUCHSTORE_ERROR_CANCEL;
+                                      }));
+    db2.reset();
+    ASSERT_FALSE(cb::io::isFile(targetFilename));
+
+    // verify that the the pre-compaction callback receives the correct
+    // header
     ASSERT_EQ(COUCHSTORE_SUCCESS,
               cb::couchstore::compact(*db,
                                       targetFilename.c_str(),
@@ -589,7 +612,18 @@ TEST_F(CouchstoreCompactTest, PitrCompactionNotLastBlock) {
                                       couchstore_get_default_file_ops(),
                                       {},
                                       30,
-                                      70));
+                                      70,
+                                      [](Db& database) {
+                                          using cb::couchstore::getHeader;
+                                          auto header = getHeader(database);
+                                          if (header.timestamp != 30) {
+                                              // Incorrect header version!
+                                              // cancel
+                                              return COUCHSTORE_ERROR_CANCEL;
+                                          }
+
+                                          return COUCHSTORE_SUCCESS;
+                                      }));
 
     db = openTargetDb();
     ASSERT_EQ(109, cb::couchstore::getHeader(*db).timestamp);

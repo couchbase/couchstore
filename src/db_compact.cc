@@ -667,7 +667,8 @@ couchstore_error_t compact(Db& source,
                            FileOpsInterface* ops,
                            PrecommitHook precommitHook,
                            uint64_t timestamp,
-                           uint64_t delta) {
+                           uint64_t delta,
+                           PreCompactionCallback preCompactionCallback) {
     if (ops == nullptr) {
         ops = couchstore_get_default_file_ops();
     }
@@ -679,6 +680,12 @@ couchstore_error_t compact(Db& source,
 
     auto header = getHeader(source);
     if (header.timestamp <= timestamp) {
+        if (preCompactionCallback) {
+            auto err = preCompactionCallback(source);
+            if (err != COUCHSTORE_SUCCESS) {
+                return err;
+            }
+        }
         // The timestamp of the header in the source is older than the
         // oldest timestamp we want to keep, so we may perform a full
         // compaction of the entire database and be done with it!
@@ -696,6 +703,12 @@ couchstore_error_t compact(Db& source,
     // compaction from that point forward.
     const auto sourceHeaderOffset = header.headerPosition;
     locateStartHeader(source, timestamp);
+    if (preCompactionCallback) {
+        auto err = preCompactionCallback(source);
+        if (err != COUCHSTORE_SUCCESS) {
+            return err;
+        }
+    }
     auto status = cb::couchstore::compact(source,
                                           target_filename,
                                           flags,
