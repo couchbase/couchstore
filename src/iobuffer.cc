@@ -452,14 +452,6 @@ couch_file_handle BufferedFileOps::constructor(couchstore_error_info_t* errinfo,
         h->raw_ops_handle = raw_ops->constructor(errinfo);
         h->nbuffers = 1;
         h->params = params;
-
-        try {
-            allocate_read_buffer(reinterpret_cast<couch_file_handle>(h));
-            allocate_write_buffer(reinterpret_cast<couch_file_handle>(h));
-        } catch (const std::bad_alloc&) {
-            destructor(reinterpret_cast<couch_file_handle>(h));
-            return NULL;
-        }
     }
     return (couch_file_handle) h;
 }
