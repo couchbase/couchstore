@@ -26,14 +26,17 @@
 #include <unordered_map>
 #include <vector>
 
+#include <gsl/gsl>
 #include <phosphor/phosphor.h>
 #include <platform/cb_malloc.h>
 #include <stdlib.h>
 #include <string.h>
 #include <memory>
+
 #ifndef WIN32
 #include <sys/mman.h>
 #endif
+
 #include "crc32.h"
 
 // Uncomment to enable debug logging of buffer operations.
@@ -451,13 +454,8 @@ couch_file_handle BufferedFileOps::constructor(couchstore_error_info_t* errinfo,
         h->params = params;
 
         try {
-            h->write_buffer = std::make_unique<file_buffer>(
-                    h,
-                    h->params.readOnly ? 0 : WRITE_BUFFER_CAPACITY,
-                    h->params.tracing_enabled,
-                    h->params.write_validation_enabled,
-                    h->params.mprotect_enabled);
-            h->read_buffer_mgr = new ReadBufferManager();
+            allocate_read_buffer(reinterpret_cast<couch_file_handle>(h));
+            allocate_write_buffer(reinterpret_cast<couch_file_handle>(h));
         } catch (const std::bad_alloc&) {
             destructor(reinterpret_cast<couch_file_handle>(h));
             return NULL;
@@ -488,8 +486,40 @@ couchstore_error_t BufferedFileOps::close(couchstore_error_info_t* errinfo,
     if (!h) {
         return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     }
-    flush_buffer(errinfo, h->write_buffer.get());
+
+    if (h->write_buffer) {
+        flush_buffer(errinfo, h->write_buffer.get());
+    }
     return h->raw_ops->close(errinfo, h->raw_ops_handle);
+}
+
+void BufferedFileOps::allocate_read_buffer(couch_file_handle handle) {
+    buffered_file_handle *h = (buffered_file_handle*)handle;
+
+    Expects(!h->read_buffer_mgr);
+    h->read_buffer_mgr = new ReadBufferManager();
+}
+
+void BufferedFileOps::allocate_write_buffer(couch_file_handle handle) {
+    buffered_file_handle *h = (buffered_file_handle*)handle;
+
+    Expects(!h->write_buffer);
+    h->write_buffer = std::make_unique<file_buffer>(
+            h,
+            h->params.readOnly ? 0 : WRITE_BUFFER_CAPACITY,
+            h->params.tracing_enabled,
+            h->params.write_validation_enabled,
+            h->params.mprotect_enabled);
+
+}
+
+void BufferedFileOps::free_buffers(couch_file_handle handle) {
+    buffered_file_handle *h = (buffered_file_handle*)handle;
+
+    // Free the read and write buffers to reclaim memory
+    h->write_buffer.reset();
+    delete h->read_buffer_mgr;
+    h->read_buffer_mgr = nullptr;
 }
 
 couchstore_error_t BufferedFileOps::set_periodic_sync(couch_file_handle handle,
@@ -531,10 +561,17 @@ ssize_t BufferedFileOps::pread(couchstore_error_info_t* errinfo,
     //fprintf(stderr, "r");
 #endif
     buffered_file_handle *h = (buffered_file_handle*)handle;
+
     // Flush the write buffer before trying to read anything:
-    couchstore_error_t err = flush_buffer(errinfo, h->write_buffer.get());
-    if (err < 0) {
-        return err;
+    if (h->write_buffer) {
+        auto err = flush_buffer(errinfo, h->write_buffer.get());
+        if (err < 0) {
+            return err;
+        }
+    }
+
+    if (!h->read_buffer_mgr) {
+        allocate_read_buffer(handle);
     }
 
     ssize_t total_read = 0;
@@ -551,7 +588,7 @@ ssize_t BufferedFileOps::pread(couchstore_error_info_t* errinfo,
             cs_off_t block_start = offset -
                                    (offset % h->params.read_buffer_capacity);
             h->read_buffer_mgr->relocateBuffer(buffer->offset, block_start);
-            err = load_buffer_from(errinfo, buffer, block_start,
+            auto err = load_buffer_from(errinfo, buffer, block_start,
                                    (size_t)(offset + nbyte - block_start));
             if (err < 0) {
                 return err;
@@ -583,6 +620,11 @@ ssize_t BufferedFileOps::pwrite(couchstore_error_info_t* errinfo,
     }
 
     buffered_file_handle *h = (buffered_file_handle*)handle;
+
+    if (!h->write_buffer) {
+        allocate_write_buffer(handle);
+    }
+
     file_buffer* buffer = h->write_buffer.get();
 
     // Write data to the current buffer:
@@ -633,7 +675,12 @@ couchstore_error_t BufferedFileOps::sync(couchstore_error_info_t* errinfo,
                                          couch_file_handle handle)
 {
     buffered_file_handle *h = (buffered_file_handle*)handle;
-    couchstore_error_t err = flush_buffer(errinfo, h->write_buffer.get());
+
+    couchstore_error_t err = COUCHSTORE_SUCCESS;
+    if (h->write_buffer) {
+        err = flush_buffer(errinfo, h->write_buffer.get());
+    }
+
     if (err == COUCHSTORE_SUCCESS) {
         err = h->raw_ops->sync(errinfo, h->raw_ops_handle);
     }

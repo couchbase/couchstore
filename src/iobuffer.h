@@ -94,6 +94,12 @@ public:
     couch_file_handle constructor(couchstore_error_info_t *errinfo,
                                   FileOpsInterface* raw_ops,
                                   buffered_file_ops_params params);
+
+    // Allocate memory for the read and write buffers
+    void allocate_read_buffer(couch_file_handle handle);
+    void allocate_write_buffer(couch_file_handle handle);
+
+    void free_buffers(couch_file_handle handle) override;
 };
 
 #endif // LIBCOUCHSTORE_IOBUFFER_H

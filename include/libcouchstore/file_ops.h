@@ -243,6 +243,13 @@ public:
      * @param handle file handle to be released
      */
     virtual void destructor(couch_file_handle handle) = 0;
+
+    /**
+     * Free any buffers that the FileOps may have allocated to reclaim memory
+     *
+     * @param handle file handle for which we want to free buffers
+     */
+    virtual void free_buffers(couch_file_handle handle) {}
 };
 
 class ScopedFileTag {

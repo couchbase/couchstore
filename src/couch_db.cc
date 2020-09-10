@@ -367,6 +367,14 @@ couchstore_error_t couchstore_commit_ex(Db* db, uint64_t timestamp) {
         errcode = db->file.ops->sync(&db->file.lastError, db->file.handle);
     }
 
+    if (errcode == COUCHSTORE_SUCCESS) {
+        // BufferedFileOps allocates read and write buffers so that we can
+        // reduce syscalls. To allow us to cache Db objects in KV_Engine we need
+        // to free these buffers as they can use a substantial amount of memory
+        // and may not be useful for the next Db usage.
+        db->file.ops->free_buffers(db->file.handle);
+    }
+
     return errcode;
 }
 
