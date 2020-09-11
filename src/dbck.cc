@@ -316,18 +316,16 @@ static int recover_file(recovery_options& options) {
     param.options = &options;
 
     // Open source file.
-    errcode = couchstore_open_db_ex(options.src_filename.c_str(),
+    error_pass(couchstore_open_db_ex(options.src_filename.c_str(),
                                     COUCHSTORE_OPEN_FLAG_RDONLY,
                                     couchstore_get_default_file_ops(),
-                                    &db_src);
-    error_pass(errcode);
+                                    &db_src));
 
     // Open source file for rewind.
-    errcode = couchstore_open_db_ex(options.src_filename.c_str(),
+    error_pass(couchstore_open_db_ex(options.src_filename.c_str(),
                                     COUCHSTORE_OPEN_FLAG_RDONLY,
                                     couchstore_get_default_file_ops(),
-                                    &db_src_alt);
-    error_pass(errcode);
+                                    &db_src_alt));
     param.db_src = db_src_alt;
 
     // Compact with recovery mode.
