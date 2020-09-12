@@ -33,7 +33,13 @@ sized_buf* arena_special_copy_buf_and_revmeta(arena *a, const sized_buf *val,
 /* Aligns the offset to the start of the next block */
 cs_off_t align_to_next_block(cs_off_t offset);
 
-   /* Sets errcode to the result of C, and jumps to the cleanup: label if it's nonzero. */
+/* Handle string truncation when copying strings. If the resulting string 'd'
+(including the terminating null) is not longer than n return 0 otherwise return
+-1 */
+int strncpy_safe(char* d, const char* s, size_t n);
+
+/* Sets errcode to the result of C, and jumps to the cleanup: label if it's
+ * nonzero. */
 #ifdef DEBUG
     void report_error(couchstore_error_t, const char* file, int line);
     #define error_pass(C)                                  \

@@ -4,9 +4,10 @@
    pje@efgh.com
    http://www.efgh.com/software/mergesor.htm
 */
+#include "mergesort.h"
 #include "couchstore_config.h"
 #include "internal.h"
-#include "mergesort.h"
+#include "util.h"
 
 #include <platform/cb_malloc.h>
 #include <stdlib.h>
@@ -116,7 +117,12 @@ int merge_sort(FILE *unsorted_file, FILE *sorted_file,
         (*record_free)(record[1]);
         return FILE_CREATION_ERROR;
     }
-    strncpy(source_tape[0].path, tmp_path, PATH_MAX);
+    if (strncpy_safe(source_tape[0].path, tmp_path, PATH_MAX)) {
+        releaseTmpFile(&source_tape[0]);
+        (*record_free)(record[0]);
+        (*record_free)(record[1]);
+        return FILE_CREATION_ERROR;
+    }
     source_tape[1].fp = openTmpFile(tmp_path);
     source_tape[1].count = 0L;
     if (source_tape[1].fp == NULL) {
@@ -125,7 +131,13 @@ int merge_sort(FILE *unsorted_file, FILE *sorted_file,
         (*record_free)(record[1]);
         return FILE_CREATION_ERROR;
     }
-    strncpy(source_tape[1].path, tmp_path, PATH_MAX);
+    if (strncpy_safe(source_tape[1].path, tmp_path, PATH_MAX)) {
+        releaseTmpFile(&source_tape[0]);
+        releaseTmpFile(&source_tape[1]);
+        (*record_free)(record[0]);
+        (*record_free)(record[1]);
+        return FILE_CREATION_ERROR;
+    }
     /* read blocks, sort them in memory, and write the alternately to */
     /* tapes 0 and 1 */
     {
@@ -238,7 +250,15 @@ int merge_sort(FILE *unsorted_file, FILE *sorted_file,
             }
 
             if (destination_tape[0].fp != sorted_file) {
-                strncpy(destination_tape[0].path, tmp_path, PATH_MAX);
+                if (strncpy_safe(
+                            destination_tape[0].path, tmp_path, PATH_MAX)) {
+                    releaseTmpFile(&destination_tape[0]);
+                    releaseTmpFile(&source_tape[0]);
+                    releaseTmpFile(&source_tape[1]);
+                    (*record_free)(record[0]);
+                    (*record_free)(record[1]);
+                    return FILE_CREATION_ERROR;
+                }
             }
 
             destination_tape[1].fp = openTmpFile(tmp_path);
@@ -253,7 +273,16 @@ int merge_sort(FILE *unsorted_file, FILE *sorted_file,
                 (*record_free)(record[1]);
                 return FILE_CREATION_ERROR;
             }
-            strncpy(destination_tape[1].path, tmp_path, PATH_MAX);
+            if (strncpy_safe(destination_tape[1].path, tmp_path, PATH_MAX)) {
+                if (destination_tape[0].fp != sorted_file) {
+                    releaseTmpFile(&destination_tape[0]);
+                }
+                releaseTmpFile(&source_tape[0]);
+                releaseTmpFile(&source_tape[1]);
+                (*record_free)(record[0]);
+                (*record_free)(record[1]);
+                return FILE_CREATION_ERROR;
+            }
             record1_size = (*read)(source_tape[0].fp, record[0], pointer);
             record2_size = (*read)(source_tape[1].fp, record[1], pointer);
             if (record1_size <= 0 || record2_size <= 0) {

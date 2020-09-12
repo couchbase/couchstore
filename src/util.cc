@@ -145,3 +145,12 @@ couchstore_error_t log_last_internal_error(const char *format, ...)
 
     return COUCHSTORE_SUCCESS;
 }
+
+int strncpy_safe(char* d, const char* s, size_t n) {
+    int b = snprintf(d, n, "%s", s);
+    if (b < 0 || (size_t)b >= n) {
+        return -1;
+    } else {
+        return 0;
+    }
+}

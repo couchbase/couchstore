@@ -58,7 +58,9 @@ couchstore_error_t TreeWriterOpen(char* unsortedFilePath,
         error_pass(COUCHSTORE_ERROR_NO_SUCH_FILE);
     }
 
-    strncpy(writer->path, writer->tmp_path, PATH_MAX);
+    if (strncpy_safe(writer->path, writer->tmp_path, PATH_MAX)) {
+        error_pass(COUCHSTORE_ERROR_NO_SUCH_FILE);
+    }
     if (unsortedFilePath) {
         fseek(writer->file, 0, SEEK_END);  // in case more items will be added
     }
