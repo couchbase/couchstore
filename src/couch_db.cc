@@ -488,8 +488,10 @@ couchstore_error_t couchstore_open_db_ex(const char *filename,
     }
 
     if (flags & COUCHSTORE_OPEN_FLAG_RDONLY) {
+        db->readOnly = true;
         openflags = O_RDONLY;
     } else {
+        db->readOnly = false;
         openflags = O_RDWR;
     }
 
@@ -1759,13 +1761,25 @@ couchstore_error_t seek(Db& db, Direction direction) {
 
     couchstore_error_t errorcode = COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     const auto current = db.header.position;
+    const auto old_file_pos = db.file.pos;
 
     switch (direction) {
     case Direction::Forward:
-        // "optimization": if we're at the end of the file we don't
-        // need to drop the internal data and reload them..
         if (db.header.position + COUCH_BLOCK_SIZE > db.file.pos) {
-            return COUCHSTORE_ERROR_NO_HEADER;
+            if (!db.readOnly) {
+                // seems dangerous to have multiple writers updating the
+                // same file concurrently
+                return COUCHSTORE_ERROR_NO_HEADER;
+            }
+
+            // The underlying file may have been written to by others;
+            // go to the next end of file!
+            auto pos = uint64_t(
+                    db.file.ops->goto_eof(&db.file.lastError, db.file.handle));
+            if (pos == db.file.pos) {
+                return COUCHSTORE_ERROR_NO_HEADER;
+            }
+            db.file.pos = pos;
         }
         errorcode = couchstore_fastforward_db_header_impl(&db);
         break;
@@ -1779,8 +1793,13 @@ couchstore_error_t seek(Db& db, Direction direction) {
         break;
     }
 
-    if (errorcode == COUCHSTORE_SUCCESS ||
-        errorcode == COUCHSTORE_ERROR_INVALID_ARGUMENTS) {
+    if (errorcode == COUCHSTORE_SUCCESS) {
+        return COUCHSTORE_SUCCESS;
+    }
+
+    // Restore the old file position (if we changed it)
+    db.file.pos = old_file_pos;
+    if (errorcode == COUCHSTORE_ERROR_INVALID_ARGUMENTS) {
         return errorcode;
     }
 

@@ -167,6 +167,31 @@ TEST_F(CouchstoreCxxTest, seek) {
     EXPECT_EQ(COUCHSTORE_ERROR_FILE_CLOSED, cb::couchstore::seek(*db, 0));
 }
 
+/**
+ * Test that a read only instance can seek forward to the next database header
+ * another writer made to the same underlying file
+ */
+TEST_F(CouchstoreCxxTest, seekForwardReadOnlyWithOtherWriters) {
+    using namespace cb::couchstore;
+    auto writeDb = openDb();
+    auto writeDb2 = openDb();
+    auto readDb = openDb(COUCHSTORE_OPEN_FLAG_RDONLY);
+
+    auto start = getHeader(*readDb);
+    EXPECT_EQ(COUCHSTORE_ERROR_NO_HEADER, seek(*readDb, Direction::Forward));
+    storeDocument(*writeDb, "foo", "bar");
+    couchstore_commit_ex(writeDb.get(), 0xdeadbeef);
+
+    // Seek beyond whatever it was opened for should NOT work for write
+    // instances
+    EXPECT_EQ(COUCHSTORE_ERROR_NO_HEADER, seek(*writeDb2, Direction::Forward));
+
+    // but a read only instance should be able to move forward
+    EXPECT_EQ(COUCHSTORE_SUCCESS, seek(*readDb, Direction::Forward));
+    auto end = getHeader(*readDb);
+    EXPECT_LT(start.headerPosition, end.headerPosition);
+}
+
 // Verify that we work as expected on files with the previous disk formats
 TEST_F(CouchstoreCxxTest, CommitTimestampOldDiskFormat) {
     cb::io::rmrf(filename);
