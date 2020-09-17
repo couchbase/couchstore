@@ -47,6 +47,11 @@ protected:
     void TearDown() override {
         Test::TearDown();
         cb::io::rmrf(filename);
+        for (const auto& file : dbfiles) {
+            if (cb::io::isFile(file)) {
+                cb::io::rmrf(file);
+            }
+        }
     }
 
     UniqueDbPtr openDb(
@@ -60,17 +65,27 @@ protected:
         return std::move(db);
     }
 
-    void storeDocument(Db& db, std::string_view key, std::string_view value) {
+    void storeDocument(Db& db,
+                       std::string_view key,
+                       std::string_view value,
+                       bool deleted = false) {
         Doc doc = {};
         doc.id = {const_cast<char*>(key.data()), key.size()};
         doc.data = {const_cast<char*>(value.data()), value.size()};
         DocInfo docInfo = {};
         docInfo.id = doc.id;
-        ASSERT_EQ(COUCHSTORE_SUCCESS,
-                  couchstore_save_document(&db, &doc, &docInfo, 0));
+        docInfo.deleted = deleted;
+        if (deleted && value.empty()) {
+            ASSERT_EQ(COUCHSTORE_SUCCESS,
+                      couchstore_save_document(&db, nullptr, &docInfo, 0));
+        } else {
+            ASSERT_EQ(COUCHSTORE_SUCCESS,
+                      couchstore_save_document(&db, &doc, &docInfo, 0));
+        }
     }
 
     std::string filename;
+    std::vector<std::string> dbfiles;
     std::vector<cs_off_t> headers;
 };
 
@@ -249,4 +264,55 @@ TEST_F(CouchstoreCxxTest, GetHeaderJson) {
     EXPECT_EQ(86103, json["file_size"]);
     EXPECT_EQ(41369, json["space_used"]);
     EXPECT_EQ(10, json["update_seq"]);
+}
+
+TEST_F(CouchstoreCxxTest, ReplayOfDeletedDocuments) {
+    auto source = openDb();
+    auto start = cb::couchstore::getHeader(*source);
+
+    // Store normal document and a temp document
+    storeDocument(*source, "alive", "bar");
+    storeDocument(*source, "deleted", "value", true);
+    storeDocument(*source, "deleted-no-value", "", true);
+    couchstore_commit(source.get());
+    auto end = cb::couchstore::getHeader(*source);
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::seek(*source, start.headerPosition));
+
+    const std::string targetdb = filename + ".ex";
+    dbfiles.emplace_back(targetdb);
+
+    auto [status, target] = openDatabase(
+            targetdb,
+            COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED);
+    ASSERT_EQ(COUCHSTORE_SUCCESS, status) << "Failed to open target db";
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::replay(
+                      *source, *target, uint64_t(-1), end.headerPosition));
+
+    // verify that I can read out the 3 documents
+    {
+        auto [st, doc] = cb::couchstore::openDocument(*target, "alive");
+        ASSERT_EQ(COUCHSTORE_SUCCESS, st);
+        ASSERT_EQ("bar", std::string(doc->data.buf, doc->data.size));
+    }
+    {
+        auto [st, docInfo] = cb::couchstore::openDocInfo(*target, "deleted");
+        ASSERT_EQ(COUCHSTORE_SUCCESS, st);
+        ASSERT_TRUE(docInfo->deleted);
+        auto [docstat, doc] = cb::couchstore::openDocument(*target, *docInfo);
+        ASSERT_EQ(COUCHSTORE_SUCCESS, docstat);
+        ASSERT_EQ("value", std::string(doc->data.buf, doc->data.size));
+    }
+
+    {
+        auto [st, docInfo] =
+                cb::couchstore::openDocInfo(*target, "deleted-no-value");
+        ASSERT_EQ(COUCHSTORE_SUCCESS, st);
+        ASSERT_TRUE(docInfo->deleted);
+        auto [docstat, doc] = cb::couchstore::openDocument(*target, *docInfo);
+        ASSERT_EQ(COUCHSTORE_ERROR_DOC_NOT_FOUND, docstat);
+        ASSERT_FALSE(doc);
+    }
 }

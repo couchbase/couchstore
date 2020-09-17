@@ -588,10 +588,12 @@ int couchstore_changes_callback(Db* db, DocInfo* docinfo, void* context) {
 
     auto [status, doc] = cb::couchstore::openDocument(*db, *docinfo);
     if (status != COUCHSTORE_SUCCESS) {
-        throw std::runtime_error(
-                std::string{"couchstore_changes_callback() Failed to "
-                            "open document: "} +
-                couchstore_strerror(status));
+        if (docinfo->deleted && status == COUCHSTORE_ERROR_DOC_NOT_FOUND) {
+            // NOT_FOUND is expected for deleted documents, continue.
+            return ctx->spool(docinfo, UniqueDocPtr{nullptr});
+        } else {
+            return status;
+        }
     }
 
     return ctx->spool(docinfo, std::move(doc));
