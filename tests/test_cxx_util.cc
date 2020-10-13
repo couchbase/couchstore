@@ -183,8 +183,8 @@ TEST_F(CouchstoreCxxTest, seek) {
 }
 
 /**
- * Test that a read only instance can seek forward to the next database header
- * another writer made to the same underlying file
+ * Test that we can't seek forward outside what the file was opened with,
+ * but seek end can do that
  */
 TEST_F(CouchstoreCxxTest, seekForwardReadOnlyWithOtherWriters) {
     using namespace cb::couchstore;
@@ -197,13 +197,16 @@ TEST_F(CouchstoreCxxTest, seekForwardReadOnlyWithOtherWriters) {
     storeDocument(*writeDb, "foo", "bar");
     couchstore_commit_ex(writeDb.get(), 0xdeadbeef);
 
-    // Seek beyond whatever it was opened for should NOT work for write
-    // instances
     EXPECT_EQ(COUCHSTORE_ERROR_NO_HEADER, seek(*writeDb2, Direction::Forward));
+    EXPECT_EQ(COUCHSTORE_ERROR_NO_HEADER, seek(*readDb, Direction::Forward));
 
-    // but a read only instance should be able to move forward
-    EXPECT_EQ(COUCHSTORE_SUCCESS, seek(*readDb, Direction::Forward));
+    // but End is allowed
+    EXPECT_EQ(COUCHSTORE_SUCCESS, seek(*readDb, Direction::End));
     auto end = getHeader(*readDb);
+    EXPECT_LT(start.headerPosition, end.headerPosition);
+
+    EXPECT_EQ(COUCHSTORE_SUCCESS, seek(*writeDb2, Direction::End));
+    end = getHeader(*writeDb2);
     EXPECT_LT(start.headerPosition, end.headerPosition);
 }
 

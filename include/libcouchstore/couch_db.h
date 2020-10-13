@@ -1038,10 +1038,25 @@ using UniqueLocalDocPtr = std::unique_ptr<LocalDoc, LocalDocDeleter>;
 LIBCOUCHSTORE_API
 couchstore_error_t seek(Db& db, cs_off_t offset);
 
-enum class Direction : uint8_t { Forward, Backward };
+enum class Direction : uint8_t {
+    /// The next header in the file (newer revisions)
+    Forward,
+    /// The previous (older) header in the file
+    Backward,
+    /// The newest (last) header in the file
+    End
+};
 
 /**
- * Find the next (forward or backward) header in a database file and open that
+ * Find the next (forward, backward or last) header in a database file and
+ * open that.
+ *
+ * Forward and backward will only seek within the file as it was opened
+ * (not detect additional data being written by others who might have
+ * the file open). They'll return COUCHSTORE_NO_HEADER if they fail to find
+ * another header (and leave the "current" position at where it was).
+ * Direction::End will "reset" its file size and find the last header in
+ * the file (just like reopening the file would do).
  *
  * @param db The database instance to use
  * @param direction The direction in the database

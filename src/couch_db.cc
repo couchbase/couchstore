@@ -1762,27 +1762,26 @@ couchstore_error_t seek(Db& db, Direction direction) {
     couchstore_error_t errorcode = COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     const auto current = db.header.position;
     const auto old_file_pos = db.file.pos;
+    cs_off_t offset;
 
     switch (direction) {
-    case Direction::Forward:
-        if (db.header.position + COUCH_BLOCK_SIZE > db.file.pos) {
-            if (!db.readOnly) {
-                // seems dangerous to have multiple writers updating the
-                // same file concurrently
-                return COUCHSTORE_ERROR_NO_HEADER;
-            }
-
-            // The underlying file may have been written to by others;
-            // go to the next end of file!
-            auto pos = uint64_t(
-                    db.file.ops->goto_eof(&db.file.lastError, db.file.handle));
-            if (pos == db.file.pos) {
-                return COUCHSTORE_ERROR_NO_HEADER;
-            }
-            db.file.pos = pos;
+    case Direction::End:
+        // Get the new file size
+        offset = db.file.ops->goto_eof(&db.file.lastError, db.file.handle);
+        if (offset < 0) {
+            // A negative value is the couchstore_error_t for the operation
+            errorcode = couchstore_error_t(offset);
+        } else {
+            db.file.pos = uint64_t(offset);
+            db.header.position = db.file.pos - 2;
+            errorcode = couchstore_rewind_db_header_impl(&db);
         }
+        break;
+
+    case Direction::Forward:
         errorcode = couchstore_fastforward_db_header_impl(&db);
         break;
+
     case Direction::Backward:
         // "optimization": if we're at the beginning of the file we don't
         // need to drop the internal data and reload them..
