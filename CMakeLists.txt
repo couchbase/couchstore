@@ -262,7 +262,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
         ADD_EXECUTABLE(${name} ${ARGN})
         SET_TARGET_PROPERTIES(${name} PROPERTIES
                               COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
-        TARGET_LINK_LIBRARIES(${name} couchstore couchstore_views dirutils)
+        TARGET_LINK_LIBRARIES(${name} couchstore_views dirutils)
         TARGET_INCLUDE_DIRECTORIES(${name} PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
     ENDMACRO()
 
@@ -332,7 +332,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                    tests/test_seek.cc
                    src/node_types.cc
                    src/crc32.cc
-                   ${COUCHSTORE_FILE_OPS})
+                   )
     SET_TARGET_PROPERTIES(couchstore_gtest PROPERTIES
                           COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
     TARGET_INCLUDE_DIRECTORIES(couchstore_gtest PRIVATE ${COUCHSTORE_GTEST_INCLUDES})
