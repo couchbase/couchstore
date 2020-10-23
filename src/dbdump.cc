@@ -467,14 +467,14 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
                     return 0;
                 }
 
-                body = _sized_buf{inflated.data(), inflated.size()};
+                body = sized_buf{inflated.data(), inflated.size()};
             }
 
             if (mcbp::datatype::is_xattr(datatype)) {
                 cb::xattr::Blob blob({body.buf, body.size}, false);
                 xattrs = blob.to_json().dump();
-                body = _sized_buf{body.buf + blob.size(),
-                                  body.size - blob.size()};
+                body = sized_buf{body.buf + blob.size(),
+                                 body.size - blob.size()};
             }
 
             if (dumpJson) {

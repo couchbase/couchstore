@@ -120,7 +120,7 @@ struct db_header {
     }
 };
 
-struct _db {
+struct Db {
     tree_file file;
     db_header header;
     int dropped;

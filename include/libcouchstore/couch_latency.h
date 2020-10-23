@@ -52,11 +52,11 @@ using couchstore_latency_callback_fn =
 /**
  * Latency info dump options.
  */
-typedef struct _couchstore_latency_dump_options {
+struct couchstore_latency_dump_options {
     /**
      * Currently empty, but left it for future extension.
      */
-} couchstore_latency_dump_options;
+};
 
 /**
  * Dump collected latency data through the given

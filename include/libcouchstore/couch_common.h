@@ -1,15 +1,26 @@
-/* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-#ifndef COUCH_COMMON_H
-#define COUCH_COMMON_H
-#include <sys/types.h>
+/*
+ *     Copyright 2020 Couchbase, Inc.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ */
+#pragma once
+
 #include <fcntl.h>
-#include <stdint.h>
+#include <sys/types.h>
+#include <cstdint>
 
 #include <libcouchstore/visibility.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
     /**
      * Using off_t turned out to be a real challenge. On "unix-like" systems
@@ -29,10 +40,10 @@ extern "C" {
      * This means we can't use off_t on Windows if we deal with files
      * that can have a size of 2Gb or more.
      */
-    typedef int64_t cs_off_t;
+    using cs_off_t = int64_t;
 
     /** Document content metadata flags */
-    typedef uint8_t couchstore_content_meta_flags;
+    using couchstore_content_meta_flags = uint8_t;
     enum {
         COUCH_DOC_IS_COMPRESSED = 128,  /**< Document contents compressed via Snappy */
         /* Content Type Reasons (content_meta & 0x0F): */
@@ -43,7 +54,7 @@ extern "C" {
         COUCH_DOC_NON_JSON_MODE = 3 /**< Document was not checked (DB running in non-JSON mode) */
     };
 
-    typedef enum {
+    enum couchstore_file_advice_t {
 #ifdef POSIX_FADV_NORMAL
         /* Evict this range from FS caches if possible */
         COUCHSTORE_FILE_ADVICE_EVICT = POSIX_FADV_DONTNEED
@@ -51,9 +62,8 @@ extern "C" {
         /* Assign these whatever values, we'll be ignoring them.. */
         COUCHSTORE_FILE_ADVICE_EVICT
 #endif
-    } couchstore_file_advice_t;
+    };
 
-#ifdef __cplusplus
     /// Different types of data contained in a couchstore file.
     enum class FileTag : uint8_t {
         Empty, // Ignore this access; speculative (e.g. searching for header).
@@ -62,22 +72,21 @@ extern "C" {
         Document, // User document data.
         Unknown, // Valid access, but unknown what for.
     };
-#endif // __cplusplus
 
     /** A generic data blob. Nothing is implied about ownership of the block pointed to. */
-    typedef struct _sized_buf {
+    struct sized_buf {
         char *buf;
         size_t size;
-    } sized_buf;
+    };
 
     /** A CouchStore document, consisting of an ID (key) and data, each of which is a blob. */
-    typedef struct _doc {
+    struct Doc {
         sized_buf id;
         sized_buf data;
-    } Doc;
+    };
 
     /** Metadata of a CouchStore document. */
-    typedef struct _docinfo {
+    struct DocInfo {
         sized_buf id;               /**< Document ID (key) */
         uint64_t db_seq;            /**< Sequence number in database */
         uint64_t rev_seq;           /**< Revision number of document */
@@ -87,20 +96,20 @@ extern "C" {
         couchstore_content_meta_flags content_meta;  /**< Content metadata flags */
         uint64_t bp;                /**< Byte offset of document data in file */
         size_t physical_size;       /**< Physical space occupied by data (*not* its length) */
-    } DocInfo;
+    };
 
 #define DOC_INITIALIZER { {0, 0}, {0, 0} }
 #define DOC_INFO_INITIALIZER { {0, 0}, 0, 0, {0, 0}, 0, 0, 0, 0 }
 
     /** Contents of a 'local' (unreplicated) document. */
-    typedef struct _local_doc {
+    struct LocalDoc {
         sized_buf id;
         sized_buf json;
         int deleted;
-    } LocalDoc;
+    };
 
     /** Information about the database as a whole. */
-    typedef struct {
+    struct DbInfo {
         const char* filename;       /**< Filesystem path */
         uint64_t last_sequence;     /**< Last sequence number allocated */
         uint64_t doc_count;         /**< Total number of (non-deleted) documents */
@@ -109,14 +118,7 @@ extern "C" {
         uint64_t file_size;         /**< Total disk space used by database */
         cs_off_t header_position;   /**< File offset of current header */
         uint64_t purge_seq;         /**< Last Purge sequence number */
-    } DbInfo;
-
+    };
 
     /** Opaque reference to an open database. */
-    typedef struct _db Db;
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+    struct Db;
