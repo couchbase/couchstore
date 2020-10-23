@@ -187,7 +187,6 @@ TARGET_INCLUDE_DIRECTORIES(couch_create PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/inclu
 IF (INSTALL_HEADER_FILES)
    INSTALL(FILES
            include/libcouchstore/couch_db.h
-           include/libcouchstore/couch_index.h
            include/libcouchstore/couch_common.h
            include/libcouchstore/error.h
            include/libcouchstore/file_ops.h
