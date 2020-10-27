@@ -38,6 +38,15 @@
 #include <v8.h>
 
 
+#define CHECK_SUCCESS(maybe)(CheckSuccess(maybe))
+
+template <typename T>
+void CheckSuccess(const v8::Maybe<T> &from) {
+  if(!from.FromJust()) {
+    // Fail silently
+  }
+}
+
 class MapReduceError;
 
 typedef std::list<mapreduce_json_t>                    json_results_list_t;

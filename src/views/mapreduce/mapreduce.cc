@@ -112,13 +112,13 @@ static void freeKvListEntries(kv_list_int_t &kvs);
 static void freeJsonListEntries(json_results_list_t &list);
 static inline Handle<Array> jsonListToJsArray(const mapreduce_json_list_t &list);
 
-static Platform *v8platform;
+static std::unique_ptr<v8::Platform> v8platform;
 
 void initV8(const char* executable_img)
 {
     V8::InitializeICUDefaultLocation(executable_img, nullptr);
-    v8platform = platform::CreateDefaultPlatform();
-    V8::InitializePlatform(v8platform);
+    v8platform = platform::NewDefaultPlatform();
+    V8::InitializePlatform(v8platform.get());
     V8::Initialize();
 }
 
@@ -126,7 +126,6 @@ void deinitV8()
 {
     V8::Dispose();
     V8::ShutdownPlatform();
-    delete v8platform;
 }
 
 void initContext(mapreduce_ctx_t *ctx,
@@ -208,14 +207,14 @@ static void doInitContext(mapreduce_ctx_t *ctx)
     Context::Scope context_scope(context);
     Local<String> jsonString = createUtf8String(ctx->isolate, "JSON");
     Handle<Object> jsonObject =
-        Local<Object>::Cast(context->Global()->Get(jsonString));
+        Local<Object>::Cast(context->Global()->Get(context, jsonString).ToLocalChecked());
 
     Local<String> parseString = createUtf8String(ctx->isolate, "parse");
     Handle<Function> parseFun =
-        Local<Function>::Cast(jsonObject->Get(parseString));
+        Local<Function>::Cast(jsonObject->Get(context, parseString).ToLocalChecked());
     Local<String> stringifyString = createUtf8String(ctx->isolate, "stringify");
     Handle<Function> stringifyFun =
-        Local<Function>::Cast(jsonObject->Get(stringifyString));
+        Local<Function>::Cast(jsonObject->Get(context, stringifyString).ToLocalChecked());
 
     isolate_data_t *isoData = new isolate_data_t();
     isoData->jsonObject.Reset(ctx->isolate, jsonObject);
@@ -241,17 +240,17 @@ static Local<Context> createJsContext()
     Context::Scope context_scope(context);
 
     Handle<Function> sumFun = compileFunction(SUM_FUNCTION_STRING);
-    context->Global()->Set(createUtf8String(isolate, "sum"), sumFun);
+    CHECK_SUCCESS(context->Global()->Set(context, createUtf8String(isolate, "sum"), sumFun));
 
     Handle<Function> decodeBase64Fun =
         compileFunction(BASE64_FUNCTION_STRING);
-    context->Global()->Set(createUtf8String(isolate, "decodeBase64"),
-        decodeBase64Fun);
+    CHECK_SUCCESS(context->Global()->Set(context, createUtf8String(isolate, "decodeBase64"),
+        decodeBase64Fun));
 
     Handle<Function> dateToArrayFun =
         compileFunction(DATE_FUNCTION_STRING);
-    context->Global()->Set(createUtf8String(isolate, "dateToArray"),
-                           dateToArrayFun);
+    CHECK_SUCCESS(context->Global()->Set(context, createUtf8String(isolate, "dateToArray"),
+                           dateToArrayFun));
 
     // Use EscapableHandleScope and return using .Escape
     // This will ensure that return values are not garbage collected
@@ -290,7 +289,7 @@ void mapDoc(mapreduce_ctx_t *ctx,
         Local<Function> fun =
             Local<Function>::New(ctx->isolate, *(*ctx->functions)[i]);
         TryCatch try_catch(ctx->isolate);
-        Handle<Value> result = fun->Call(context->Global(), 2, funArgs);
+        Handle<Value> result = fun->Call(context, context->Global(), 2, funArgs).ToLocalChecked();
 
         if (!result.IsEmpty()) {
             mapResult.error = MAPREDUCE_SUCCESS;
@@ -355,7 +354,7 @@ json_results_list_t runReduce(mapreduce_ctx_t *ctx,
         Local<Function> fun =
             Local<Function>::New(ctx->isolate, *(*ctx->functions)[i]);
         TryCatch try_catch(ctx->isolate);
-        Handle<Value> result = fun->Call(context->Global(), 3, args);
+        Handle<Value> result = fun->Call(context, context->Global(), 3, args).ToLocalChecked();
 
         if (result.IsEmpty()) {
             freeJsonListEntries(results);
@@ -411,7 +410,7 @@ mapreduce_json_t runReduce(mapreduce_ctx_t *ctx,
     taskStarted(ctx);
 
     TryCatch try_catch(ctx->isolate);
-    Handle<Value> result = fun->Call(context->Global(), 3, args);
+    Handle<Value> result = fun->Call(context, context->Global(), 3, args).ToLocalChecked();
 
     taskFinished(ctx);
 
@@ -454,7 +453,7 @@ mapreduce_json_t runRereduce(mapreduce_ctx_t *ctx,
     taskStarted(ctx);
 
     TryCatch try_catch(ctx->isolate);
-    Handle<Value> result = fun->Call(context->Global(), 3, args);
+    Handle<Value> result = fun->Call(context, context->Global(), 3, args).ToLocalChecked();
 
     taskFinished(ctx);
 
@@ -615,13 +614,14 @@ static inline isolate_data_t *getIsolateData()
 static inline mapreduce_json_t jsonStringify(const Handle<Value> &obj)
 {
     isolate_data_t *isoData = getIsolateData();
+    Local<Context> context(isoData->ctx->isolate->GetCurrentContext());
     Handle<Value> args[] = { obj };
     TryCatch try_catch(isoData->ctx->isolate);
     Local<Function> stringifyFun =
         Local<Function>::New(isoData->ctx->isolate, isoData->stringifyFun);
     Local<Object> jsonObject =
         Local<Object>::New(isoData->ctx->isolate, isoData->jsonObject);
-    Handle<Value> result = stringifyFun->Call(jsonObject, 1, args);
+    Handle<Value> result = stringifyFun->Call(context, jsonObject, 1, args).ToLocalChecked();
 
     if (result.IsEmpty()) {
         throw try_catch.Exception();
@@ -656,6 +656,7 @@ static inline mapreduce_json_t jsonStringify(const Handle<Value> &obj)
 static inline Handle<Value> jsonParse(const mapreduce_json_t &thing)
 {
     isolate_data_t *isoData = getIsolateData();
+    Local<Context> context(isoData->ctx->isolate->GetCurrentContext());
     Handle<Value> args[] =
         { createUtf8String(isoData->ctx->isolate, thing.json,
             thing.length) };
@@ -664,7 +665,7 @@ static inline Handle<Value> jsonParse(const mapreduce_json_t &thing)
         Local<Function>::New(isoData->ctx->isolate, isoData->jsonParseFun);
     Local<Object> jsonObject =
         Local<Object>::New(isoData->ctx->isolate, isoData->jsonObject);
-    Handle<Value> result = jsonParseFun->Call(jsonObject, 1, args);
+    Handle<Value> result = jsonParseFun->Call(context, jsonObject, 1, args).ToLocalChecked();
 
     if (result.IsEmpty()) {
         throw MapReduceError(MAPREDUCE_RUNTIME_ERROR,
@@ -693,11 +694,12 @@ static inline void taskFinished(mapreduce_ctx_t *ctx)
 static inline Handle<Array> jsonListToJsArray(const mapreduce_json_list_t &list)
 {
     Isolate *isolate = Isolate::GetCurrent();
+    Local<Context> context(isolate->GetCurrentContext());
     Handle<Array> array = Array::New(isolate, list.length);
 
     for (int i = 0 ; i < list.length; ++i) {
         Handle<Value> v = jsonParse(list.values[i]);
-        array->Set(Number::New(isolate, i), v);
+        CHECK_SUCCESS(array->Set(context, Number::New(isolate, i), v));
     }
 
     return array;
