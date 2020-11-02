@@ -72,8 +72,37 @@ struct CouchbaseRevMetaV2 {
 
 // Additional Couchbase V3 metadata - SyncReplication state
 struct CouchbaseRevMetaV3 {
+    CouchbaseRevMetaV3(sized_buf revMeta) {
+        cb_assert(revMeta.size == 25);
+        // V3 Metadata is after the V0 and V1 metadata.
+        const char* raw = revMeta.buf + 18;
+        operation = raw[0];
+        // details stored in network (big) endian.
+        if (folly::kIsLittleEndian) {
+            std::reverse_copy(&raw[1], &raw[7], details.raw.raw_bytes);
+        } else {
+            std::copy(&raw[1], &raw[7], details.raw.raw_bytes);
+        }
+    }
+
     uint8_t operation;
-    uint8_t level;
+
+    // [[if Pending]] Properties of the pending SyncWrite.
+    // Currently using 3 bits out of the available 8 in this byte.
+    union detailsUnion {
+        struct {
+            // 0:pendingSyncWrite, 1:pendingSyncDelete.
+            uint8_t isDelete : 1;
+            // cb::durability::Level
+            uint8_t level : 2;
+        } pending;
+        struct completedDetails {
+            // prepareSeqno of the completed Sync Write
+            raw_48 prepareSeqno;
+        } completed;
+
+        raw_48 raw;
+    } details;
 
     const char* getOperationName() const {
         switch (operation) {
@@ -88,7 +117,8 @@ struct CouchbaseRevMetaV3 {
         }
     }
     const char* getLevelName() const {
-        switch (level) {
+        cb_assert(operation == 0);
+        switch (details.pending.level) {
         case 0:
             return "none";
         case 1:
@@ -100,6 +130,21 @@ struct CouchbaseRevMetaV3 {
         default:
             return "<INVALID>";
         }
+    }
+    uint64_t getPrepareSeqno() const {
+        cb_assert(operation == 1 || operation == 2);
+        // Prepare has already been converted to native endian in ctor;
+        // need to convert to 64bit int.
+        const auto& src = details.completed.prepareSeqno.raw_bytes;
+        uint64_t result{0};
+        std::copy(&src[0],
+                  &src[0] + sizeof(src),
+                  reinterpret_cast<char*>(&result));
+        return result;
+    }
+    bool isDelete() const {
+        cb_assert(operation == 0);
+        return details.pending.isDelete;
     }
 };
 
@@ -414,22 +459,29 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
     if (docinfo->rev_meta.size == sizeof(CouchbaseRevMeta) +
                                           sizeof(CouchbaseRevMetaV1) +
                                           sizeof(CouchbaseRevMetaV3)) {
-        // 21 bytes of rev_meta indicates CouchbaseRevMetaV3 - adds
+        // 25 bytes of rev_meta indicates CouchbaseRevMetaV3 - adds
         // Synchronous Replication state.
-        const auto* metaV3 =
-                (const CouchbaseRevMetaV3*)(docinfo->rev_meta.buf +
-                                            sizeof(CouchbaseRevMeta) +
-                                            sizeof(CouchbaseRevMetaV1));
+        const auto metaV3 = CouchbaseRevMetaV3(docinfo->rev_meta);
 
         if (dumpJson) {
-            printf(",\"sync_write\":\"%s\"", metaV3->getOperationName());
-            if (metaV3->operation == 0 /*Pending*/) {
-                printf(",\"level\":\"%s\"", metaV3->getLevelName());
+            printf(",\"sync_write\":\"%s\"", metaV3.getOperationName());
+            if (metaV3.operation == 0 /*Pending*/) {
+                printf(",\"level\":\"%s\"", metaV3.getLevelName());
+                printf(",\"isDelete\":%s", metaV3.isDelete() ? "true" : "false");
+            } else if (metaV3.operation == 1 /*Commit*/ ||
+                       metaV3.operation == 2 /*Abort*/) {
+                printf(",\"prepareSeqno\":\"%" PRIu64 "\"",
+                       metaV3.getPrepareSeqno());
             }
         } else {
-            printf(", sync_write: %s", metaV3->getOperationName());
-            if (metaV3->operation == 0 /*Pending*/) {
-                printf(" [level: %s]", metaV3->getLevelName());
+            printf(", sync_write: %s", metaV3.getOperationName());
+            if (metaV3.operation == 0 /*Pending*/) {
+                printf(" [level: %s", metaV3.getLevelName());
+                printf(", isDelete:%s]", metaV3.isDelete() ? "true" : "false");
+            } else if (metaV3.operation == 1 /*Commit*/ ||
+                       metaV3.operation == 2 /*Abort*/) {
+                printf(" [prepareSeqno: %" PRIu64 "]",
+                       metaV3.getPrepareSeqno());
             }
         }
     }
@@ -530,7 +582,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         }
     } else {
         if (dumpJson) {
-            printf("\"body\":null}\n");
+            printf(",\"body\":null}\n");
         } else {
             printf("\n");
         }
@@ -1156,7 +1208,9 @@ int main(int argc, char **argv)
         }
     }
 
-    printf("\nTotal docs: %d\n", count);
+    if (!dumpJson) {
+        printf("\nTotal docs: %d\n", count);
+    }
     if (error) {
         exit(EXIT_FAILURE);
     } else {
