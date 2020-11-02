@@ -95,7 +95,8 @@ int main(int argc, char** argv) {
                                          {},
                                          {},
                                          oldest,
-                                         increment);
+                                         increment,
+                                         {});
     } catch (const std::runtime_error& error) {
         std::cerr << "Compaction failed: " << error.what() << std::endl;
         exit(EXIT_FAILURE);

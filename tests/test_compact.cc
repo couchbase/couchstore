@@ -468,7 +468,8 @@ TEST_F(CouchstoreCompactTest, PitrCompaction) {
                                       couchstore_get_default_file_ops(),
                                       {},
                                       50,
-                                      1));
+                                      1,
+                                      {}));
 
     db = openTargetDb();
     int num_headers = 1;
@@ -538,7 +539,8 @@ TEST_F(CouchstoreCompactTest, PitrCompactionSquashHeaders) {
                                       couchstore_get_default_file_ops(),
                                       {},
                                       50,
-                                      5));
+                                      5,
+                                      {}));
 
     db = openTargetDb();
     int num_headers = 1;
@@ -677,7 +679,8 @@ TEST_F(CouchstoreCompactTest, CheckMultipleMissingInBeginning) {
                                     .count(),
                     std::chrono::duration_cast<std::chrono::nanoseconds>(
                             std::chrono::seconds(1))
-                            .count()));
+                            .count(),
+                    {}));
 
     db = openTargetDb();
     ASSERT_EQ(now + 9, cb::couchstore::getHeader(*db).timestamp);

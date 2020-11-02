@@ -1273,6 +1273,27 @@ couchstore_error_t compact(Db& source,
 /// will fail with the returned value
 using PreCompactionCallback = std::function<couchstore_error_t(Db&)>;
 
+/// A callback the user may provide to a PointInTime compaction which gets
+/// called after the full comaction
+/// If the callback returns anthing else than COUCHSTORE_SUCCESS compaction
+/// will fail with the returned value
+using PostCompactionCallback = std::function<couchstore_error_t(Db&)>;
+
+/// A callback the user may provide which gets called as part of copying
+/// each document during the replay of changes.
+/// The parameters are (in the described order)
+///    source The database where the document comes from
+///    target The database copying stuff to
+///    DocInfo The doc info for the document (or nullptr if this is a local
+///            document).
+///    local doc info The doc info for the local document (or nullptr if this
+///                   isn't a local document)
+///
+/// A return value != COUCHSTORE_SUCCESS will cause replay to abort with
+/// the provided error code.
+using PreCopyHook = std::function<couchstore_error_t(
+        Db&, Db&, const DocInfo*, const DocInfo*)>;
+
 /**
  * Compact a Couchstore file with support for Point in Time Recovery (PiTR)
  *
@@ -1315,6 +1336,12 @@ using PreCompactionCallback = std::function<couchstore_error_t(Db&)>;
  *                              start. You may use this callback to look at
  *                              the header fields (or for instance look at
  *                              the _local documents)
+ * @param postCompactionCallback A callback is called after the full
+ *                              compaction is done, but before replay of
+ *                              additional changes.
+ * @param replayPreCopyHook A callback which happens _before_ each copy of the
+ *                          documents during the replay.
+ * @param replayPrecommitHook The precommit hook to use for replay
  * @return Couchstore error code
  * @throws std::runtime_error
  */
@@ -1328,7 +1355,37 @@ couchstore_error_t compact(Db& source,
                            PrecommitHook precommitHook,
                            uint64_t timestamp,
                            uint64_t delta,
-                           PreCompactionCallback preCompactionCallback = {});
+                           PreCompactionCallback preCompactionCallback,
+                           PostCompactionCallback postCompactionCallback,
+                           PreCopyHook replayPreCopyHook,
+                           PrecommitHook replayPrecommitHook);
+
+// @todo kill this method as soon as ep-engine stops using it
+inline couchstore_error_t compact(
+        Db& source,
+        const char* target_filename,
+        couchstore_compact_flags flags,
+        CompactFilterCallback filterCallback,
+        CompactRewriteDocInfoCallback rewriteDocInfoCallback,
+        FileOpsInterface* ops,
+        PrecommitHook precommitHook,
+        uint64_t timestamp,
+        uint64_t delta,
+        PreCompactionCallback preCompactionCallback) {
+    return compact(source,
+                   target_filename,
+                   flags,
+                   filterCallback,
+                   rewriteDocInfoCallback,
+                   ops,
+                   precommitHook,
+                   timestamp,
+                   delta,
+                   preCompactionCallback,
+                   {},
+                   {},
+                   {});
+}
 
 /**
  * Replay mutations (with PiTR compaction) from the current header in the
@@ -1336,13 +1393,32 @@ couchstore_error_t compact(Db& source,
  * as the granularity for the number of headers to deduplicate. Stop
  * when we reach the provided sourceHeaderEndOffset. The precommit hook
  * will be called for each commit in the destination database
+ *
+ * @param source The database to copy from (current header offset)
+ * @param target The database to copy data to
+ * @param delta The delta between each header to persist (multiple headers
+ *              within the same delta will be deduped)
+ * @param sourceHeaderEndOffset The last header to include
+ * @param preCopyHook The hook to be called before each document is copied over
+ * @param precommitHook The hook to call before each commit
  */
 LIBCOUCHSTORE_API
 couchstore_error_t replay(Db& source,
                           Db& target,
                           uint64_t delta,
                           uint64_t sourceHeaderEndOffset,
-                          PrecommitHook precommitHook = {});
+                          PreCopyHook preCopyHook,
+                          PrecommitHook precommitHook);
+
+// Todo: Delete this method once ep-engine stop using it
+inline couchstore_error_t replay(Db& source,
+                                 Db& target,
+                                 uint64_t delta,
+                                 uint64_t sourceHeaderEndOffset,
+                                 PrecommitHook precommitHook) {
+    return replay(
+            source, target, delta, sourceHeaderEndOffset, {}, precommitHook);
+}
 
 /**
  * Save multiple local docs to the db. see couchstore_save_local_document. The

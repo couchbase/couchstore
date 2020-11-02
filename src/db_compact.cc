@@ -516,6 +516,11 @@ static void locateStartHeader(Db& db, uint64_t timestamp) {
 
 struct Context {
     Db* target;
+
+    PreCopyHook preCopyHook = [](Db&, Db&, const DocInfo*, const DocInfo*) {
+        return COUCHSTORE_SUCCESS;
+    };
+
     uint64_t highest = 0;
 
     std::vector<DocInfo*> docInfos;
@@ -586,6 +591,11 @@ int couchstore_changes_callback(Db* db, DocInfo* docinfo, void* context) {
         ctx->highest = docinfo->db_seq;
     }
 
+    auto st = ctx->preCopyHook(*db, *ctx->target, docinfo, nullptr);
+    if (st != COUCHSTORE_SUCCESS) {
+        return st;
+    }
+
     auto [status, doc] = cb::couchstore::openDocument(*db, *docinfo);
     if (status != COUCHSTORE_SUCCESS) {
         if (docinfo->deleted && status == COUCHSTORE_ERROR_DOC_NOT_FOUND) {
@@ -606,10 +616,15 @@ int couchstore_walk_local_tree_callback(Db* db,
                                         const sized_buf*,
                                         void* context) {
     if (doc_info != nullptr) {
+        auto* ctx = static_cast<Context*>(context);
+        auto st = ctx->preCopyHook(*db, *ctx->target, nullptr, doc_info);
+        if (st != COUCHSTORE_SUCCESS) {
+            return st;
+        }
+
         auto [status, doc] = cb::couchstore::openLocalDocument(*db, *doc_info);
         if (status == COUCHSTORE_SUCCESS) {
-            auto error = couchstore_save_local_document(
-                    static_cast<Context*>(context)->target, doc.get());
+            auto error = couchstore_save_local_document(ctx->target, doc.get());
             if (error != COUCHSTORE_SUCCESS) {
                 throw std::runtime_error(
                         std::string{"couchstore_walk_local_tree_callback() "
@@ -670,7 +685,10 @@ couchstore_error_t compact(Db& source,
                            PrecommitHook precommitHook,
                            uint64_t timestamp,
                            uint64_t delta,
-                           PreCompactionCallback preCompactionCallback) {
+                           PreCompactionCallback preCompactionCallback,
+                           PostCompactionCallback postCompactionCallback,
+                           PreCopyHook replayPreCopyHook,
+                           PrecommitHook replayPrecommitHook) {
     if (ops == nullptr) {
         ops = couchstore_get_default_file_ops();
     }
@@ -737,8 +755,19 @@ couchstore_error_t compact(Db& source,
         targetDbHolder = std::move(target);
     }
 
-    status = replay(
-            source, *targetDbHolder, delta, sourceHeaderOffset, precommitHook);
+    if (postCompactionCallback) {
+        auto err = postCompactionCallback(*targetDbHolder);
+        if (err != COUCHSTORE_SUCCESS) {
+            return err;
+        }
+    }
+
+    status = replay(source,
+                    *targetDbHolder,
+                    delta,
+                    sourceHeaderOffset,
+                    replayPreCopyHook,
+                    replayPrecommitHook);
     if (status != COUCHSTORE_SUCCESS) {
         // need to close the file before I can remove it
         targetDbHolder.reset();
@@ -754,8 +783,12 @@ couchstore_error_t replay(Db& source,
                           Db& target,
                           uint64_t delta,
                           uint64_t sourceHeaderEndOffset,
+                          PreCopyHook preCopyHook,
                           PrecommitHook precommitHook) {
     Context ctx;
+    if (preCopyHook) {
+        ctx.preCopyHook = std::move(preCopyHook);
+    }
     auto header = cb::couchstore::getHeader(source);
     ctx.highest = header.updateSeqNum;
     ctx.target = &target;
