@@ -482,7 +482,6 @@ cleanup:
 couchstore_error_t couchstore_set_purge_seq(Db* target, uint64_t purge_seq) {
     target->header.purge_seq = purge_seq;
     return COUCHSTORE_SUCCESS;
-
 }
 
 namespace cb::couchstore {
@@ -819,6 +818,7 @@ couchstore_error_t replay(Db& source,
                     couchstore_strerror(status));
         }
 
+        couchstore_set_purge_seq(ctx.target, source.header.purge_seq);
         if (precommitHook) {
             status = precommitHook(*ctx.target);
             if (status != COUCHSTORE_SUCCESS) {
