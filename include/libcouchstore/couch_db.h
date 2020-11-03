@@ -1366,33 +1366,6 @@ couchstore_error_t compact(Db& source,
                            PreCopyHook replayPreCopyHook,
                            PrecommitHook replayPrecommitHook);
 
-// @todo kill this method as soon as ep-engine stops using it
-inline couchstore_error_t compact(
-        Db& source,
-        const char* target_filename,
-        couchstore_compact_flags flags,
-        CompactFilterCallback filterCallback,
-        CompactRewriteDocInfoCallback rewriteDocInfoCallback,
-        FileOpsInterface* ops,
-        PrecommitHook precommitHook,
-        uint64_t timestamp,
-        uint64_t delta,
-        PreCompactionCallback preCompactionCallback) {
-    return compact(source,
-                   target_filename,
-                   flags,
-                   filterCallback,
-                   rewriteDocInfoCallback,
-                   ops,
-                   precommitHook,
-                   timestamp,
-                   delta,
-                   preCompactionCallback,
-                   {},
-                   {},
-                   {});
-}
-
 /**
  * Replay mutations (with PiTR compaction) from the current header in the
  * source database to the target database by using the specified delta
@@ -1415,16 +1388,6 @@ couchstore_error_t replay(Db& source,
                           uint64_t sourceHeaderEndOffset,
                           PreCopyHook preCopyHook,
                           PrecommitHook precommitHook);
-
-// Todo: Delete this method once ep-engine stop using it
-inline couchstore_error_t replay(Db& source,
-                                 Db& target,
-                                 uint64_t delta,
-                                 uint64_t sourceHeaderEndOffset,
-                                 PrecommitHook precommitHook) {
-    return replay(
-            source, target, delta, sourceHeaderEndOffset, {}, precommitHook);
-}
 
 /**
  * Save multiple local docs to the db. see couchstore_save_local_document. The

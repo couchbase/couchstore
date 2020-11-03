@@ -469,6 +469,9 @@ TEST_F(CouchstoreCompactTest, PitrCompaction) {
                                       {},
                                       50,
                                       1,
+                                      {},
+                                      {},
+                                      {},
                                       {}));
 
     db = openTargetDb();
@@ -540,6 +543,9 @@ TEST_F(CouchstoreCompactTest, PitrCompactionSquashHeaders) {
                                       {},
                                       50,
                                       5,
+                                      {},
+                                      {},
+                                      {},
                                       {}));
 
     db = openTargetDb();
@@ -587,19 +593,21 @@ TEST_F(CouchstoreCompactTest, PitrCompactionNotLastBlock) {
     // verify that cancel works for pre-compaction callback as we'll be using
     // that functionality in the real compaction
     auto db2 = openSourceDb();
-    ASSERT_EQ(COUCHSTORE_ERROR_CANCEL,
-              cb::couchstore::compact(*db2,
-                                      targetFilename.c_str(),
-                                      COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
-                                      {},
-                                      {},
-                                      couchstore_get_default_file_ops(),
-                                      {},
-                                      30,
-                                      70,
-                                      [](Db&) {
-                                            return COUCHSTORE_ERROR_CANCEL;
-                                      }));
+    ASSERT_EQ(
+            COUCHSTORE_ERROR_CANCEL,
+            cb::couchstore::compact(*db2,
+                                    targetFilename.c_str(),
+                                    COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                    {},
+                                    {},
+                                    couchstore_get_default_file_ops(),
+                                    {},
+                                    30,
+                                    70,
+                                    [](Db&) { return COUCHSTORE_ERROR_CANCEL; },
+                                    {},
+                                    {},
+                                    {}));
     db2.reset();
     ASSERT_FALSE(cb::io::isFile(targetFilename));
 
@@ -625,7 +633,10 @@ TEST_F(CouchstoreCompactTest, PitrCompactionNotLastBlock) {
                                           }
 
                                           return COUCHSTORE_SUCCESS;
-                                      }));
+                                      },
+                                      {},
+                                      {},
+                                      {}));
 
     db = openTargetDb();
     ASSERT_EQ(109, cb::couchstore::getHeader(*db).timestamp);
@@ -680,6 +691,9 @@ TEST_F(CouchstoreCompactTest, CheckMultipleMissingInBeginning) {
                     std::chrono::duration_cast<std::chrono::nanoseconds>(
                             std::chrono::seconds(1))
                             .count(),
+                    {},
+                    {},
+                    {},
                     {}));
 
     db = openTargetDb();
