@@ -208,7 +208,7 @@ static couchstore_error_t update_indexes(Db* db,
         idacts[ii].setType(ACTION_FETCH_INSERT);
         idacts[ii].data = &idvals[isorted];
         idacts[ii].setKey(&ids[isorted]);
-        // @todo MB-39283: expect userReqs != nullptr when all work completed
+        // Compaction doesn't provide any save-doc-callback / userReqs
         idacts[ii].userReq = userReqs ? userReqs[isorted] : nullptr;
     }
 
