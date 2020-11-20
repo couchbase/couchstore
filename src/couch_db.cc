@@ -240,6 +240,9 @@ static couchstore_error_t db_write_header_impl(Db* db) {
     writebuf.size = calculate_header_size(db, seqrootsize,
                                           idrootsize, localrootsize);
     writebuf.buf = (char *) cb_malloc(writebuf.size);
+    if (!writebuf.buf) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
     auto* header = reinterpret_cast<raw_file_header_v13*>(writebuf.buf);
     header->version = encode_raw08(db->header.disk_version);
     encode_raw48(db->header.update_seq, &header->update_seq);
