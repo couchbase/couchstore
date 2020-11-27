@@ -171,7 +171,7 @@ int db_write_buf(tree_file *file, const sized_buf *buf, cs_off_t *pos, size_t *d
 
     file->pos = end_pos;
     if (disk_size) {
-        *disk_size = (size_t) (end_pos - write_pos);
+        *disk_size = sized_headerbuf.size + buf->size;
     }
 
     return 0;
