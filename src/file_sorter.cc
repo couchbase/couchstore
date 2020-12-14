@@ -24,7 +24,6 @@
 #include <platform/cbassert.h>
 #include <platform/dirutils.h>
 
-#include <strings.h>
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
