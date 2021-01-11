@@ -57,7 +57,7 @@ size_t getCapacity(size_t capacity, bool mprotect){
 }
 struct BufferedFileHandle;
 struct file_buffer : public boost::intrusive::list_base_hook<> {
-    file_buffer(BufferedFileHandle* _owner,
+    file_buffer(BufferedFileHandle& _owner,
                 size_t _capacity,
                 bool _tracing_enabled,
                 bool _write_validation_enabled,
@@ -113,7 +113,7 @@ struct file_buffer : public boost::intrusive::list_base_hook<> {
     // Hook for intrusive list.
     boost::intrusive::list_member_hook<> _lru_hook;
     // File handle that owns this buffer instance.
-    struct BufferedFileHandle* owner;
+    BufferedFileHandle& owner;
     // Buffer capacity.
     size_t capacity;
     // Length of data written.
@@ -199,7 +199,7 @@ public:
             // We can still create another buffer.
             UniqueFileBufferPtr buffer_unique;
             buffer_unique = std::make_unique<file_buffer>(
-                    h,
+                    *h,
                     h->params.read_buffer_capacity,
                     h->params.tracing_enabled,
                     h->params.write_validation_enabled,
@@ -304,11 +304,11 @@ static couchstore_error_t flush_buffer(couchstore_error_info_t *errinfo,
                                        file_buffer* buf) {
     while (buf->length > 0 && buf->dirty) {
         ssize_t raw_written;
-        raw_written = buf->owner->raw_ops->pwrite(errinfo,
-                                                  buf->owner->raw_ops_handle,
-                                                  buf->getRawPtr(),
-                                                  buf->length,
-                                                  buf->offset);
+        raw_written = buf->owner.raw_ops->pwrite(errinfo,
+                                                 buf->owner.raw_ops_handle,
+                                                 buf->getRawPtr(),
+                                                 buf->length,
+                                                 buf->offset);
 #if defined(LOG_BUFFER)
         fprintf(stderr, "BUFFER: %p flush %zd bytes at %zd --> %zd\n",
                 buf, buf->length, buf->offset, raw_written);
@@ -378,11 +378,12 @@ static couchstore_error_t load_buffer_from(couchstore_error_info_t *errinfo,
     }
 
     // Read data to extend the buffer to its capacity (if possible):
-    ssize_t bytes_read = buf->owner->raw_ops->pread(errinfo,
-                                                    buf->owner->raw_ops_handle,
-                                                    buf->getRawPtr() + buf->length,
-                                                    buf->capacity - buf->length,
-                                                    buf->offset + buf->length);
+    ssize_t bytes_read =
+            buf->owner.raw_ops->pread(errinfo,
+                                      buf->owner.raw_ops_handle,
+                                      buf->getRawPtr() + buf->length,
+                                      buf->capacity - buf->length,
+                                      buf->offset + buf->length);
 #if defined(LOG_BUFFER)
     fprintf(stderr, "BUFFER: %p loaded %zd bytes from %zd\n",
             buf, bytes_read, offset + buf->length);
@@ -493,12 +494,11 @@ void BufferedFileOps::allocate_write_buffer(couch_file_handle handle) {
 
     Expects(!h->write_buffer);
     h->write_buffer = std::make_unique<file_buffer>(
-            h,
+            *h,
             h->params.readOnly ? 0 : WRITE_BUFFER_CAPACITY,
             h->params.tracing_enabled,
             h->params.write_validation_enabled,
             h->params.mprotect_enabled);
-
 }
 
 void BufferedFileOps::free_buffers(couch_file_handle handle) {
