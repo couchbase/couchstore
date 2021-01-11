@@ -55,9 +55,9 @@ size_t getCapacity(size_t capacity, bool mprotect){
         return capacity;
     }
 }
-struct buffered_file_handle;
+struct BufferedFileHandle;
 struct file_buffer : public boost::intrusive::list_base_hook<> {
-    file_buffer(buffered_file_handle* _owner,
+    file_buffer(BufferedFileHandle* _owner,
                 size_t _capacity,
                 bool _tracing_enabled,
                 bool _write_validation_enabled,
@@ -80,8 +80,7 @@ struct file_buffer : public boost::intrusive::list_base_hook<> {
            */
           mprotect_enabled(false),
 #endif
-          bytes(new uint8_t[getCapacity(_capacity, _mprotect_enabled)])
-    {
+          bytes(new uint8_t[getCapacity(_capacity, _mprotect_enabled)]) {
 #ifndef WIN32
         if (mprotect_enabled) {
             /* Need to page align the ptr to data for mprotect,
@@ -114,7 +113,7 @@ struct file_buffer : public boost::intrusive::list_base_hook<> {
     // Hook for intrusive list.
     boost::intrusive::list_member_hook<> _lru_hook;
     // File handle that owns this buffer instance.
-    struct buffered_file_handle *owner;
+    struct BufferedFileHandle* owner;
     // Buffer capacity.
     size_t capacity;
     // Length of data written.
@@ -146,10 +145,14 @@ using FileBufferMap = std::unordered_map<size_t, UniqueFileBufferPtr>;
 class ReadBufferManager;
 
 // How I interpret a couch_file_handle:
-struct buffered_file_handle {
+struct BufferedFileHandle {
+    BufferedFileHandle(FileOpsInterface* raw_ops,
+                       couch_file_handle raw_ops_handle,
+                       buffered_file_ops_params params)
+        : raw_ops(raw_ops), raw_ops_handle(raw_ops_handle), params(params) {
+    }
     FileOpsInterface* raw_ops;
     couch_file_handle raw_ops_handle;
-    unsigned nbuffers;
     UniqueFileBufferPtr write_buffer;
     std::unique_ptr<ReadBufferManager> read_buffer_mgr;
     buffered_file_ops_params params;
@@ -174,7 +177,7 @@ public:
         }
     }
 
-    file_buffer* findBuffer(buffered_file_handle* h, cs_off_t offset) {
+    file_buffer* findBuffer(BufferedFileHandle* h, cs_off_t offset) {
         // Align offset.
         offset = offset - offset % h->params.read_buffer_capacity;
 
@@ -432,7 +435,7 @@ buffered_file_ops_params::buffered_file_ops_params(
 
 void BufferedFileOps::destructor(couch_file_handle handle)
 {
-    auto *h = (buffered_file_handle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
     if (!h) {
         return;
     }
@@ -441,18 +444,12 @@ void BufferedFileOps::destructor(couch_file_handle handle)
     delete h;
 }
 
-couch_file_handle BufferedFileOps::constructor(couchstore_error_info_t* errinfo,
-                                               FileOpsInterface* raw_ops,
-                                               buffered_file_ops_params params)
-{
-    auto *h = new buffered_file_handle();
-    if (h) {
-        h->raw_ops = raw_ops;
-        h->raw_ops_handle = raw_ops->constructor(errinfo);
-        h->nbuffers = 1;
-        h->params = params;
-    }
-    return (couch_file_handle) h;
+couch_file_handle BufferedFileOps::constructor(
+        couchstore_error_info_t* errinfo,
+        FileOpsInterface* raw_ops,
+        buffered_file_ops_params params) {
+    return (couch_file_handle) new BufferedFileHandle(
+            raw_ops, raw_ops->constructor(errinfo), params);
 }
 
 couch_file_handle BufferedFileOps::constructor(couchstore_error_info_t* errinfo)
@@ -466,14 +463,14 @@ couchstore_error_t BufferedFileOps::open(couchstore_error_info_t* errinfo,
                                          const char* path,
                                          int oflag)
 {
-    buffered_file_handle *h = (buffered_file_handle*)*handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)*handle;
     return h->raw_ops->open(errinfo, &h->raw_ops_handle, path, oflag);
 }
 
 couchstore_error_t BufferedFileOps::close(couchstore_error_info_t* errinfo,
                             couch_file_handle handle)
 {
-    buffered_file_handle *h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
     if (!h) {
         return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     }
@@ -485,14 +482,14 @@ couchstore_error_t BufferedFileOps::close(couchstore_error_info_t* errinfo,
 }
 
 void BufferedFileOps::allocate_read_buffer(couch_file_handle handle) {
-    buffered_file_handle *h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
 
     Expects(!h->read_buffer_mgr);
     h->read_buffer_mgr = std::make_unique<ReadBufferManager>();
 }
 
 void BufferedFileOps::allocate_write_buffer(couch_file_handle handle) {
-    buffered_file_handle *h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
 
     Expects(!h->write_buffer);
     h->write_buffer = std::make_unique<file_buffer>(
@@ -505,7 +502,7 @@ void BufferedFileOps::allocate_write_buffer(couch_file_handle handle) {
 }
 
 void BufferedFileOps::free_buffers(couch_file_handle handle) {
-    auto *h = (buffered_file_handle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
     Expects(h);
 
     // Free the read and write buffers to reclaim memory
@@ -517,28 +514,28 @@ couchstore_error_t BufferedFileOps::set_periodic_sync(couch_file_handle handle,
                                                       uint64_t period_bytes) {
     // Delegate to underlying file ops, given they perform the real disk
     // writes.
-    buffered_file_handle *h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
     return h->raw_ops->set_periodic_sync(h->raw_ops_handle, period_bytes);
 }
 
 couchstore_error_t BufferedFileOps::set_tracing_enabled(
         couch_file_handle handle) {
     // trigger setting tracing flags at the file level */
-    buffered_file_handle* h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
     return h->raw_ops->set_tracing_enabled(h->raw_ops_handle);
 }
 
 couchstore_error_t BufferedFileOps::set_write_validation_enabled(
         couch_file_handle handle) {
     // trigger setting write validation flags at the file level */
-    buffered_file_handle* h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
     return h->raw_ops->set_write_validation_enabled(h->raw_ops_handle);
 }
 
 couchstore_error_t BufferedFileOps::set_mprotect_enabled(
         couch_file_handle handle) {
     // trigger setting mprotect flags at the file level */
-    buffered_file_handle* h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
     return h->raw_ops->set_mprotect_enabled(h->raw_ops_handle);
 }
 
@@ -551,7 +548,7 @@ ssize_t BufferedFileOps::pread(couchstore_error_info_t* errinfo,
 #if defined(LOG_BUFFER)
     //fprintf(stderr, "r");
 #endif
-    buffered_file_handle *h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
 
     // Flush the write buffer before trying to read anything:
     if (h->write_buffer) {
@@ -610,7 +607,7 @@ ssize_t BufferedFileOps::pwrite(couchstore_error_info_t* errinfo,
         return 0;
     }
 
-    buffered_file_handle *h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
 
     if (!h->write_buffer) {
         allocate_write_buffer(handle);
@@ -658,14 +655,14 @@ ssize_t BufferedFileOps::pwrite(couchstore_error_info_t* errinfo,
 cs_off_t BufferedFileOps::goto_eof(couchstore_error_info_t* errinfo,
                                   couch_file_handle handle)
 {
-    buffered_file_handle *h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
     return h->raw_ops->goto_eof(errinfo, h->raw_ops_handle);
 }
 
 couchstore_error_t BufferedFileOps::sync(couchstore_error_info_t* errinfo,
                                          couch_file_handle handle)
 {
-    buffered_file_handle *h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
 
     couchstore_error_t err = COUCHSTORE_SUCCESS;
     if (h->write_buffer) {
@@ -684,14 +681,14 @@ couchstore_error_t BufferedFileOps::advise(couchstore_error_info_t* errinfo,
                                            cs_off_t len,
                                            couchstore_file_advice_t adv)
 {
-    buffered_file_handle *h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
     return h->raw_ops->advise(errinfo, h->raw_ops_handle, offs, len, adv);
 }
 
 FileOpsInterface::FHStats* BufferedFileOps::get_stats(
         couch_file_handle handle) {
     // Not implemeted ourselves, just forward to wrapped ops.
-    buffered_file_handle* h = (buffered_file_handle*)handle;
+    BufferedFileHandle* h = (BufferedFileHandle*)handle;
     return h->raw_ops->get_stats(h->raw_ops_handle);
 }
 
