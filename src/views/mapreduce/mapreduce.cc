@@ -26,7 +26,6 @@
 #include <libplatform/libplatform.h>
 
 using namespace v8;
-
 typedef struct {
     Persistent<Object>    jsonObject;
     Persistent<Function>  jsonParseFun;
@@ -289,9 +288,9 @@ void mapDoc(mapreduce_ctx_t *ctx,
         Local<Function> fun =
             Local<Function>::New(ctx->isolate, *(*ctx->functions)[i]);
         TryCatch try_catch(ctx->isolate);
-        Handle<Value> result = fun->Call(context, context->Global(), 2, funArgs).ToLocalChecked();
+        Handle<Value> result;
 
-        if (!result.IsEmpty()) {
+        if (fun->Call(context, context->Global(), 2, funArgs).ToLocal(&result)) {
             mapResult.error = MAPREDUCE_SUCCESS;
             mapResult.result.kvs.length = kvs.size();
             size_t sz = sizeof(mapreduce_kv_t) * mapResult.result.kvs.length;
@@ -354,9 +353,9 @@ json_results_list_t runReduce(mapreduce_ctx_t *ctx,
         Local<Function> fun =
             Local<Function>::New(ctx->isolate, *(*ctx->functions)[i]);
         TryCatch try_catch(ctx->isolate);
-        Handle<Value> result = fun->Call(context, context->Global(), 3, args).ToLocalChecked();
+        Handle<Value> result;
 
-        if (result.IsEmpty()) {
+        if (!fun->Call(context, context->Global(), 3, args).ToLocal(&result)) {
             freeJsonListEntries(results);
 
             if (!try_catch.CanContinue()) {
@@ -410,11 +409,12 @@ mapreduce_json_t runReduce(mapreduce_ctx_t *ctx,
     taskStarted(ctx);
 
     TryCatch try_catch(ctx->isolate);
-    Handle<Value> result = fun->Call(context, context->Global(), 3, args).ToLocalChecked();
+    Handle<Value> result;
+    bool isEmpty = !fun->Call(context, context->Global(), 3, args).ToLocal(&result);
 
     taskFinished(ctx);
 
-    if (result.IsEmpty()) {
+    if (isEmpty) {
         if (!try_catch.CanContinue()) {
             throw MapReduceError(MAPREDUCE_TIMEOUT, "timeout");
         }
@@ -453,11 +453,12 @@ mapreduce_json_t runRereduce(mapreduce_ctx_t *ctx,
     taskStarted(ctx);
 
     TryCatch try_catch(ctx->isolate);
-    Handle<Value> result = fun->Call(context, context->Global(), 3, args).ToLocalChecked();
+    Handle<Value> result;
+    bool isEmpty = !fun->Call(context, context->Global(), 3, args).ToLocal(&result);
 
     taskFinished(ctx);
 
-    if (result.IsEmpty()) {
+    if (isEmpty) {
         if (!try_catch.CanContinue()) {
             throw MapReduceError(MAPREDUCE_TIMEOUT, "timeout");
         }
@@ -621,9 +622,10 @@ static inline mapreduce_json_t jsonStringify(const Handle<Value> &obj)
         Local<Function>::New(isoData->ctx->isolate, isoData->stringifyFun);
     Local<Object> jsonObject =
         Local<Object>::New(isoData->ctx->isolate, isoData->jsonObject);
-    Handle<Value> result = stringifyFun->Call(context, jsonObject, 1, args).ToLocalChecked();
+    Handle<Value> result;
+    bool isEmpty = !stringifyFun->Call(context, jsonObject, 1, args).ToLocal(&result);
 
-    if (result.IsEmpty()) {
+    if (isEmpty) {
         throw try_catch.Exception();
     }
 
@@ -665,9 +667,10 @@ static inline Handle<Value> jsonParse(const mapreduce_json_t &thing)
         Local<Function>::New(isoData->ctx->isolate, isoData->jsonParseFun);
     Local<Object> jsonObject =
         Local<Object>::New(isoData->ctx->isolate, isoData->jsonObject);
-    Handle<Value> result = jsonParseFun->Call(context, jsonObject, 1, args).ToLocalChecked();
+    Handle<Value> result;
+    bool isEmpty = !jsonParseFun->Call(context, jsonObject, 1, args).ToLocal(&result);
 
-    if (result.IsEmpty()) {
+    if (isEmpty) {
         throw MapReduceError(MAPREDUCE_RUNTIME_ERROR,
                 exceptionString(try_catch));
     }

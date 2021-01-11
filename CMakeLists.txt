@@ -52,9 +52,21 @@ IF (WIN32)
 ELSE(WIN32)
   SET(COUCHSTORE_FILE_OPS "src/os.cc")
   # v8 expects icudtl.dat to be next to binary
-  INSTALL(FILES ${CMAKE_INSTALL_PREFIX}/lib/icudtl.dat
+  INSTALL(FILES
+          ${CMAKE_INSTALL_PREFIX}/lib/icudtl.dat
+          # icudtl_extra.dat adds support for additional JS functions.
+          ${CMAKE_INSTALL_PREFIX}/lib/icudtl_extra.dat
           DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 ENDIF(WIN32)
+
+# Disabling Undefined sanitize checks for the file mapreduce.cc since v8::Platform was wrapped in unique_ptr
+# and UBSan was unable to lookup symbols for it, thus leading to undefined-behaviour errors
+IF(DEFINED UNDEFINED_SANITIZER_FLAG_DISABLE)
+  SEPARATE_ARGUMENTS(ubsan_disable_list UNIX_COMMAND ${UNDEFINED_SANITIZER_FLAG_DISABLE})
+  SET_PROPERTY(SOURCE src/views/mapreduce/mapreduce.cc
+    APPEND
+    PROPERTY COMPILE_OPTIONS ${ubsan_disable_list})
+ENDIF()
 
 # Create two object libraries, one for the core couchstore code
 ADD_LIBRARY(couchstore_objs OBJECT
