@@ -151,7 +151,7 @@ struct buffered_file_handle {
     couch_file_handle raw_ops_handle;
     unsigned nbuffers;
     UniqueFileBufferPtr write_buffer;
-    ReadBufferManager *read_buffer_mgr;
+    std::unique_ptr<ReadBufferManager> read_buffer_mgr;
     buffered_file_ops_params params;
 };
 
@@ -432,13 +432,12 @@ buffered_file_ops_params::buffered_file_ops_params(
 
 void BufferedFileOps::destructor(couch_file_handle handle)
 {
-    buffered_file_handle *h = (buffered_file_handle*)handle;
+    auto *h = (buffered_file_handle*)handle;
     if (!h) {
         return;
     }
     h->raw_ops->destructor(h->raw_ops_handle);
 
-    delete h->read_buffer_mgr;
     delete h;
 }
 
@@ -446,7 +445,7 @@ couch_file_handle BufferedFileOps::constructor(couchstore_error_info_t* errinfo,
                                                FileOpsInterface* raw_ops,
                                                buffered_file_ops_params params)
 {
-    buffered_file_handle *h = new buffered_file_handle();
+    auto *h = new buffered_file_handle();
     if (h) {
         h->raw_ops = raw_ops;
         h->raw_ops_handle = raw_ops->constructor(errinfo);
@@ -489,7 +488,7 @@ void BufferedFileOps::allocate_read_buffer(couch_file_handle handle) {
     buffered_file_handle *h = (buffered_file_handle*)handle;
 
     Expects(!h->read_buffer_mgr);
-    h->read_buffer_mgr = new ReadBufferManager();
+    h->read_buffer_mgr = std::make_unique<ReadBufferManager>();
 }
 
 void BufferedFileOps::allocate_write_buffer(couch_file_handle handle) {
@@ -506,12 +505,12 @@ void BufferedFileOps::allocate_write_buffer(couch_file_handle handle) {
 }
 
 void BufferedFileOps::free_buffers(couch_file_handle handle) {
-    buffered_file_handle *h = (buffered_file_handle*)handle;
+    auto *h = (buffered_file_handle*)handle;
+    Expects(h);
 
     // Free the read and write buffers to reclaim memory
     h->write_buffer.reset();
-    delete h->read_buffer_mgr;
-    h->read_buffer_mgr = nullptr;
+    h->read_buffer_mgr.reset();
 }
 
 couchstore_error_t BufferedFileOps::set_periodic_sync(couch_file_handle handle,
