@@ -52,12 +52,12 @@ size_t getCapacity(size_t capacity, bool mprotect){
     }
 }
 struct BufferedFileHandle;
-struct file_buffer : public boost::intrusive::list_base_hook<> {
-    file_buffer(BufferedFileHandle& _owner,
-                size_t _capacity,
-                bool _tracing_enabled,
-                bool _write_validation_enabled,
-                bool _mprotect_enabled)
+struct FileBuffer : public boost::intrusive::list_base_hook<> {
+    FileBuffer(BufferedFileHandle& _owner,
+               size_t _capacity,
+               bool _tracing_enabled,
+               bool _write_validation_enabled,
+               bool _mprotect_enabled)
         : owner(_owner),
           capacity(_capacity),
           length(0),
@@ -90,7 +90,7 @@ struct file_buffer : public boost::intrusive::list_base_hook<> {
 #endif
     }
 
-    ~file_buffer() {
+    ~FileBuffer() {
 #ifndef WIN32
         if (mprotect_enabled) {
             mprotect(getRawPtr(), capacity, PROT_READ | PROT_WRITE);
@@ -128,14 +128,14 @@ struct file_buffer : public boost::intrusive::list_base_hook<> {
     std::unique_ptr<uint8_t[]> bytes;
 };
 
-using UniqueFileBufferPtr = std::unique_ptr<file_buffer>;
+using UniqueFileBufferPtr = std::unique_ptr<FileBuffer>;
 
 using ListMember =
-        boost::intrusive::member_hook< file_buffer,
-                                       boost::intrusive::list_member_hook<>,
-                                       &file_buffer::_lru_hook >;
+        boost::intrusive::member_hook<FileBuffer,
+                                      boost::intrusive::list_member_hook<>,
+                                      &FileBuffer::_lru_hook>;
 
-using FileBufferList = boost::intrusive::list<file_buffer, ListMember>;
+using FileBufferList = boost::intrusive::list<FileBuffer, ListMember>;
 using FileBufferMap = std::unordered_map<size_t, UniqueFileBufferPtr>;
 
 class ReadBufferManager;
@@ -173,13 +173,13 @@ public:
         }
     }
 
-    file_buffer* findBuffer(BufferedFileHandle* h, cs_off_t offset) {
+    FileBuffer* findBuffer(BufferedFileHandle* h, cs_off_t offset) {
         // Align offset.
         offset = offset - offset % h->params.read_buffer_capacity;
 
         // Find a buffer for this offset,
         // OR use the last one in LRU list.
-        file_buffer* buffer = nullptr;
+        FileBuffer* buffer = nullptr;
         auto itr_map = readMap.find(offset);
         if (itr_map != readMap.end()) {
             // Matching buffer exists.
@@ -194,7 +194,7 @@ public:
         if (nBuffers < h->params.max_read_buffers) {
             // We can still create another buffer.
             UniqueFileBufferPtr buffer_unique;
-            buffer_unique = std::make_unique<file_buffer>(
+            buffer_unique = std::make_unique<FileBuffer>(
                     *h,
                     h->params.read_buffer_capacity,
                     h->params.tracing_enabled,
@@ -249,11 +249,10 @@ private:
 
 
 // Write as many bytes as possible into the buffer, returning the count
-static size_t write_to_buffer(file_buffer* buf,
-                              const void *bytes,
+static size_t write_to_buffer(FileBuffer* buf,
+                              const void* bytes,
                               size_t nbyte,
-                              cs_off_t offset)
-{
+                              cs_off_t offset) {
     if (buf->length == 0) {
         // If buffer is empty, align it to start at the current offset:
         buf->offset = offset;
@@ -296,8 +295,8 @@ static size_t write_to_buffer(file_buffer* buf,
 }
 
 // Write the current buffer to disk and empty it.
-static couchstore_error_t flush_buffer(couchstore_error_info_t *errinfo,
-                                       file_buffer* buf) {
+static couchstore_error_t flush_buffer(couchstore_error_info_t* errinfo,
+                                       FileBuffer* buf) {
     while (buf->length > 0 && buf->dirty) {
         ssize_t raw_written;
         raw_written = buf->owner.raw_ops->pwrite(errinfo,
@@ -336,12 +335,10 @@ static couchstore_error_t flush_buffer(couchstore_error_info_t *errinfo,
     return COUCHSTORE_SUCCESS;
 }
 
-
 //////// BUFFER READS:
 
-
-static size_t read_from_buffer(file_buffer* buf,
-                               void *bytes,
+static size_t read_from_buffer(FileBuffer* buf,
+                               void* bytes,
                                size_t nbyte,
                                cs_off_t offset) {
     if (offset < buf->offset || offset >= buf->offset + (cs_off_t)buf->length) {
@@ -354,9 +351,8 @@ static size_t read_from_buffer(file_buffer* buf,
     return buffer_nbyte;
 }
 
-
-static couchstore_error_t load_buffer_from(couchstore_error_info_t *errinfo,
-                                           file_buffer* buf,
+static couchstore_error_t load_buffer_from(couchstore_error_info_t* errinfo,
+                                           FileBuffer* buf,
                                            cs_off_t offset,
                                            size_t nbyte) {
     if (buf->dirty) {
@@ -390,7 +386,6 @@ static couchstore_error_t load_buffer_from(couchstore_error_info_t *errinfo,
     buf->length += bytes_read;
     return COUCHSTORE_SUCCESS;
 }
-
 
 //////// PARAMS:
 
@@ -489,7 +484,7 @@ void BufferedFileOps::allocate_write_buffer(couch_file_handle handle) {
     auto* h = (BufferedFileHandle*)handle;
 
     Expects(!h->write_buffer);
-    h->write_buffer = std::make_unique<file_buffer>(
+    h->write_buffer = std::make_unique<FileBuffer>(
             *h,
             h->params.readOnly ? 0 : WRITE_BUFFER_CAPACITY,
             h->params.tracing_enabled,
@@ -560,7 +555,7 @@ ssize_t BufferedFileOps::pread(couchstore_error_info_t* errinfo,
 
     ssize_t total_read = 0;
     while (nbyte > 0) {
-        file_buffer* buffer = h->read_buffer_mgr->findBuffer(h, offset);
+        FileBuffer* buffer = h->read_buffer_mgr->findBuffer(h, offset);
 
         // Read as much as we can from the current buffer:
         ssize_t nbyte_read = read_from_buffer(buffer, buf, nbyte, offset);
@@ -609,7 +604,7 @@ ssize_t BufferedFileOps::pwrite(couchstore_error_info_t* errinfo,
         allocate_write_buffer(handle);
     }
 
-    file_buffer* buffer = h->write_buffer.get();
+    FileBuffer* buffer = h->write_buffer.get();
 
     // Write data to the current buffer:
     size_t nbyte_written = write_to_buffer(buffer, buf, nbyte, offset);
