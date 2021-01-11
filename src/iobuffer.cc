@@ -15,29 +15,25 @@
  *   limitations under the License.
  */
 
-#include "couchstore_config.h"
 #include "iobuffer.h"
+#include "couchstore_config.h"
+#include "crc32.h"
 #include "internal.h"
 
-#include <algorithm>
 #include <boost/intrusive/list.hpp>
+#include <phosphor/phosphor.h>
+#include <cstdlib>
+#include <cstring>
+#include <gsl/gsl>
 #include <memory>
 #include <new>
 #include <unordered_map>
 #include <vector>
 
-#include <gsl/gsl>
-#include <phosphor/phosphor.h>
-#include <platform/cb_malloc.h>
-#include <stdlib.h>
-#include <string.h>
-#include <memory>
-
 #ifndef WIN32
 #include <sys/mman.h>
 #endif
 
-#include "crc32.h"
 
 // Uncomment to enable debug logging of buffer operations.
 // #define LOG_BUFFER 1
