@@ -261,7 +261,7 @@ static size_t write_to_buffer(file_buffer* buf,
         // If it's out of range, don't write anything
         return 0;
     }
-    size_t offset_in_buffer = (size_t)(offset - buf->offset);
+    auto offset_in_buffer = (size_t)(offset - buf->offset);
     size_t buffer_nbyte = std::min(buf->capacity - offset_in_buffer, nbyte);
 
     if (buf->tracing_enabled) {
@@ -347,7 +347,7 @@ static size_t read_from_buffer(file_buffer* buf,
     if (offset < buf->offset || offset >= buf->offset + (cs_off_t)buf->length) {
         return 0;
     }
-    size_t offset_in_buffer = (size_t)(offset - buf->offset);
+    auto offset_in_buffer = (size_t)(offset - buf->offset);
     size_t buffer_nbyte = std::min(buf->length - offset_in_buffer, nbyte);
 
     memcpy(bytes, buf->getRawPtr() + offset_in_buffer, buffer_nbyte);
@@ -460,14 +460,14 @@ couchstore_error_t BufferedFileOps::open(couchstore_error_info_t* errinfo,
                                          const char* path,
                                          int oflag)
 {
-    BufferedFileHandle* h = (BufferedFileHandle*)*handle;
+    auto* h = (BufferedFileHandle*)*handle;
     return h->raw_ops->open(errinfo, &h->raw_ops_handle, path, oflag);
 }
 
 couchstore_error_t BufferedFileOps::close(couchstore_error_info_t* errinfo,
                             couch_file_handle handle)
 {
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
     if (!h) {
         return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     }
@@ -479,14 +479,14 @@ couchstore_error_t BufferedFileOps::close(couchstore_error_info_t* errinfo,
 }
 
 void BufferedFileOps::allocate_read_buffer(couch_file_handle handle) {
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
 
     Expects(!h->read_buffer_mgr);
     h->read_buffer_mgr = std::make_unique<ReadBufferManager>();
 }
 
 void BufferedFileOps::allocate_write_buffer(couch_file_handle handle) {
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
 
     Expects(!h->write_buffer);
     h->write_buffer = std::make_unique<file_buffer>(
@@ -510,28 +510,28 @@ couchstore_error_t BufferedFileOps::set_periodic_sync(couch_file_handle handle,
                                                       uint64_t period_bytes) {
     // Delegate to underlying file ops, given they perform the real disk
     // writes.
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
     return h->raw_ops->set_periodic_sync(h->raw_ops_handle, period_bytes);
 }
 
 couchstore_error_t BufferedFileOps::set_tracing_enabled(
         couch_file_handle handle) {
     // trigger setting tracing flags at the file level */
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
     return h->raw_ops->set_tracing_enabled(h->raw_ops_handle);
 }
 
 couchstore_error_t BufferedFileOps::set_write_validation_enabled(
         couch_file_handle handle) {
     // trigger setting write validation flags at the file level */
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
     return h->raw_ops->set_write_validation_enabled(h->raw_ops_handle);
 }
 
 couchstore_error_t BufferedFileOps::set_mprotect_enabled(
         couch_file_handle handle) {
     // trigger setting mprotect flags at the file level */
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
     return h->raw_ops->set_mprotect_enabled(h->raw_ops_handle);
 }
 
@@ -544,7 +544,7 @@ ssize_t BufferedFileOps::pread(couchstore_error_info_t* errinfo,
 #if defined(LOG_BUFFER)
     //fprintf(stderr, "r");
 #endif
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
 
     // Flush the write buffer before trying to read anything:
     if (h->write_buffer) {
@@ -603,7 +603,7 @@ ssize_t BufferedFileOps::pwrite(couchstore_error_info_t* errinfo,
         return 0;
     }
 
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
 
     if (!h->write_buffer) {
         allocate_write_buffer(handle);
@@ -651,14 +651,14 @@ ssize_t BufferedFileOps::pwrite(couchstore_error_info_t* errinfo,
 cs_off_t BufferedFileOps::goto_eof(couchstore_error_info_t* errinfo,
                                   couch_file_handle handle)
 {
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
     return h->raw_ops->goto_eof(errinfo, h->raw_ops_handle);
 }
 
 couchstore_error_t BufferedFileOps::sync(couchstore_error_info_t* errinfo,
                                          couch_file_handle handle)
 {
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
 
     couchstore_error_t err = COUCHSTORE_SUCCESS;
     if (h->write_buffer) {
@@ -677,14 +677,14 @@ couchstore_error_t BufferedFileOps::advise(couchstore_error_info_t* errinfo,
                                            cs_off_t len,
                                            couchstore_file_advice_t adv)
 {
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
     return h->raw_ops->advise(errinfo, h->raw_ops_handle, offs, len, adv);
 }
 
 FileOpsInterface::FHStats* BufferedFileOps::get_stats(
         couch_file_handle handle) {
     // Not implemeted ourselves, just forward to wrapped ops.
-    BufferedFileHandle* h = (BufferedFileHandle*)handle;
+    auto* h = (BufferedFileHandle*)handle;
     return h->raw_ops->get_stats(h->raw_ops_handle);
 }
 
