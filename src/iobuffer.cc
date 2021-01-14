@@ -22,6 +22,7 @@
 
 #include <boost/intrusive/list.hpp>
 #include <phosphor/phosphor.h>
+#include <platform/string_hex.h>
 #include <cstdlib>
 #include <cstring>
 #include <gsl/gsl>
@@ -71,6 +72,8 @@ size_t getAlignment(bool mprotect) {
     return sizeof(void*);
 }
 
+enum class AccessMode { None, Read, Write, Full };
+
 struct BufferedFileHandle;
 struct FileBuffer : public boost::intrusive::list_base_hook<> {
     FileBuffer(BufferedFileHandle& _owner,
@@ -88,29 +91,63 @@ struct FileBuffer : public boost::intrusive::list_base_hook<> {
           dirty(0),
           tracing_enabled(_tracing_enabled),
           write_validation_enabled(_write_validation_enabled),
-#ifdef WIN32
-          // For WIN32 mprotect is not supported
-          mprotect_enabled(false),
-#else
           mprotect_enabled(_mprotect_enabled),
-#endif
           bytes{static_cast<uint8_t*>(cb_aligned_alloc(
                   getAlignment(mprotect_enabled), _capacity))} {
         if (!bytes) {
             throw std::bad_alloc();
         }
+        setAccessMode(AccessMode::None);
     }
 
     ~FileBuffer() {
-#ifndef WIN32
-        if (mprotect_enabled) {
-            mprotect(getRawPtr(), capacity, PROT_READ | PROT_WRITE);
+        // We need to remove any restrictions to the memory in case the
+        // memory allocator reuse it without clearing such
+        try {
+            setAccessMode(AccessMode::Full);
+        } catch (const std::exception& e) {
+            // we failed to remove the restriction so we should probably just
+            // leak the memory to avoid weird stuff to happen when the memory
+            // gets reused
+            std::cerr << "Failed to remove protection mode for allocated "
+                         "memory in FileBuffer. Leak the memory allocated at "
+                      << cb::to_hex(uint64_t(bytes.get()))
+                      << " to avoid crashing at a later use when the memory "
+                         "gets returned from the allocator"
+                      << std::endl;
+            std::cout.flush();
+            bytes.release();
         }
-#endif
     }
 
     uint8_t* getRawPtr() {
         return bytes.get();
+    }
+
+    void setAccessMode(AccessMode accessMode) {
+        currentAccessMode = accessMode;
+#ifndef WIN32
+        if (mprotect_enabled) {
+            int mode = PROT_NONE;
+            switch (accessMode) {
+            case AccessMode::None:
+                break;
+            case AccessMode::Read:
+                mode = PROT_READ;
+                break;
+            case AccessMode::Write:
+                mode = PROT_WRITE;
+                break;
+            case AccessMode::Full:
+                mode = PROT_READ | PROT_WRITE;
+                break;
+            }
+            if (mprotect(bytes.get(), capacity, mode) == -1) {
+                throw std::system_error(
+                        errno, std::system_category(), "mprotect failed");
+            }
+        }
+#endif
     }
 
     // Hook for intrusive list.
@@ -129,6 +166,7 @@ struct FileBuffer : public boost::intrusive::list_base_hook<> {
     bool tracing_enabled;
     bool write_validation_enabled;
     const bool mprotect_enabled;
+    AccessMode currentAccessMode;
 
     // Data array.
     struct CbAllocDeletor {
@@ -137,6 +175,19 @@ struct FileBuffer : public boost::intrusive::list_base_hook<> {
         }
     };
     std::unique_ptr<uint8_t, CbAllocDeletor> bytes;
+};
+
+class AccessModeGuard {
+public:
+    AccessModeGuard(FileBuffer& buffer, AccessMode mode) : buffer(buffer) {
+        buffer.setAccessMode(mode);
+    }
+    ~AccessModeGuard() {
+        buffer.setAccessMode(AccessMode::None);
+    }
+
+protected:
+    FileBuffer& buffer;
 };
 
 using UniqueFileBufferPtr = std::unique_ptr<FileBuffer>;
@@ -285,15 +336,8 @@ static size_t write_to_buffer(FileBuffer* buf,
                        buffer_nbyte << 32 | crc32);
     }
 
-    if (buf->mprotect_enabled) {
-#ifndef WIN32
-        mprotect(buf->getRawPtr(),
-                 WRITE_BUFFER_CAPACITY,
-                 PROT_READ | PROT_WRITE);
-        memcpy(buf->getRawPtr() + offset_in_buffer, bytes, buffer_nbyte);
-        mprotect(buf->getRawPtr(), WRITE_BUFFER_CAPACITY, PROT_READ);
-#endif
-    } else {
+    {
+        AccessModeGuard guard(*buf, AccessMode::Write);
         memcpy(buf->getRawPtr() + offset_in_buffer, bytes, buffer_nbyte);
     }
 
@@ -310,23 +354,32 @@ static couchstore_error_t flush_buffer(couchstore_error_info_t* errinfo,
                                        FileBuffer* buf) {
     while (buf->length > 0 && buf->dirty) {
         ssize_t raw_written;
-        raw_written = buf->owner.raw_ops->pwrite(errinfo,
-                                                 buf->owner.raw_ops_handle,
-                                                 buf->getRawPtr(),
-                                                 buf->length,
-                                                 buf->offset);
+        {
+            AccessModeGuard guard(*buf, AccessMode::Read);
+            raw_written = buf->owner.raw_ops->pwrite(errinfo,
+                                                     buf->owner.raw_ops_handle,
+                                                     buf->getRawPtr(),
+                                                     buf->length,
+                                                     buf->offset);
+
 #if defined(LOG_BUFFER)
-        fprintf(stderr, "BUFFER: %p flush %zd bytes at %zd --> %zd\n",
-                buf, buf->length, buf->offset, raw_written);
+            fprintf(stderr,
+                    "BUFFER: %p flush %zd bytes at %zd --> %zd\n",
+                    buf,
+                    buf->length,
+                    buf->offset,
+                    raw_written);
 #endif
-        if (buf->tracing_enabled) {
-            uint32_t crc32 = get_checksum(buf->getRawPtr(), buf->length, CRC32);
-            TRACE_INSTANT2("couchstore_write",
-                           "flush_buffer",
-                           "offset",
-                           buf->offset,
-                           "nbytes&CRC",
-                           raw_written << 32 | crc32);
+            if (buf->tracing_enabled) {
+                uint32_t crc32 =
+                        get_checksum(buf->getRawPtr(), buf->length, CRC32);
+                TRACE_INSTANT2("couchstore_write",
+                               "flush_buffer",
+                               "offset",
+                               buf->offset,
+                               "nbytes&CRC",
+                               raw_written << 32 | crc32);
+            }
         }
 
         if (raw_written < 0) {
@@ -336,11 +389,17 @@ static couchstore_error_t flush_buffer(couchstore_error_info_t* errinfo,
                                "raw_written",
                                raw_written);
             }
-            return (couchstore_error_t) raw_written;
+            return (couchstore_error_t)raw_written;
         }
         buf->length -= raw_written;
         buf->offset += raw_written;
-        memmove(buf->getRawPtr(), buf->getRawPtr() + raw_written, buf->length);
+
+        {
+            AccessModeGuard guard(*buf, AccessMode::Full);
+            memmove(buf->getRawPtr(),
+                    buf->getRawPtr() + raw_written,
+                    buf->length);
+        }
     }
     buf->dirty = 0;
     return COUCHSTORE_SUCCESS;
@@ -358,6 +417,7 @@ static size_t read_from_buffer(FileBuffer* buf,
     auto offset_in_buffer = (size_t)(offset - buf->offset);
     size_t buffer_nbyte = std::min(buf->length - offset_in_buffer, nbyte);
 
+    AccessModeGuard guard(*buf, AccessMode::Read);
     memcpy(bytes, buf->getRawPtr() + offset_in_buffer, buffer_nbyte);
     return buffer_nbyte;
 }
@@ -381,12 +441,15 @@ static couchstore_error_t load_buffer_from(couchstore_error_info_t* errinfo,
     }
 
     // Read data to extend the buffer to its capacity (if possible):
-    ssize_t bytes_read =
-            buf->owner.raw_ops->pread(errinfo,
-                                      buf->owner.raw_ops_handle,
-                                      buf->getRawPtr() + buf->length,
-                                      buf->capacity - buf->length,
-                                      buf->offset + buf->length);
+    ssize_t bytes_read;
+    {
+        AccessModeGuard guard(*buf, AccessMode::Write);
+        bytes_read = buf->owner.raw_ops->pread(errinfo,
+                                               buf->owner.raw_ops_handle,
+                                               buf->getRawPtr() + buf->length,
+                                               buf->capacity - buf->length,
+                                               buf->offset + buf->length);
+    }
 #if defined(LOG_BUFFER)
     fprintf(stderr, "BUFFER: %p loaded %zd bytes from %zd\n",
             buf, bytes_read, offset + buf->length);

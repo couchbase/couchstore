@@ -440,10 +440,11 @@ static tree_file_options get_tree_file_options_from_flags(couchstore_open_flags 
     if (flags & COUCHSTORE_OPEN_WITH_WRITE_VALIDATION) {
         options.write_validation_enabled = true;
     }
+#ifndef WIN32
     if (flags & COUCHSTORE_OPEN_WITH_MPROTECT) {
         options.mprotect_enabled = true;
     }
-
+#endif
     return options;
 }
 

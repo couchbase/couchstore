@@ -38,7 +38,7 @@ protected:
     static UniqueDbPtr openDb(std::string fname) {
         auto [status, db] = openDatabase(
                 fname,
-                COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED);
+                COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_WITH_MPROTECT);
         if (status != COUCHSTORE_SUCCESS) {
             throw std::runtime_error(std::string{"Failed to open database \""} +
                                      fname +
