@@ -60,16 +60,17 @@ static long getPageSize() {
 #endif
 }
 
-size_t getCapacity(size_t capacity, bool mprotect){
-#ifndef WIN32
-    if (mprotect){
-        return capacity + getPageSize() - 1;
-    } else
-#endif
-    {
-        return capacity;
+size_t getAlignment(bool mprotect) {
+    if (mprotect) {
+        // mprotect need to be page aligned
+        return getPageSize();
     }
+
+    // We can do with byte alignment, but posix_memalign require a minimum
+    // of sizeof(void*) so lets just use that..
+    return sizeof(void*);
 }
+
 struct BufferedFileHandle;
 struct FileBuffer : public boost::intrusive::list_base_hook<> {
     FileBuffer(BufferedFileHandle& _owner,
@@ -87,26 +88,17 @@ struct FileBuffer : public boost::intrusive::list_base_hook<> {
           dirty(0),
           tracing_enabled(_tracing_enabled),
           write_validation_enabled(_write_validation_enabled),
-#ifndef WIN32
-          mprotect_enabled(_mprotect_enabled),
-#else
-          /* For WIN32 mprotect is not supported and so
-           * mprotect_enabled will be always false
-           */
+#ifdef WIN32
+          // For WIN32 mprotect is not supported
           mprotect_enabled(false),
+#else
+          mprotect_enabled(_mprotect_enabled),
 #endif
-          bytes(new uint8_t[getCapacity(_capacity, _mprotect_enabled)]) {
-#ifndef WIN32
-        if (mprotect_enabled) {
-            /* Need to page align the ptr to data for mprotect,
-             * allocate more and align based on page size
-             */
-            int pagesize = getPageSize();
-            raw_aligned_ptr_to_data =
-                    (uint8_t*)(((intptr_t)(&bytes[0]) + (pagesize - 1)) &
-                               (~(pagesize - 1)));
+          bytes{static_cast<uint8_t*>(cb_aligned_alloc(
+                  getAlignment(mprotect_enabled), _capacity))} {
+        if (!bytes) {
+            throw std::bad_alloc();
         }
-#endif
     }
 
     ~FileBuffer() {
@@ -116,13 +108,9 @@ struct FileBuffer : public boost::intrusive::list_base_hook<> {
         }
 #endif
     }
+
     uint8_t* getRawPtr() {
-        if (mprotect_enabled) {
-            /* mprotect needs page aligned address */
-            return raw_aligned_ptr_to_data;
-        } else {
-            return &bytes[0];
-        }
+        return bytes.get();
     }
 
     // Hook for intrusive list.
@@ -140,11 +128,15 @@ struct FileBuffer : public boost::intrusive::list_base_hook<> {
     // Trace and verify flags
     bool tracing_enabled;
     bool write_validation_enabled;
-    bool mprotect_enabled;
-    // Aligned ptr to data for mprotect enabled case
-    uint8_t* raw_aligned_ptr_to_data;
+    const bool mprotect_enabled;
+
     // Data array.
-    std::unique_ptr<uint8_t[]> bytes;
+    struct CbAllocDeletor {
+        void operator()(uint8_t* ptr) {
+            cb_aligned_free(ptr);
+        }
+    };
+    std::unique_ptr<uint8_t, CbAllocDeletor> bytes;
 };
 
 using UniqueFileBufferPtr = std::unique_ptr<FileBuffer>;
