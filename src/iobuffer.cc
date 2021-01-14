@@ -41,10 +41,29 @@
 #include <stdio.h>
 #endif
 
+static long getPageSize() {
+#ifdef WIN32
+    throw std::invalid_argument(
+            "getPageSize(): mprotect not implemented for win32");
+#else
+    static std::atomic_long pagesize{0};
+    if (!pagesize) {
+        auto ret = sysconf(_SC_PAGE_SIZE);
+        if (ret == -1) {
+            throw std::system_error(
+                    errno, std::system_category(), "sysconf(_SC_PAGE_SIZE)");
+        }
+        pagesize = ret;
+    }
+
+    return pagesize;
+#endif
+}
+
 size_t getCapacity(size_t capacity, bool mprotect){
 #ifndef WIN32
     if (mprotect){
-        return capacity + sysconf(_SC_PAGE_SIZE) - 1;
+        return capacity + getPageSize() - 1;
     } else
 #endif
     {
@@ -82,7 +101,7 @@ struct FileBuffer : public boost::intrusive::list_base_hook<> {
             /* Need to page align the ptr to data for mprotect,
              * allocate more and align based on page size
              */
-            int pagesize = sysconf(_SC_PAGE_SIZE);
+            int pagesize = getPageSize();
             raw_aligned_ptr_to_data =
                     (uint8_t*)(((intptr_t)(&bytes[0]) + (pagesize - 1)) &
                                (~(pagesize - 1)));
