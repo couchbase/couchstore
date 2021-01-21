@@ -6,20 +6,15 @@
 **  Copyright (c) 2012 Couchbase, Inc. All rights reserved.
 */
 
-#ifndef COUCHSTORE_ARENA_H
-#define COUCHSTORE_ARENA_H
+#pragma once
 
 #include <sys/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /** Opaque arena-allocator object. */
-typedef struct arena arena;
+struct arena;
 
 /** Saved position/state of an arena. */
-typedef struct arena_position arena_position;
+struct arena_position;
 
 /**
  * Creates a new arena allocator.
@@ -71,9 +66,3 @@ void arena_free_from_mark(arena *a, const arena_position *mark);
  * Frees all blocks from the arena.
  */
 void arena_free_all(arena *a);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* COUCHSTORE_ARENA_H */

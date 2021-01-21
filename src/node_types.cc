@@ -10,7 +10,7 @@
 #include "node_types.h"
 
 #include <platform/cb_malloc.h>
-#include <stdlib.h>
+#include <cstring>
 
 size_t read_kv(const void *buf, sized_buf *key, sized_buf *value)
 {

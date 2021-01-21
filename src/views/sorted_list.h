@@ -17,18 +17,10 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  **/
+#pragma once
 
-#ifndef _SORTED_LIST_H
-#define _SORTED_LIST_H
-
-#include <stddef.h>
 #include <libcouchstore/visibility.h>
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+#include <cstddef>
 
 /** Returns:
  *  negative integer if a < b, 0 if a == b, positive integer if a > b
@@ -54,9 +46,3 @@ void *sorted_list_next(void *iterator);
 
 void sorted_list_free_iterator(void *iterator);
 
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif

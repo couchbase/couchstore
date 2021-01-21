@@ -18,78 +18,67 @@
  * the License.
  **/
 
-#ifndef _VIEW_FILE_SORTER_H
-#define _VIEW_FILE_SORTER_H
+#pragma once
 
-#include "couchstore_config.h"
-#include <libcouchstore/visibility.h>
 #include "../file_sorter.h"
+#include "couchstore_config.h"
 #include "util.h"
+#include <libcouchstore/visibility.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/*
+ * Sort a file containing records of btree operations for a view btree.
+ */
+LIBCOUCHSTORE_API
+file_sorter_error_t sort_view_kvs_ops_file(const char* file_path,
+                                           const char* tmp_dir);
 
+/*
+ * Sort a file containing view records for a view btree.
+ */
+LIBCOUCHSTORE_API
+file_sorter_error_t sort_view_kvs_file(const char* file_path,
+                                       const char* tmp_dir,
+                                       file_merger_feed_record_t callback,
+                                       void* user_ctx);
 
-    /*
-     * Sort a file containing records of btree operations for a view btree.
-     */
-    LIBCOUCHSTORE_API
-    file_sorter_error_t sort_view_kvs_ops_file(const char *file_path,
-                                               const char *tmp_dir);
+/*
+ * Sort a file containing records of btree operations for a view id
+ * btree (back index).
+ */
+LIBCOUCHSTORE_API
+file_sorter_error_t sort_view_ids_ops_file(const char* file_path,
+                                           const char* tmp_dir);
 
-    /*
-     * Sort a file containing view records for a view btree.
-     */
-    LIBCOUCHSTORE_API
-    file_sorter_error_t sort_view_kvs_file(const char *file_path,
-                                           const char *tmp_dir,
-                                           file_merger_feed_record_t callback,
-                                           void *user_ctx);
+/*
+ * Sort a file containing records for a view id btree (back index).
+ */
+LIBCOUCHSTORE_API
+file_sorter_error_t sort_view_ids_file(const char* file_path,
+                                       const char* tmp_dir,
+                                       file_merger_feed_record_t callback,
+                                       void* user_ctx);
 
-    /*
-     * Sort a file containing records of btree operations for a view id
-     * btree (back index).
-     */
-    LIBCOUCHSTORE_API
-    file_sorter_error_t sort_view_ids_ops_file(const char *file_path,
-                                               const char *tmp_dir);
+/*
+ * Sort a file containing records for a spatial index.
+ */
+LIBCOUCHSTORE_API
+file_sorter_error_t sort_spatial_kvs_file(const char* file_path,
+                                          const char* tmp_dir,
+                                          file_merger_feed_record_t callback,
+                                          void* user_ctx);
 
-    /*
-     * Sort a file containing records for a view id btree (back index).
-     */
-    LIBCOUCHSTORE_API
-    file_sorter_error_t sort_view_ids_file(const char *file_path,
-                                           const char *tmp_dir,
-                                           file_merger_feed_record_t callback,
-                                           void *user_ctx);
+/*
+ * Sort a file containing records of spatial index operations for a
+ * spatial view.
+ */
+LIBCOUCHSTORE_API
+file_sorter_error_t sort_spatial_kvs_ops_file(const char* file_path,
+                                              const char* tmp_dir,
+                                              view_file_merge_ctx_t* ctx);
 
-    /*
-     * Sort a file containing records for a spatial index.
-     */
-    LIBCOUCHSTORE_API
-    file_sorter_error_t sort_spatial_kvs_file(const char *file_path,
-                                              const char *tmp_dir,
-                                              file_merger_feed_record_t callback,
-                                              void *user_ctx);
-
-    /*
-     * Sort a file containing records of spatial index operations for a
-     * spatial view.
-     */
-    LIBCOUCHSTORE_API
-    file_sorter_error_t sort_spatial_kvs_ops_file(const char *file_path,
-                                                  const char *tmp_dir,
-                                                  view_file_merge_ctx_t *ctx);
-
-    /* Record file sorter */
-    typedef file_sorter_error_t (*sort_record_fn)(const char *file_path,
-                                                  const char *tmp_dir,
-                                                  file_merger_feed_record_t callback,
-                                                  void *user_ctx);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+/* Record file sorter */
+typedef file_sorter_error_t (*sort_record_fn)(
+        const char* file_path,
+        const char* tmp_dir,
+        file_merger_feed_record_t callback,
+        void* user_ctx);

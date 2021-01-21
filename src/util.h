@@ -1,18 +1,13 @@
-#ifndef COUCHSTORE_UTIL_H
-#define COUCHSTORE_UTIL_H
-
-#include <libcouchstore/couch_db.h>
-#include <platform/dynamic.h>
-#include <signal.h>
-#include <string.h>
+#pragma once
 
 #include "internal.h"
 #include "fatbuf.h"
 #include "arena.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <libcouchstore/couch_db.h>
+#include <platform/dynamic.h>
+#include <csignal>
+#include <cstring>
 
 /** Plain lexicographic comparison of the contents of two sized_bufs. */
 int ebin_cmp(const sized_buf *e1, const sized_buf *e2);
@@ -88,8 +83,3 @@ int strncpy_safe(char* d, const char* s, size_t n);
 
     couchstore_error_t log_last_internal_error(const char *format, ...) CB_FORMAT_PRINTF(1, 2);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* COUCHSTORE_UTIL_H */

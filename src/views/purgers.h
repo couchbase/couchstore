@@ -18,35 +18,25 @@
  * the License.
  **/
 
-#ifndef _VIEW_PURGERS_H
-#define _VIEW_PURGERS_H
-#endif
+#pragma once
 
 #include "../couch_btree.h"
 #include "../internal.h"
 #include "bitmap.h"
 #include "mapreduce/mapreduce.h"
-#include <stdint.h>
-#include <libcouchstore/visibility.h>
-#include <libcouchstore/couch_db.h>
 #include <libcouchstore/couch_common.h>
+#include <libcouchstore/couch_db.h>
+#include <libcouchstore/visibility.h>
+#include <cstdint>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+struct view_purger_ctx_t {
+    bitmap_t cbitmask;
+    uint64_t count;
+};
 
-    typedef struct {
-        bitmap_t cbitmask;
-        uint64_t count;
-    } view_purger_ctx_t;
-
-    int view_id_btree_purge_kv(const sized_buf *key, const sized_buf *val,
-                                                     void *ctx);
-    int view_id_btree_purge_kp(const node_pointer *ptr, void *ctx);
-    int view_btree_purge_kv(const sized_buf *key, const sized_buf *val,
-                                                  void *ctx);
-    int view_btree_purge_kp(const node_pointer *ptr, void *ctx);
-
-#ifdef __cplusplus
-}
-#endif
+int view_id_btree_purge_kv(const sized_buf* key,
+                           const sized_buf* val,
+                           void* ctx);
+int view_id_btree_purge_kp(const node_pointer* ptr, void* ctx);
+int view_btree_purge_kv(const sized_buf* key, const sized_buf* val, void* ctx);
+int view_btree_purge_kp(const node_pointer* ptr, void* ctx);

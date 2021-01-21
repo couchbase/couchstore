@@ -14,15 +14,7 @@
 #define VIEW_KV_CHUNK_THRESHOLD (7 * 1024)
 #define VIEW_KP_CHUNK_THRESHOLD (6 * 1024)
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-int view_btree_cmp(const sized_buf *key1, const sized_buf *key2);
-
-#ifdef __cplusplus
-}
-#endif
+extern int view_btree_cmp(const sized_buf* key1, const sized_buf* key2);
 
 static void free_node_list(nodelist *nl)
 {

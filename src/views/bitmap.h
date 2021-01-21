@@ -18,15 +18,10 @@
  * the License.
  **/
 
-#ifndef _BITMAP_H
-#define _BITMAP_H
+#pragma once
 
 #include <climits>
 #include <cstdint>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct bitmap_t {
     /* Big endian format.
@@ -41,10 +36,3 @@ void unset_bit(bitmap_t *bm, uint16_t bit);
 void union_bitmaps(bitmap_t *dst_bm, const bitmap_t *src_bm);
 void intersect_bitmaps(bitmap_t *dst_bm, const bitmap_t *src_bm);
 int is_equal_bitmap(const bitmap_t *bm1, const bitmap_t *bm2);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif

@@ -77,9 +77,7 @@ static void close_view_group_file(view_group_info_t *info);
 static int read_record(FILE *f, arena *a, sized_buf *k, sized_buf *v,
                                                         uint8_t *op);
 
-extern "C" {
-    int view_btree_cmp(const sized_buf *key1, const sized_buf *key2);
-}
+int view_btree_cmp(const sized_buf* key1, const sized_buf* key2);
 static couchstore_error_t update_btree(const char *source_file,
                                        tree_file *dest_file,
                                        const node_pointer *root,

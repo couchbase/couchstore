@@ -1,11 +1,7 @@
-#ifndef MERGESORT_H
-#define MERGESORT_H
 
-#include <stdio.h>
+#pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <cstdio>
 
 /*
  * Returns the length of the record read from the file on success.
@@ -53,9 +49,3 @@ int merge_sort(FILE *unsorted_file, FILE *sorted_file,
                unsigned long block_size,
                unsigned long *pcount);
 
-#ifdef __cplusplus
-}
-#endif
-
-
-#endif

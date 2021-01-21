@@ -3,10 +3,9 @@
 #include "keys.h"
 #include "../bitfield.h"
 
-#include <stdlib.h>
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
-
+#include <cstring>
 
 #define dec_uint16(b) (decode_raw16(*((raw_16 *) b)))
 

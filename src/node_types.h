@@ -11,17 +11,12 @@
 **
 */
 
-#ifndef COUCHSTORE_NODE_TYPES_H
-#define COUCHSTORE_NODE_TYPES_H
+#pragma once
 
 #include "bitfield.h"
 #include "internal.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef struct {
+struct raw_file_header_v12 {
     raw_08 version;
     raw_48 update_seq;
     raw_48 purge_seq;
@@ -30,12 +25,10 @@ typedef struct {
     raw_16 idrootsize;
     raw_16 localrootsize;
     /* Three variable-size raw_btree_root structures follow */
-} raw_file_header_v12;
-#ifdef __cplusplus
+};
 static_assert(sizeof(raw_file_header_v12) == 25, "Unexpected file header side");
-#endif
 
-typedef struct {
+struct raw_file_header_v13 {
     raw_08 version;
     raw_48 update_seq;
     raw_48 purge_seq;
@@ -45,34 +38,32 @@ typedef struct {
     raw_16 localrootsize;
     raw_64 timestamp;
     /* Three variable-size raw_btree_root structures follow */
-} raw_file_header_v13;
-#ifdef __cplusplus
+};
 static_assert(sizeof(raw_file_header_v13) == 33, "Unexpected file header side");
-#endif
 
-typedef struct {
+struct raw_btree_root {
     raw_48 pointer;
     raw_48 subtreesize;
     /* Variable-size reduce value follows */
-} raw_btree_root;
+};
 
 /** Packed key-and-value length type. Key length is 12 bits, value length is 28. */
-typedef struct {
+struct raw_kv_length {
     uint8_t raw_kv[5];
-} raw_kv_length;
+};
 
-typedef struct {
+struct raw_node_pointer {
     raw_48 pointer;
     raw_48 subtreesize;
     raw_16 reduce_value_size;
     /* Variable-size reduce value follows */
-} raw_node_pointer;
+};
 
-typedef struct {
+struct raw_by_seq_key {
     raw_48 sequence;
-} raw_by_seq_key;
+};
 
-typedef struct {
+struct raw_id_index_value {
     raw_48 db_seq;
     /* physical on-disk size of the value (including headers). */
     raw_32 physical_size;
@@ -80,9 +71,9 @@ typedef struct {
     raw_48 rev_seq;
     raw_08 content_meta;
     /* Variable-size rev_meta data follows */
-} raw_id_index_value;
+};
 
-typedef struct {
+struct raw_seq_index_value {
     /* value length - physical on-disk size of the value (including headers). */
     raw_kv_length sizes;
     raw_48 bp;                 /* high bit is 'deleted' flag */
@@ -90,7 +81,7 @@ typedef struct {
     raw_08 content_meta;
     /* Variable-size id follows */
     /* Variable-size rev_meta data follows */
-} raw_seq_index_value;
+};
 
 /* Mask for the 'deleted' bit in .bp fields */
 #ifndef UINT64_C
@@ -129,8 +120,3 @@ void* write_kv(void *buf, sized_buf key, sized_buf value);
  */
 uint64_t decode_sequence_key(const sized_buf *buf);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif

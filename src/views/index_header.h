@@ -18,90 +18,73 @@
  * the License.
  **/
 
-#ifndef _INDEX_HEADER_H
-#define _INDEX_HEADER_H
+#pragma once
 
-#include "couchstore_config.h"
-#include <stdint.h>
-#include <libcouchstore/visibility.h>
-#include <libcouchstore/couch_db.h>
-#include "bitmap.h"
-#include "sorted_list.h"
 #include "../node_types.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+#include "bitmap.h"
+#include "couchstore_config.h"
+#include "sorted_list.h"
+#include <libcouchstore/couch_db.h>
+#include <libcouchstore/visibility.h>
+#include <cstdint>
 
 #define LATEST_INDEX_HEADER_VERSION 2
 
-typedef struct {
+struct part_seq_t {
     uint16_t part_id;
     uint64_t seq;
-} part_seq_t;
+};
 
-
-typedef struct {
+struct index_state_transition_t {
     /* sorted_list instance, values of type uint16_t */
-    void   *active;
+    void* active;
     /* sorted_list instance, values of type uint16_t */
-    void   *passive;
+    void* passive;
     /* sorted_list instance, values of type uint16_t */
-    void   *unindexable;
-} index_state_transition_t;
+    void* unindexable;
+};
 
-
-typedef struct {
+struct failover_log_t {
     unsigned char uuid[8];
-    uint64_t      seq;
-} failover_log_t;
+    uint64_t seq;
+};
 
+struct part_version_t {
+    uint16_t part_id;
+    uint16_t num_failover_log;
+    failover_log_t* failover_log;
+};
 
-typedef struct {
-    uint16_t       part_id;
-    uint16_t       num_failover_log;
-    failover_log_t *failover_log;
-} part_version_t;
-
-
-typedef struct {
-    uint8_t                    version;
+struct index_header_t {
+    uint8_t version;
     /* MD5 hash */
-    unsigned char              signature[16];
-    uint8_t                    num_views;
-    uint16_t                   num_partitions;
-    bitmap_t                   active_bitmask;
-    bitmap_t                   passive_bitmask;
-    bitmap_t                   cleanup_bitmask;
+    unsigned char signature[16];
+    uint8_t num_views;
+    uint16_t num_partitions;
+    bitmap_t active_bitmask;
+    bitmap_t passive_bitmask;
+    bitmap_t cleanup_bitmask;
     /* sorted_list instance, values of type part_seq_t */
-    void                       *seqs;
-    node_pointer               *id_btree_state;
+    void* seqs;
+    node_pointer* id_btree_state;
     /* array of num_views elements */
-    node_pointer               **view_states;
-    int                        has_replica;
+    node_pointer** view_states;
+    int has_replica;
     /* sorted_list instance, values of type uint16_t */
-    void                       *replicas_on_transfer;
-    index_state_transition_t   pending_transition;
+    void* replicas_on_transfer;
+    index_state_transition_t pending_transition;
     /* sorted_list instance, values of type part_seq_t */
-    void                       *unindexable_seqs;
+    void* unindexable_seqs;
     /* sorted_list instance, values of type part_ver_t */
-    void                       *part_versions;
-} index_header_t;
+    void* part_versions;
+};
 
-
-couchstore_error_t decode_index_header(const char *bytes,
+couchstore_error_t decode_index_header(const char* bytes,
                                        size_t len,
-                                       index_header_t **header);
+                                       index_header_t** header);
 
-couchstore_error_t encode_index_header(const index_header_t *header,
-                                       char **buffer,
-                                       size_t *buffer_size);
+couchstore_error_t encode_index_header(const index_header_t* header,
+                                       char** buffer,
+                                       size_t* buffer_size);
 
-void free_index_header(index_header_t *header);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+void free_index_header(index_header_t* header);

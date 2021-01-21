@@ -17,42 +17,30 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  **/
+#pragma once
 
-#ifndef _VIEW_TESTS_H
-#define _VIEW_TESTS_H
-
-#include "couchstore_config.h"
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include "../macros.h"
 #include "../src/views/bitmap.h"
-#include "../src/views/sorted_list.h"
 #include "../src/views/index_header.h"
-#include "../src/views/reductions.h"
 #include "../src/views/keys.h"
-#include "../src/views/values.h"
-#include "../src/views/reducers.h"
 #include "../src/views/purgers.h"
+#include "../src/views/reducers.h"
+#include "../src/views/reductions.h"
+#include "../src/views/sorted_list.h"
+#include "../src/views/values.h"
+#include "couchstore_config.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void view_tests(void);
-void test_bitmaps(void);
-void test_sorted_lists(void);
-void test_collate_json(void);
-void test_index_headers_v1(void);
-void test_index_headers_v2(void);
-void test_reductions(void);
-void test_keys(void);
-void test_values(void);
-void reducer_tests(void);
-void cleanup_tests(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+void view_tests();
+void test_bitmaps();
+void test_sorted_lists();
+void test_collate_json();
+void test_index_headers_v1();
+void test_index_headers_v2();
+void test_reductions();
+void test_keys();
+void test_values();
+void reducer_tests();
+void cleanup_tests();

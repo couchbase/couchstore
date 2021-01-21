@@ -19,66 +19,54 @@
  * the License.
  **/
 
-#ifndef _VIEW_REDUCERS_H
-#define _VIEW_REDUCERS_H
+#pragma once
 
 #include "../couch_btree.h"
 #include "../internal.h"
 #include "mapreduce/mapreduce.h"
-#include <stdint.h>
-#include <libcouchstore/visibility.h>
-#include <libcouchstore/couch_db.h>
 #include <libcouchstore/couch_common.h>
+#include <libcouchstore/couch_db.h>
+#include <libcouchstore/visibility.h>
+#include <cstdint>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+struct view_reducer_ctx_t {
+    /* If not NULL, an error happened and it contains a human
+       readable error message. */
+    const char* error;
+    void* priv;
+};
 
-    typedef struct {
-        /* If not NULL, an error happened and it contains a human
-           readable error message. */
-        const char           *error;
-        void                 *priv;
-    } view_reducer_ctx_t;
+struct stats_t {
+    uint64_t count;
+    double sum, min, max, sumsqr;
+};
 
-    typedef struct {
-        uint64_t count;
-        double sum, min, max, sumsqr;
-    } stats_t;
+view_reducer_ctx_t* make_view_reducer_ctx(const char* functions[],
+                                          unsigned num_functions,
+                                          char** error_msg);
 
+void free_view_reducer_ctx(view_reducer_ctx_t* ctx);
 
-    view_reducer_ctx_t *make_view_reducer_ctx(const char *functions[],
-                                              unsigned num_functions,
-                                              char **error_msg);
+couchstore_error_t view_id_btree_reduce(char* dst,
+                                        size_t* size_r,
+                                        const nodelist* leaflist,
+                                        int count,
+                                        void* ctx);
 
-    void free_view_reducer_ctx(view_reducer_ctx_t *ctx);
+couchstore_error_t view_id_btree_rereduce(char* dst,
+                                          size_t* size_r,
+                                          const nodelist* itmlist,
+                                          int count,
+                                          void* ctx);
 
-    couchstore_error_t view_id_btree_reduce(char *dst,
-                                            size_t *size_r,
-                                            const nodelist *leaflist,
-                                            int count,
-                                            void *ctx);
+couchstore_error_t view_btree_reduce(char* dst,
+                                     size_t* size_r,
+                                     const nodelist* leaflist,
+                                     int count,
+                                     void* ctx);
 
-    couchstore_error_t view_id_btree_rereduce(char *dst,
-                                              size_t *size_r,
-                                              const nodelist *itmlist,
-                                              int count,
-                                              void *ctx);
-
-    couchstore_error_t view_btree_reduce(char *dst,
-                                         size_t *size_r,
-                                         const nodelist *leaflist,
-                                         int count,
-                                         void *ctx);
-
-    couchstore_error_t view_btree_rereduce(char *dst,
-                                           size_t *size_r,
-                                           const nodelist *nodelist,
-                                           int count,
-                                           void *ctx);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+couchstore_error_t view_btree_rereduce(char* dst,
+                                       size_t* size_r,
+                                       const nodelist* nodelist,
+                                       int count,
+                                       void* ctx);
