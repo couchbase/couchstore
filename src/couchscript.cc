@@ -107,7 +107,7 @@ extern "C" {
             flags = lua_toboolean(ls, 2) ? COUCHSTORE_OPEN_FLAG_CREATE : 0;
         }
 
-        Db *db(NULL);
+        Db* db(nullptr);
 
         couchstore_error_t rc = couchstore_open_db(pathname, flags, &db);
         if (rc != COUCHSTORE_SUCCESS) {
@@ -176,7 +176,7 @@ extern "C" {
         Db *db = getDb(ls);
         CHECK_NULL(db)
 
-        Doc *doc(NULL);
+        Doc* doc(nullptr);
         lua_remove(ls, 1);
         DocInfo *docinfo = getDocInfo(ls);
         cb_assert(docinfo);
@@ -683,27 +683,24 @@ extern "C" {
         return 1;
     }
 
-    static const luaL_Reg couch_funcs[] = {
-        {"open", couch_open},
-        {NULL, NULL}
-    };
+    static const luaL_Reg couch_funcs[] = {{"open", couch_open},
+                                           {nullptr, nullptr}};
 
     static const luaL_Reg couch_methods[] = {
-        {"save", couch_save},
-        {"save_bulk", couch_save_bulk},
-        {"delete", couch_delete},
-        {"get", couch_get},
-        {"get_from_docinfo", couch_get_from_docinfo},
-        {"changes", couch_changes},
-        {"save_local", couch_save_local},
-        {"delete_local", couch_delete_local},
-        {"get_local", couch_get_local},
-        {"commit", couch_commit},
-        {"close", couch_close},
-        {"truncate", couch_truncate},
-        {"__gc", couch_gc},
-        {NULL, NULL}
-    };
+            {"save", couch_save},
+            {"save_bulk", couch_save_bulk},
+            {"delete", couch_delete},
+            {"get", couch_get},
+            {"get_from_docinfo", couch_get_from_docinfo},
+            {"changes", couch_changes},
+            {"save_local", couch_save_local},
+            {"delete_local", couch_delete_local},
+            {"get_local", couch_get_local},
+            {"commit", couch_commit},
+            {"close", couch_close},
+            {"truncate", couch_truncate},
+            {"__gc", couch_gc},
+            {nullptr, nullptr}};
 
     static int docinfo_id(lua_State *ls)
     {
@@ -791,20 +788,18 @@ extern "C" {
     }
 
     static const luaL_Reg docinfo_methods[] = {
-        {"id", docinfo_id},
-        {"rev", docinfo_rev_seq},
-        {"db_seq", docinfo_db_seq},
-        {"cas", docinfo_cas},
-        {"exp", docinfo_exp},
-        {"flags", docinfo_flags},
-        {"deleted", docinfo_deleted},
-        {"content_meta", docinfo_content_meta},
-        {"size", docinfo_len},
-        {"__len", docinfo_len},
-        {"__gc", docinfo_gc},
-        {NULL, NULL}
-    };
-
+            {"id", docinfo_id},
+            {"rev", docinfo_rev_seq},
+            {"db_seq", docinfo_db_seq},
+            {"cas", docinfo_cas},
+            {"exp", docinfo_exp},
+            {"flags", docinfo_flags},
+            {"deleted", docinfo_deleted},
+            {"content_meta", docinfo_content_meta},
+            {"size", docinfo_len},
+            {"__len", docinfo_len},
+            {"__gc", docinfo_gc},
+            {nullptr, nullptr}};
 }
 
 static void initCouch(lua_State *ls)
@@ -815,7 +810,7 @@ static void initCouch(lua_State *ls)
     lua_pushvalue(ls, -2);  /* pushes the metatable */
     lua_settable(ls, -3);  /* metatable.__index = metatable */
 
-    luaL_openlib(ls, NULL, couch_methods, 0);
+    luaL_openlib(ls, nullptr, couch_methods, 0);
 
     luaL_openlib(ls, "couch", couch_funcs, 0);
 }
@@ -828,7 +823,7 @@ static void initDocInfo(lua_State *ls)
     lua_pushvalue(ls, -2);  /* pushes the metatable */
     lua_settable(ls, -3);  /* metatable.__index = metatable */
 
-    luaL_openlib(ls, NULL, docinfo_methods, 0);
+    luaL_openlib(ls, nullptr, docinfo_methods, 0);
 }
 
 int main(int argc, char **argv)
@@ -838,7 +833,7 @@ int main(int argc, char **argv)
         exit(EX_USAGE);
     }
 
-    if (getenv("LUA_PATH") == NULL) {
+    if (getenv("LUA_PATH") == nullptr) {
         std::string path = argv[1];
         static char lua_path[LUA_PATH_MAX_SIZE];
         size_t pos = path.find_last_of("/\\");

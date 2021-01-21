@@ -42,13 +42,13 @@ static void test_view_btree_reduction_decoding(const char* reduction_bin,
 
 static view_id_btree_reduction_t *test_view_id_btree_reduction_decoding(const char *id_btree_reduction_bin)
 {
-    view_id_btree_reduction_t *r = NULL;
+    view_id_btree_reduction_t* r = nullptr;
     uint16_t partition_bitset[] = { 49, 50, 51, 52 };
     bitmap_t expected_part_bitmap;
     unsigned i;
 
     cb_assert(decode_view_id_btree_reduction(id_btree_reduction_bin, &r) == COUCHSTORE_SUCCESS);
-    cb_assert(r != NULL);
+    cb_assert(r != nullptr);
     cb_assert(r->kv_count == 3026);
     memset(&expected_part_bitmap, 0, sizeof(expected_part_bitmap));
     for (i = 0; i < (sizeof(partition_bitset) / sizeof(partition_bitset[0])); ++i) {

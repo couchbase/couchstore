@@ -65,20 +65,20 @@ int spatial_key_cmp(const sized_buf *key1, const sized_buf *key2,
     mbbs[0].num = mbb1_num;
     mbbs[0].mbb = (double *)(key1->buf + sizeof(uint16_t));
     mbbs_center[0] = spatial_center(&mbbs[0]);
-    cb_assert(mbbs_center[0] != NULL);
+    cb_assert(mbbs_center[0] != nullptr);
     mbbs_scaled[0] = spatial_scale_point(mbbs_center[0], sf);
-    cb_assert(mbbs_scaled[0] != NULL);
+    cb_assert(mbbs_scaled[0] != nullptr);
     mbbs_zcode[0] = interleave_uint32s(mbbs_scaled[0], sf->dim);
-    cb_assert(mbbs_zcode[0] != NULL);
+    cb_assert(mbbs_zcode[0] != nullptr);
 
     mbbs[1].num = mbb2_num;
     mbbs[1].mbb = (double *)(key2->buf + sizeof(uint16_t));
     mbbs_center[1] = spatial_center(&mbbs[1]);
-    cb_assert(mbbs_center[1] != NULL);
+    cb_assert(mbbs_center[1] != nullptr);
     mbbs_scaled[1] = spatial_scale_point(mbbs_center[1], sf);
-    cb_assert(mbbs_scaled[1] != NULL);
+    cb_assert(mbbs_scaled[1] != nullptr);
     mbbs_zcode[1] = interleave_uint32s(mbbs_scaled[1], sf->dim);
-    cb_assert(mbbs_zcode[1] != NULL);
+    cb_assert(mbbs_zcode[1] != nullptr);
 
     res = memcmp(mbbs_zcode[0], mbbs_zcode[1], sf->dim * BYTE_PER_COORD);
 
@@ -114,24 +114,24 @@ scale_factor_t *spatial_scale_factor(const double *mbb, uint16_t dim,
 {
     int i;
     double range;
-    scale_factor_t *sf = NULL;
-    double *offsets = NULL;
-    double *scales = NULL;
+    scale_factor_t* sf = nullptr;
+    double* offsets = nullptr;
+    double* scales = nullptr;
 
     sf = (scale_factor_t *)cb_malloc(sizeof(scale_factor_t));
-    if (sf == NULL) {
-        return NULL;
+    if (sf == nullptr) {
+        return nullptr;
     }
     offsets = (double *)cb_malloc(sizeof(double) * dim);
-    if (offsets == NULL) {
+    if (offsets == nullptr) {
         cb_free(sf);
-        return NULL;
+        return nullptr;
     }
     scales = (double *)cb_malloc(sizeof(double) * dim);
-    if (scales == NULL) {
+    if (scales == nullptr) {
         cb_free(sf);
         cb_free(offsets);
-        return NULL;
+        return nullptr;
     }
 
     for (i = 0; i < dim; ++i) {
@@ -152,7 +152,7 @@ scale_factor_t *spatial_scale_factor(const double *mbb, uint16_t dim,
 
 void free_spatial_scale_factor(scale_factor_t *sf)
 {
-    if (sf == NULL) {
+    if (sf == nullptr) {
         return;
     }
     cb_free(sf->offsets);
@@ -165,8 +165,8 @@ double *spatial_center(const sized_mbb_t *mbb)
 {
     double *center = (double *)cb_calloc(mbb->num/2, sizeof(double));
     uint32_t i;
-    if (center == NULL) {
-        return NULL;
+    if (center == nullptr) {
+        return nullptr;
     }
 
     for (i = 0; i < mbb->num; i += 2) {
@@ -180,8 +180,8 @@ uint32_t *spatial_scale_point(const double *point, const scale_factor_t *sf)
 {
     int i;
     uint32_t *scaled = (uint32_t *)cb_malloc(sizeof(uint32_t) * sf->dim);
-    if (scaled == NULL) {
-        return NULL;
+    if (scaled == nullptr) {
+        return nullptr;
     }
 
     for (i = 0; i < sf->dim; ++i) {
@@ -204,15 +204,15 @@ unsigned char *interleave_uint32s(uint32_t *numbers, uint16_t num)
 {
     uint8_t i;
     uint16_t j, bitmap_size;
-    unsigned char *bitmap = NULL;
+    unsigned char* bitmap = nullptr;
 
     cb_assert(num < 16384);
 
     /* bitmap_size in bits (hence the `*8`) */
     bitmap_size = (sizeof(uint32_t) * num * 8);
     bitmap = (unsigned char *)cb_calloc(bitmap_size / 8, sizeof(unsigned char));
-    if (bitmap == NULL) {
-        return NULL;
+    if (bitmap == nullptr) {
+        return nullptr;
     }
 
     /* i is the bit offset within a number
@@ -297,7 +297,7 @@ couchstore_error_t view_spatial_reduce(char *dst,
     decode_spatial_key(leaflist->key.buf, &enclosing);
     count--;
 
-    for (i = leaflist->next; i != NULL && count > 0; i = i->next, count--) {
+    for (i = leaflist->next; i != nullptr && count > 0; i = i->next, count--) {
         decode_spatial_key(i->key.buf, &tmp_mbb);
         expand_mbb(&enclosing, &tmp_mbb);
     }

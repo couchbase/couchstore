@@ -105,7 +105,7 @@ couchstore_error_t encode_view_btree_value(const view_btree_value_t *value,
                                            char **buffer,
                                            size_t *buffer_size)
 {
-    char *buf = NULL, *b = NULL;
+    char *buf = nullptr, *b = nullptr;
     uint16_t i;
     size_t sz = 0;
 
@@ -117,7 +117,7 @@ couchstore_error_t encode_view_btree_value(const view_btree_value_t *value,
     }
 
     b = buf = (char *) cb_malloc(sz);
-    if (buf == NULL) {
+    if (buf == nullptr) {
         goto alloc_error;
     }
 
@@ -137,7 +137,7 @@ couchstore_error_t encode_view_btree_value(const view_btree_value_t *value,
 
  alloc_error:
     cb_free(buf);
-    *buffer = NULL;
+    *buffer = nullptr;
     *buffer_size = 0;
     return COUCHSTORE_ERROR_ALLOC_FAIL;
 }
@@ -146,17 +146,17 @@ couchstore_error_t decode_view_id_btree_value(const char *bytes,
                                               size_t len,
                                               view_id_btree_value_t **value)
 {
-    view_id_btree_value_t *v = NULL;
+    view_id_btree_value_t* v = nullptr;
     uint16_t i, j, num_keys;
     const char *bs;
     size_t sz, length;
 
     v = (view_id_btree_value_t *) cb_malloc(sizeof(view_id_btree_value_t));
-    if (v == NULL) {
+    if (v == nullptr) {
         goto alloc_error;
     }
 
-    v->view_keys_map = NULL;
+    v->view_keys_map = nullptr;
 
     cb_assert(len >= 2);
     v->partition = dec_uint16(bytes);
@@ -207,12 +207,12 @@ couchstore_error_t decode_view_id_btree_value(const char *bytes,
     v->view_keys_map = (view_keys_mapping_t *) cb_malloc(v->num_view_keys_map *
                                                      sizeof(view_keys_mapping_t));
 
-    if (v->view_keys_map == NULL) {
+    if (v->view_keys_map == nullptr) {
         goto alloc_error;
     }
 
     for (j = 0; j< v->num_view_keys_map; ++j) {
-        v->view_keys_map[j].json_keys = NULL;
+        v->view_keys_map[j].json_keys = nullptr;
     }
 
     i = 0;
@@ -229,12 +229,12 @@ couchstore_error_t decode_view_id_btree_value(const char *bytes,
         len -= 2;
 
         v->view_keys_map[i].json_keys = (sized_buf *) cb_malloc(num_keys * sizeof(sized_buf));
-        if (v->view_keys_map[i].json_keys == NULL) {
+        if (v->view_keys_map[i].json_keys == nullptr) {
             goto alloc_error;
         }
 
         for (j = 0; j< num_keys; ++j) {
-            v->view_keys_map[i].json_keys[j].buf = NULL;
+            v->view_keys_map[i].json_keys[j].buf = nullptr;
         }
 
         for ( j = 0; j < num_keys; ++j) {
@@ -246,7 +246,7 @@ couchstore_error_t decode_view_id_btree_value(const char *bytes,
             v->view_keys_map[i].json_keys[j].size = sz;
             v->view_keys_map[i].json_keys[j].buf = (char *) cb_malloc(sz);
 
-            if (v->view_keys_map[i].json_keys[j].buf == NULL) {
+            if (v->view_keys_map[i].json_keys[j].buf == nullptr) {
                 goto alloc_error;
             }
 
@@ -272,7 +272,7 @@ couchstore_error_t encode_view_id_btree_value(const view_id_btree_value_t *value
                                               char **buffer,
                                               size_t *buffer_size)
 {
-    char *buf = NULL, *b = NULL;
+    char *buf = nullptr, *b = nullptr;
     size_t sz = 0;
     uint16_t i, j;
 
@@ -290,7 +290,7 @@ couchstore_error_t encode_view_id_btree_value(const view_id_btree_value_t *value
     }
 
     b = buf = (char *) cb_malloc(sz);
-    if (buf == NULL) {
+    if (buf == nullptr) {
         goto alloc_error;
     }
 
@@ -321,7 +321,7 @@ couchstore_error_t encode_view_id_btree_value(const view_id_btree_value_t *value
 
  alloc_error:
     cb_free(buf);
-    *buffer = NULL;
+    *buffer = nullptr;
     *buffer_size = 0;
     return COUCHSTORE_ERROR_ALLOC_FAIL;
 }
@@ -332,13 +332,13 @@ void free_view_id_btree_value(view_id_btree_value_t *value)
     int i;
     int j;
 
-    if (value == NULL) {
+    if (value == nullptr) {
         return;
     }
 
-    if (value->view_keys_map != NULL){
+    if (value->view_keys_map != nullptr) {
         for (i = 0; i < value->num_view_keys_map; ++i) {
-            if (value->view_keys_map[i].json_keys != NULL) {
+            if (value->view_keys_map[i].json_keys != nullptr) {
                 for (j = 0; j <value->view_keys_map[i].num_keys; ++j) {
                     cb_free(value->view_keys_map[i].json_keys[j].buf);
                 }

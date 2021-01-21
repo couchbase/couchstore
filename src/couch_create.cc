@@ -511,9 +511,9 @@ public:
     Document(const char* k, int klen, ProgramParameters& params, int dlen)
         : meta(0, 0),
           key_len(klen),
-          key(NULL),
+          key(nullptr),
           data_len(dlen),
-          data(NULL),
+          data(nullptr),
           parameters(params),
           doc_created(0) {
         key = new char[klen];
@@ -647,7 +647,7 @@ public:
             int vb,
             uint64_t& saved_counter,
             ProgramParameters& params_ref)
-        : handle(NULL),
+        : handle(nullptr),
           next_free_doc(0),
           flush_threshold(params_ref.get_keys_per_flush()),
           docs(params_ref.get_keys_per_flush()),

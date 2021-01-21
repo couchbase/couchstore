@@ -85,8 +85,15 @@ static file_merger_error_t merge_view_files(const char *source_files[],
                                             const char *dest_path,
                                             view_file_merge_ctx_t *ctx)
 {
-    return merge_files(source_files, num_source_files, dest_path,
-                       read_view_record, write_view_record, NULL,
-                       compare_view_records, dedup_view_records_merger,
-                       free_view_record, 0, ctx);
+    return merge_files(source_files,
+                       num_source_files,
+                       dest_path,
+                       read_view_record,
+                       write_view_record,
+                       nullptr,
+                       compare_view_records,
+                       dedup_view_records_merger,
+                       free_view_record,
+                       0,
+                       ctx);
 }

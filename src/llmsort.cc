@@ -28,7 +28,7 @@ void *sort_linked_list(void *p, unsigned idx,
 
     memset(&tape, 0, sizeof(struct tape) * 4);
     base = 0;
-    while (p != NULL) {
+    while (p != nullptr) {
         struct record *next = ((struct record *)p)->next[idx];
         ((struct record *)p)->next[idx] = tape[base].first;
         tape[base].first = ((struct record *)p);
@@ -86,9 +86,9 @@ void *sort_linked_list(void *p, unsigned idx,
     }
 
     if (tape[base].count > 1L) {
-        tape[base].last->next[idx] = NULL;
+        tape[base].last->next[idx] = nullptr;
     }
-    if (pcount != NULL) {
+    if (pcount != nullptr) {
         *pcount = tape[base].count;
     }
     return tape[base].first;

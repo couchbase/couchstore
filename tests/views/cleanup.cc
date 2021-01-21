@@ -29,7 +29,7 @@ static void test_view_id_btree_cleanup()
     sized_buf valbuf;
     view_purger_ctx_t purge_ctx;
     view_id_btree_value_t data1;
-    char *data_bin1 = NULL;
+    char* data_bin1 = nullptr;
     size_t data_bin1_size = 0;
     view_id_btree_reduction_t reduction1;
     char reduction_bin1[512];
@@ -43,7 +43,7 @@ static void test_view_id_btree_cleanup()
     data1.partition = 64;
     data1.num_view_keys_map = 1;
     data1.view_keys_map = (view_keys_mapping_t *) cb_malloc(sizeof(view_keys_mapping_t));
-    cb_assert(data1.view_keys_map != NULL);
+    cb_assert(data1.view_keys_map != nullptr);
     data1.view_keys_map[0].view_id = 0;
     data1.view_keys_map[0].num_keys = 1;
     data1.view_keys_map[0].json_keys = (sized_buf *) cb_malloc(sizeof(sized_buf));
@@ -53,7 +53,8 @@ static void test_view_id_btree_cleanup()
     valbuf.buf = data_bin1;
     valbuf.size = data_bin1_size;
 
-    cb_assert(view_id_btree_purge_kv(NULL, &valbuf, &purge_ctx) == PURGE_ITEM);
+    cb_assert(view_id_btree_purge_kv(nullptr, &valbuf, &purge_ctx) ==
+              PURGE_ITEM);
     cb_assert(purge_ctx.count == 1);
     cb_free(data_bin1);
     data1.partition = 32;
@@ -61,7 +62,8 @@ static void test_view_id_btree_cleanup()
     valbuf.buf = data_bin1;
     valbuf.size = data_bin1_size;
     purge_ctx.count = 0;
-    cb_assert(view_id_btree_purge_kv(NULL, &valbuf, &purge_ctx) == PURGE_KEEP);
+    cb_assert(view_id_btree_purge_kv(nullptr, &valbuf, &purge_ctx) ==
+              PURGE_KEEP);
     cb_assert(purge_ctx.count == 0);
     cb_free(data_bin1);
     cb_free(data1.view_keys_map[0].json_keys);
@@ -101,7 +103,7 @@ static void test_view_btree_cleanup()
     sized_buf valbuf;
     view_purger_ctx_t purge_ctx;
     view_btree_value_t value1;
-    char *value_bin1 = NULL;
+    char* value_bin1 = nullptr;
     size_t value_bin1_size = 0;
     view_btree_reduction_t reduction1;
     char reduction_bin1[512];
@@ -124,7 +126,7 @@ static void test_view_btree_cleanup()
     valbuf.buf = value_bin1;
     valbuf.size = value_bin1_size;
 
-    cb_assert(view_btree_purge_kv(NULL, &valbuf, &purge_ctx) == PURGE_ITEM);
+    cb_assert(view_btree_purge_kv(nullptr, &valbuf, &purge_ctx) == PURGE_ITEM);
     cb_assert(purge_ctx.count == 2);
     purge_ctx.count = 0;
     cb_free(value_bin1);
@@ -134,7 +136,7 @@ static void test_view_btree_cleanup()
     valbuf.buf = value_bin1;
     valbuf.size = value_bin1_size;
 
-    cb_assert(view_btree_purge_kv(NULL, &valbuf, &purge_ctx) == PURGE_KEEP);
+    cb_assert(view_btree_purge_kv(nullptr, &valbuf, &purge_ctx) == PURGE_KEEP);
     cb_assert(purge_ctx.count == 0);
     cb_free(value_bin1);
     cb_free(value1.values);

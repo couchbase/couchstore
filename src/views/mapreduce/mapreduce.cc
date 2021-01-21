@@ -235,7 +235,7 @@ static Local<Context> createJsContext()
     global->Set(createUtf8String(isolate, "emit"),
             FunctionTemplate::New(isolate, emit));
 
-    Handle<Context> context = Context::New(isolate, NULL, global);
+    Handle<Context> context = Context::New(isolate, nullptr, global);
     Context::Scope context_scope(context);
 
     Handle<Function> sumFun = compileFunction(SUM_FUNCTION_STRING);
@@ -295,7 +295,7 @@ void mapDoc(mapreduce_ctx_t *ctx,
             mapResult.result.kvs.length = kvs.size();
             size_t sz = sizeof(mapreduce_kv_t) * mapResult.result.kvs.length;
             mapResult.result.kvs.kvs = (mapreduce_kv_t *) cb_malloc(sz);
-            if (mapResult.result.kvs.kvs == NULL) {
+            if (mapResult.result.kvs.kvs == nullptr) {
                 freeKvListEntries(kvs);
                 throw std::bad_alloc();
             }
@@ -315,7 +315,7 @@ void mapDoc(mapreduce_ctx_t *ctx,
             size_t len = exceptString.length();
 
             mapResult.result.error_msg = (char *) cb_malloc(len + 1);
-            if (mapResult.result.error_msg == NULL) {
+            if (mapResult.result.error_msg == nullptr) {
                 throw std::bad_alloc();
             }
             memcpy(mapResult.result.error_msg, exceptString.data(), len);
@@ -587,7 +587,7 @@ static void emit(const FunctionCallbackInfo<Value> &args)
 {
     isolate_data_t *isoData = getIsolateData();
 
-    if (isoData->ctx->kvs == NULL) {
+    if (isoData->ctx->kvs == nullptr) {
         return;
     }
 
@@ -635,16 +635,18 @@ static inline mapreduce_json_t jsonStringify(const Handle<Value> &obj)
         Handle<String> str = Handle<String>::Cast(result);
         jsonResult.length = str->Utf8Length(isoData->ctx->isolate);
         jsonResult.json = (char *) cb_malloc(jsonResult.length);
-        if (jsonResult.json == NULL) {
+        if (jsonResult.json == nullptr) {
             throw std::bad_alloc();
         }
         str->WriteUtf8(isoData->ctx->isolate,
-                       jsonResult.json, jsonResult.length,
-                       NULL, String::NO_NULL_TERMINATION);
+                       jsonResult.json,
+                       jsonResult.length,
+                       nullptr,
+                       String::NO_NULL_TERMINATION);
     } else {
         jsonResult.length = sizeof("null") - 1;
         jsonResult.json = (char *) cb_malloc(jsonResult.length);
-        if (jsonResult.json == NULL) {
+        if (jsonResult.json == nullptr) {
             throw std::bad_alloc();
         }
         memcpy(jsonResult.json, "null", jsonResult.length);
@@ -681,8 +683,8 @@ static inline Handle<Value> jsonParse(const mapreduce_json_t &thing)
 
 static inline void taskStarted(mapreduce_ctx_t *ctx)
 {
-    ctx->taskStartTime = time(NULL);
-    ctx->kvs = NULL;
+    ctx->taskStartTime = time(nullptr);
+    ctx->kvs = nullptr;
 }
 
 

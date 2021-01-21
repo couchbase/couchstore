@@ -36,23 +36,23 @@ static const mapreduce_json_t meta = {const_cast<char*>("{\"id\":\"doc1\"}"),
                                       sizeof("{\"id\":\"doc1\"}") - 1};
 
 static void test_sum_function(void) {
-    void* context = NULL;
-    char* error_msg = NULL;
+    void* context = nullptr;
+    char* error_msg = nullptr;
     mapreduce_error_t ret;
     const char* functions[] = {
             "function(doc, meta) { emit(meta.id, sum(doc.values)); }"};
-    mapreduce_map_result_list_t* result = NULL;
+    mapreduce_map_result_list_t* result = nullptr;
 
     ret = mapreduce_start_map_context(functions, 1, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(error_msg == NULL);
-    cb_assert(context != NULL);
+    cb_assert(error_msg == nullptr);
+    cb_assert(context != nullptr);
 
     ret = mapreduce_map(context, &doc, &meta, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 1);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     cb_assert(result->list[0].error == MAPREDUCE_SUCCESS);
     cb_assert(result->list[0].result.kvs.length == 1);
@@ -72,26 +72,26 @@ static void test_sum_function(void) {
 }
 
 static void test_b64decode_function(void) {
-    void* context = NULL;
-    char* error_msg = NULL;
+    void* context = nullptr;
+    char* error_msg = nullptr;
     mapreduce_error_t ret;
     const char* functions[] = {
             "function(doc, meta) {"
             "  emit(meta.id, String.fromCharCode.apply(this, "
             "decodeBase64(doc.bin)));"
             "}"};
-    mapreduce_map_result_list_t* result = NULL;
+    mapreduce_map_result_list_t* result = nullptr;
 
     ret = mapreduce_start_map_context(functions, 1, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(error_msg == NULL);
-    cb_assert(context != NULL);
+    cb_assert(error_msg == nullptr);
+    cb_assert(context != nullptr);
 
     ret = mapreduce_map(context, &doc, &meta, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 1);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     cb_assert(result->list[0].error == MAPREDUCE_SUCCESS);
     cb_assert(result->list[0].result.kvs.length == 1);
@@ -111,23 +111,23 @@ static void test_b64decode_function(void) {
 }
 
 static void test_date_to_array_function(void) {
-    void* context = NULL;
-    char* error_msg = NULL;
+    void* context = nullptr;
+    char* error_msg = nullptr;
     mapreduce_error_t ret;
     const char* functions[] = {
             "function(doc, meta) { emit(meta.id, dateToArray(doc.date)); }"};
-    mapreduce_map_result_list_t* result = NULL;
+    mapreduce_map_result_list_t* result = nullptr;
 
     ret = mapreduce_start_map_context(functions, 1, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(error_msg == NULL);
-    cb_assert(context != NULL);
+    cb_assert(error_msg == nullptr);
+    cb_assert(context != nullptr);
 
     ret = mapreduce_map(context, &doc, &meta, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 1);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     cb_assert(result->list[0].error == MAPREDUCE_SUCCESS);
     cb_assert(result->list[0].result.kvs.length == 1);

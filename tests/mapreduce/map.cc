@@ -39,8 +39,8 @@ static const mapreduce_json_t meta3 = {const_cast<char*>("{\"id\":\"doc3\"}"),
                                        sizeof("{\"id\":\"doc3\"}") - 1};
 
 static void test_bad_syntax_functions(void) {
-    void* context = NULL;
-    char* error_msg = NULL;
+    void* context = nullptr;
+    char* error_msg = nullptr;
     mapreduce_error_t ret;
     const char* functions[] = {
             "function(doc, meta) { emit(meta.id, null); }",
@@ -48,33 +48,33 @@ static void test_bad_syntax_functions(void) {
 
     ret = mapreduce_start_map_context(functions, 2, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SYNTAX_ERROR);
-    cb_assert(error_msg != NULL);
+    cb_assert(error_msg != nullptr);
     cb_assert(strlen(error_msg) > 0);
-    cb_assert(context == NULL);
+    cb_assert(context == nullptr);
 
     mapreduce_free_error_msg(error_msg);
 }
 
 static void test_runtime_exception(void) {
-    void* context = NULL;
-    char* error_msg = NULL;
+    void* context = nullptr;
+    char* error_msg = nullptr;
     mapreduce_error_t ret;
     const char* functions[] = {"function(doc, meta) { throw('foobar'); }"};
-    mapreduce_map_result_list_t* result = NULL;
+    mapreduce_map_result_list_t* result = nullptr;
 
     ret = mapreduce_start_map_context(functions, 1, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(error_msg == NULL);
-    cb_assert(context != NULL);
+    cb_assert(error_msg == nullptr);
+    cb_assert(context != nullptr);
 
     ret = mapreduce_map(context, &doc1, &meta1, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 1);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     cb_assert(result->list[0].error == MAPREDUCE_RUNTIME_ERROR);
-    cb_assert(result->list[0].result.error_msg != NULL);
+    cb_assert(result->list[0].result.error_msg != nullptr);
 
     cb_assert(strcmp("foobar (line 1:23)", result->list[0].result.error_msg) ==
               0);
@@ -84,26 +84,26 @@ static void test_runtime_exception(void) {
 }
 
 static void test_runtime_error(void) {
-    void* context = NULL;
-    char* error_msg = NULL;
+    void* context = nullptr;
+    char* error_msg = nullptr;
     mapreduce_error_t ret;
     const char* functions[] = {
             "function(doc, meta) { emit(doc.foo.bar, meta.id); }"};
-    mapreduce_map_result_list_t* result = NULL;
+    mapreduce_map_result_list_t* result = nullptr;
 
     ret = mapreduce_start_map_context(functions, 1, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(error_msg == NULL);
-    cb_assert(context != NULL);
+    cb_assert(error_msg == nullptr);
+    cb_assert(context != nullptr);
 
     ret = mapreduce_map(context, &doc1, &meta1, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 1);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     cb_assert(result->list[0].error == MAPREDUCE_RUNTIME_ERROR);
-    cb_assert(result->list[0].result.error_msg != NULL);
+    cb_assert(result->list[0].result.error_msg != nullptr);
     cb_assert(strcmp("TypeError: Cannot read property 'bar' of undefined (line "
                      "1:36)",
                      result->list[0].result.error_msg) == 0);
@@ -113,24 +113,24 @@ static void test_runtime_error(void) {
 }
 
 static void test_map_no_emit(void) {
-    void* context = NULL;
-    char* error_msg = NULL;
+    void* context = nullptr;
+    char* error_msg = nullptr;
     mapreduce_error_t ret;
     const char* functions[] = {"function(doc, meta) { }",
                                "function(doc, meta) { if (doc.value > 12345) { "
                                "emit(meta.id, null); } }"};
-    mapreduce_map_result_list_t* result = NULL;
+    mapreduce_map_result_list_t* result = nullptr;
 
     ret = mapreduce_start_map_context(functions, 2, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(error_msg == NULL);
-    cb_assert(context != NULL);
+    cb_assert(error_msg == nullptr);
+    cb_assert(context != nullptr);
 
     ret = mapreduce_map(context, &doc1, &meta1, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 2);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     cb_assert(result->list[0].error == MAPREDUCE_SUCCESS);
     cb_assert(result->list[0].result.kvs.length == 0);
@@ -143,24 +143,24 @@ static void test_map_no_emit(void) {
 }
 
 static void test_map_single_emit(void) {
-    void* context = NULL;
-    char* error_msg = NULL;
+    void* context = nullptr;
+    char* error_msg = nullptr;
     mapreduce_error_t ret;
     const char* functions[] = {
             "function(doc, meta) { emit(meta.id, doc.value); }",
             "function(doc, meta) { emit(doc.value, meta.id); }"};
-    mapreduce_map_result_list_t* result = NULL;
+    mapreduce_map_result_list_t* result = nullptr;
 
     ret = mapreduce_start_map_context(functions, 2, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(error_msg == NULL);
-    cb_assert(context != NULL);
+    cb_assert(error_msg == nullptr);
+    cb_assert(context != nullptr);
 
     ret = mapreduce_map(context, &doc1, &meta1, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 2);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     cb_assert(result->list[0].error == MAPREDUCE_SUCCESS);
     cb_assert(result->list[0].result.kvs.length == 1);
@@ -192,9 +192,9 @@ static void test_map_single_emit(void) {
 
     ret = mapreduce_map(context, &doc2, &meta2, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 2);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     cb_assert(result->list[0].error == MAPREDUCE_SUCCESS);
     cb_assert(result->list[0].result.kvs.length == 1);
@@ -228,8 +228,8 @@ static void test_map_single_emit(void) {
 }
 
 static void test_map_multiple_emits(void) {
-    void* context = NULL;
-    char* error_msg = NULL;
+    void* context = nullptr;
+    char* error_msg = nullptr;
     mapreduce_error_t ret;
     const char* functions[] = {
             "function(doc, meta) {\n"
@@ -245,19 +245,19 @@ static void test_map_multiple_emits(void) {
             "  if (doc.value != 3) { emit(doc.value, 0); } else { "
             "emit(meta.id, doc.value.f.z); }\n"
             "}\n"};
-    mapreduce_map_result_list_t* result = NULL;
+    mapreduce_map_result_list_t* result = nullptr;
 
     ret = mapreduce_start_map_context(functions, 3, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(error_msg == NULL);
-    cb_assert(context != NULL);
+    cb_assert(error_msg == nullptr);
+    cb_assert(context != nullptr);
 
     /* map doc1 */
     ret = mapreduce_map(context, &doc1, &meta1, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 3);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     /* function 1 */
     cb_assert(result->list[0].error == MAPREDUCE_SUCCESS);
@@ -326,13 +326,13 @@ static void test_map_multiple_emits(void) {
     /* map doc2 */
     ret = mapreduce_map(context, &doc2, &meta2, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 3);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     /* function 1 */
     cb_assert(result->list[0].error == MAPREDUCE_RUNTIME_ERROR);
-    cb_assert(result->list[0].result.error_msg != NULL);
+    cb_assert(result->list[0].result.error_msg != nullptr);
     cb_assert(strcmp("foobar (line 2:24)", result->list[0].result.error_msg) ==
               0);
 
@@ -389,13 +389,13 @@ static void test_map_multiple_emits(void) {
     /* map doc3 */
     ret = mapreduce_map(context, &doc3, &meta3, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 3);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     /* function 1 */
     cb_assert(result->list[0].error == MAPREDUCE_RUNTIME_ERROR);
-    cb_assert(result->list[0].result.error_msg != NULL);
+    cb_assert(result->list[0].result.error_msg != nullptr);
     cb_assert(strcmp("foobar (line 2:24)", result->list[0].result.error_msg) ==
               0);
 
@@ -435,7 +435,7 @@ static void test_map_multiple_emits(void) {
 
     /* function 3 */
     cb_assert(result->list[2].error == MAPREDUCE_RUNTIME_ERROR);
-    cb_assert(result->list[2].result.error_msg != NULL);
+    cb_assert(result->list[2].result.error_msg != nullptr);
     cb_assert(strcmp("TypeError: Cannot read property 'z' of undefined (line "
                      "2:79)",
                      result->list[2].result.error_msg) == 0);
@@ -446,8 +446,8 @@ static void test_map_multiple_emits(void) {
 }
 
 static void test_timeout(void) {
-    void* context = NULL;
-    char* error_msg = NULL;
+    void* context = nullptr;
+    char* error_msg = nullptr;
     mapreduce_error_t ret;
     const char* functions[] = {
             "function(doc, meta) {"
@@ -457,22 +457,22 @@ static void test_timeout(void) {
             "    emit(meta.id, doc.value);"
             "  }"
             "}"};
-    mapreduce_map_result_list_t* result = NULL;
+    mapreduce_map_result_list_t* result = nullptr;
 
     ret = mapreduce_start_map_context(functions, 1, &context, &error_msg);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(error_msg == NULL);
-    cb_assert(context != NULL);
+    cb_assert(error_msg == nullptr);
+    cb_assert(context != nullptr);
 
     ret = mapreduce_map(context, &doc1, &meta1, &result);
     cb_assert(ret == MAPREDUCE_TIMEOUT);
-    cb_assert(result == NULL);
+    cb_assert(result == nullptr);
 
     ret = mapreduce_map(context, &doc2, &meta2, &result);
     cb_assert(ret == MAPREDUCE_SUCCESS);
-    cb_assert(result != NULL);
+    cb_assert(result != nullptr);
     cb_assert(result->length == 1);
-    cb_assert(result->list != NULL);
+    cb_assert(result->list != nullptr);
 
     cb_assert(result->list[0].error == MAPREDUCE_SUCCESS);
     cb_assert(result->list[0].result.kvs.length == 1);

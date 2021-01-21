@@ -62,8 +62,8 @@ static couchstore_error_t maybe_flush_spatial(couchfile_modify_result *mr)
 static nodelist *make_nodelist(arena* a, size_t bufsize)
 {
     nodelist *r = (nodelist *) arena_alloc(a, sizeof(nodelist) + bufsize);
-    if (r == NULL) {
-        return NULL;
+    if (r == nullptr) {
+        return nullptr;
     }
     memset(r, 0, sizeof(nodelist));
     r->data.size = bufsize;
@@ -76,22 +76,22 @@ static couchfile_modify_result *spatial_make_modres(arena* a,
 {
     couchfile_modify_result *res = (couchfile_modify_result *) arena_alloc(
         a, sizeof(couchfile_modify_result));
-    if (res == NULL) {
-        return NULL;
+    if (res == nullptr) {
+        return nullptr;
     }
     res->rq = rq;
     res->arena = a;
-    res->arena_transient = NULL;
+    res->arena_transient = nullptr;
     res->values = make_nodelist(a, 0);
-    if (res->values == NULL) {
-        return NULL;
+    if (res->values == nullptr) {
+        return nullptr;
     }
     res->values_end = res->values;
     res->node_len = 0;
     res->count = 0;
     res->pointers = make_nodelist(a, 0);
-    if (res->pointers == NULL) {
-        return NULL;
+    if (res->pointers == nullptr) {
+        return nullptr;
     }
     res->pointers_end = res->pointers;
     res->modified = 0;
@@ -104,20 +104,19 @@ couchstore_error_t spatial_push_item(sized_buf *k,
                                      sized_buf *v,
                                      couchfile_modify_result *dst)
 {
-    nodelist *itm = NULL;
-    if(dst->arena_transient != NULL)
-    {
+    nodelist* itm = nullptr;
+    if (dst->arena_transient != nullptr) {
         itm = make_nodelist(dst->arena_transient, 0);
     } else {
-        cb_assert(dst->arena != NULL);
+        cb_assert(dst->arena != nullptr);
         itm = make_nodelist(dst->arena, 0);
     }
-    if (itm == NULL) {
+    if (itm == nullptr) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
     itm->data = *v;
     itm->key = *k;
-    itm->pointer = NULL;
+    itm->pointer = nullptr;
     dst->values_end->next = itm;
     dst->values_end = itm;
     /* Encoded size (see flush_spatial) */
@@ -131,8 +130,8 @@ static nodelist *encode_pointer(arena* a, node_pointer *ptr)
     raw_node_pointer *raw;
     nodelist *pel = make_nodelist(
         a, sizeof(raw_node_pointer) + ptr->reduce_value.size);
-    if (pel == NULL) {
-        return NULL;
+    if (pel == nullptr) {
+        return nullptr;
     }
     raw = (raw_node_pointer*)pel->data.buf;
     encode_raw48(ptr->pointer, &raw->pointer);
@@ -159,7 +158,7 @@ static couchstore_error_t flush_spatial_partial(couchfile_modify_result *res,
     char *dst;
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
     int itmcount = 0;
-    char *nodebuf = NULL;
+    char* nodebuf = nullptr;
     sized_buf writebuf;
     char reducebuf[MAX_REDUCTION_SIZE];
     size_t reducesize = 0;
@@ -177,7 +176,7 @@ static couchstore_error_t flush_spatial_partial(couchfile_modify_result *res,
     /* nodebuf/writebuf is very short-lived and can be large, so use regular
      * malloc heap for it: */
     nodebuf = (char *) cb_malloc(res->node_len + 1);
-    if (nodebuf == NULL) {
+    if (nodebuf == nullptr) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
 
@@ -189,7 +188,7 @@ static couchstore_error_t flush_spatial_partial(couchfile_modify_result *res,
     i = res->values->next;
     /* We don't care that we've reached mr_quota if we haven't written out
      * at least two items and we're not writing a leaf node. */
-    while (i != NULL &&
+    while (i != nullptr &&
            (mr_quota > 0 || (itmcount < 2 && res->node_type == KP_NODE))) {
         dst = (char *) write_kv(dst, i->key, i->data);
         if (i->pointer) {
@@ -234,7 +233,7 @@ static couchstore_error_t flush_spatial_partial(couchfile_modify_result *res,
     /* `reducesize` one time for the key, one time for the actual reduce */
     ptr = (node_pointer *) arena_alloc(
         res->arena, sizeof(node_pointer) + 2 * reducesize);
-    if (ptr == NULL) {
+    if (ptr == nullptr) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
 
@@ -254,7 +253,7 @@ static couchstore_error_t flush_spatial_partial(couchfile_modify_result *res,
     ptr->pointer = diskpos;
 
     pel = encode_pointer(res->arena, ptr);
-    if (pel == NULL) {
+    if (pel == nullptr) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
 
@@ -264,7 +263,7 @@ static couchstore_error_t flush_spatial_partial(couchfile_modify_result *res,
     res->node_len -= (writebuf.size - 1);
 
     res->values->next = i;
-    if(i == NULL) {
+    if (i == nullptr) {
         res->values_end = res->values;
     }
 
@@ -284,13 +283,13 @@ static couchstore_error_t spatial_move_pointers(couchfile_modify_result *src,
 
     ptr = src->pointers->next;
     next = ptr;
-    while (ptr != NULL && errcode == 0) {
+    while (ptr != nullptr && errcode == 0) {
         dst->node_len += ptr->data.size + ptr->key.size +
                 sizeof(raw_kv_length);
         dst->count++;
 
         next = ptr->next;
-        ptr->next = NULL;
+        ptr->next = nullptr;
 
         dst->values_end->next = ptr;
         dst->values_end = ptr;
@@ -309,11 +308,11 @@ static node_pointer *spatial_finish_root(couchfile_modify_request *rq,
                                  couchfile_modify_result *root_result,
                                  couchstore_error_t *errcode)
 {
-    node_pointer *ret_ptr = NULL;
+    node_pointer* ret_ptr = nullptr;
     couchfile_modify_result *collector = spatial_make_modres(root_result->arena, rq);
-    if (collector == NULL) {
+    if (collector == nullptr) {
         *errcode = COUCHSTORE_ERROR_ALLOC_FAIL;
-        return NULL;
+        return nullptr;
     }
     collector->modified = 1;
     collector->node_type = KP_NODE;
@@ -332,12 +331,12 @@ static node_pointer *spatial_finish_root(couchfile_modify_request *rq,
             *errcode = spatial_move_pointers(root_result, collector);
 
             if (*errcode < 0) {
-                return NULL;
+                return nullptr;
             }
 
             *errcode = flush_spatial(collector);
             if (*errcode < 0) {
-                return NULL;
+                return nullptr;
             }
             /* Swap root_result and collector mr's. */
             tmp = root_result;
@@ -359,20 +358,20 @@ node_pointer* complete_new_spatial(couchfile_modify_result* mr,
 
     *errcode = flush_spatial(mr);
     if(*errcode != COUCHSTORE_SUCCESS) {
-        return NULL;
+        return nullptr;
     }
 
     targ_mr = spatial_make_modres(mr->arena, mr->rq);
-    if (targ_mr == NULL) {
+    if (targ_mr == nullptr) {
         *errcode = COUCHSTORE_ERROR_ALLOC_FAIL;
-        return NULL;
+        return nullptr;
     }
     targ_mr->modified = 1;
     targ_mr->node_type = KP_NODE;
 
     *errcode = spatial_move_pointers(mr, targ_mr);
     if(*errcode != COUCHSTORE_SUCCESS) {
-        return NULL;
+        return nullptr;
     }
 
     if(targ_mr->count > 1 || targ_mr->pointers != targ_mr->pointers_end) {
@@ -381,12 +380,12 @@ node_pointer* complete_new_spatial(couchfile_modify_result* mr,
         ret_ptr = targ_mr->values_end->pointer;
     }
 
-    if (*errcode != COUCHSTORE_SUCCESS || ret_ptr == NULL) {
-        return NULL;
+    if (*errcode != COUCHSTORE_SUCCESS || ret_ptr == nullptr) {
+        return nullptr;
     }
 
     ret_ptr = copy_node_pointer(ret_ptr);
-    if (ret_ptr == NULL) {
+    if (ret_ptr == nullptr) {
         *errcode = COUCHSTORE_ERROR_ALLOC_FAIL;
     }
     return ret_ptr;

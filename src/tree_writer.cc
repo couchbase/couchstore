@@ -103,18 +103,19 @@ cleanup:
 couchstore_error_t TreeWriterSort(TreeWriter* writer)
 {
     rewind(writer->file);
-    return static_cast<couchstore_error_t>(merge_sort(writer->file,
-                                                      writer->file,
-                                                      writer->tmp_path,
-                                                      read_id_record,
-                                                      write_id_record,
-                                                      compare_id_record,
-                                                      alloc_record,
-                                                      duplicate_record,
-                                                      free_record,
-                                                      writer,  // 'context' parameter to the above callbacks
-                                                      ID_SORT_CHUNK_SIZE,
-                                                      NULL));
+    return static_cast<couchstore_error_t>(
+            merge_sort(writer->file,
+                       writer->file,
+                       writer->tmp_path,
+                       read_id_record,
+                       write_id_record,
+                       compare_id_record,
+                       alloc_record,
+                       duplicate_record,
+                       free_record,
+                       writer, // 'context' parameter to the above callbacks
+                       ID_SORT_CHUNK_SIZE,
+                       nullptr));
 }
 
 
@@ -147,7 +148,7 @@ couchstore_error_t TreeWriterWrite(TreeWriter* writer,
                                  writer->user_reduce_ctx,
                                  treefile->options.kv_nodesize,
                                  treefile->options.kp_nodesize);
-    if (target_mr == NULL) {
+    if (target_mr == nullptr) {
         error_pass(COUCHSTORE_ERROR_ALLOC_FAIL);
     }
 
@@ -274,7 +275,7 @@ static char *duplicate_record(char *rec)
     size_t record_size = sizeof(extsort_record) + record->k.size + record->v.size;
     extsort_record *new_record = (extsort_record *) cb_malloc(record_size);
 
-    if (new_record != NULL) {
+    if (new_record != nullptr) {
         memcpy(new_record, record, record_size);
     }
 

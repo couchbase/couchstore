@@ -36,7 +36,7 @@ static couchstore_error_t btree_lookup_inner(couchfile_lookup_request *rq,
     }
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
 
-    char *nodebuf = NULL;
+    char* nodebuf = nullptr;
 
     {
         ScopedFileTag tag(rq->file->ops, rq->file->handle, FileTag::BTree);
@@ -84,7 +84,7 @@ static couchstore_error_t btree_lookup_inner(couchfile_lookup_request *rq,
                     current = last_item;
                 }
                 if(rq->node_callback) {
-                    error_pass(rq->node_callback(rq, 0, NULL));
+                    error_pass(rq->node_callback(rq, 0, nullptr));
                 }
             }
         }
@@ -121,8 +121,8 @@ static couchstore_error_t btree_lookup_inner(couchfile_lookup_request *rq,
                 if (cmp_val == 0 || rq->in_fold) { // Found
                     errcode_local = rq->fetch_callback(rq, &cmp_key, &val_buf);
                 } else {
-                    errcode_local = rq->fetch_callback(
-                            rq, rq->keys[current], NULL);
+                    errcode_local =
+                            rq->fetch_callback(rq, rq->keys[current], nullptr);
                 }
 
                 if (rq->tolerate_corruption) {
@@ -145,7 +145,7 @@ static couchstore_error_t btree_lookup_inner(couchfile_lookup_request *rq,
 
     //Any remaining items are not found.
     while (current < end && !rq->fold) {
-        error_pass(rq->fetch_callback(rq, rq->keys[current], NULL));
+        error_pass(rq->fetch_callback(rq, rq->keys[current], nullptr));
         current++;
     }
 

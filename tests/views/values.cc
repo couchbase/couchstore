@@ -25,10 +25,10 @@ static view_btree_value_t test_view_btree_value_decoding(const char* value_bin,
 static view_id_btree_value_t *test_view_id_btree_value_decoding(const char *id_btree_value_bin,
                                                                 size_t len)
 {
-    view_id_btree_value_t *v = NULL;
+    view_id_btree_value_t* v = nullptr;
 
     cb_assert(decode_view_id_btree_value(id_btree_value_bin, len, &v) == COUCHSTORE_SUCCESS);
-    cb_assert(v != NULL);
+    cb_assert(v != nullptr);
 
     cb_assert(v->partition == 67);
     cb_assert(v->num_view_keys_map == 2);
@@ -86,13 +86,13 @@ void test_values()
     };
     view_id_btree_value_t *id_btree_v;
     view_id_btree_value_t *id_btree_v2;
-    char *v_bin2 = NULL;
+    char* v_bin2 = nullptr;
     size_t v_bin2_size = 0;
-    char *id_btree_v_bin2 = NULL;
+    char* id_btree_v_bin2 = nullptr;
     size_t id_btree_v_bin2_size = 0;
-    char *v_bin3 = NULL;
+    char* v_bin3 = nullptr;
     size_t v_bin3_size = 0;
-    char *id_btree_v_bin3 = NULL;
+    char* id_btree_v_bin3 = nullptr;
     size_t id_btree_v_bin3_size = 0;
 
     fprintf(stderr, "Decoding a view btree value ...\n");

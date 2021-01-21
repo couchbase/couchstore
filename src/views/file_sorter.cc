@@ -40,7 +40,7 @@ file_sorter_error_t sort_view_kvs_ops_file(const char *file_path,
     ctx.key_cmp_fun = view_key_cmp;
     ctx.type = INCREMENTAL_UPDATE_VIEW_RECORD;
 
-    return do_sort_file(file_path, tmp_dir, NULL, 0, &ctx);
+    return do_sort_file(file_path, tmp_dir, nullptr, 0, &ctx);
 }
 
 file_sorter_error_t sort_view_kvs_file(const char *file_path,
@@ -65,7 +65,7 @@ file_sorter_error_t sort_view_ids_ops_file(const char *file_path,
     ctx.key_cmp_fun = view_id_cmp;
     ctx.type = INCREMENTAL_UPDATE_VIEW_RECORD;
 
-    return do_sort_file(file_path, tmp_dir, NULL, 0, &ctx);
+    return do_sort_file(file_path, tmp_dir, nullptr, 0, &ctx);
 }
 
 file_sorter_error_t sort_view_ids_file(const char *file_path,
@@ -103,7 +103,7 @@ file_sorter_error_t sort_spatial_kvs_ops_file(const char *file_path,
                                               const char *tmp_dir,
                                               view_file_merge_ctx_t *ctx)
 {
-    return do_sort_file(file_path, tmp_dir, NULL, 0, ctx);
+    return do_sort_file(file_path, tmp_dir, nullptr, 0, ctx);
 }
 
 

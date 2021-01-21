@@ -34,15 +34,15 @@
 
 int main(int argc, char *argv[])
 {
-    view_group_info_t *group_info = NULL;
+    view_group_info_t* group_info = nullptr;
     char buf[BUF_SIZE];
-    char **source_files = NULL;
-    char *dest_file = NULL;
-    char *tmp_dir = NULL;
+    char** source_files = nullptr;
+    char* dest_file = nullptr;
+    char* tmp_dir = nullptr;
     int i;
     int ret = 2;
     uint64_t header_pos;
-    view_error_t error_info = {NULL, NULL, "GENERIC"};
+    view_error_t error_info = {nullptr, nullptr, "GENERIC"};
     cb_thread_t exit_thread;
 
     (void) argc;
@@ -52,8 +52,8 @@ int main(int argc, char *argv[])
      * Disable buffering for stdout/stderr since index builder messages
      * needs to be immediately available at erlang side
      */
-    setvbuf(stdout, (char *) NULL, _IONBF, 0);
-    setvbuf(stderr, (char *) NULL, _IONBF, 0);
+    setvbuf(stdout, (char*)nullptr, _IONBF, 0);
+    setvbuf(stderr, (char*)nullptr, _IONBF, 0);
 
     if (set_binary_mode() < 0) {
         fprintf(stderr, "Error setting binary mode\n");
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
     }
 
     group_info = couchstore_read_view_group_info(stdin, stderr);
-    if (group_info == NULL) {
+    if (group_info == nullptr) {
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;
         goto out;
     }
@@ -73,14 +73,14 @@ int main(int argc, char *argv[])
     }
 
     tmp_dir = cb_strdup(buf);
-    if (tmp_dir == NULL) {
+    if (tmp_dir == nullptr) {
         fprintf(stderr, "Memory allocation failure\n");
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;
         goto out;
     }
 
     source_files = (char **) cb_calloc(group_info->num_btrees + 1, sizeof(char *));
-    if (source_files == NULL) {
+    if (source_files == nullptr) {
         fprintf(stderr, "Memory allocation failure\n");
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;
         goto out;
@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
     }
 
     dest_file = cb_strdup(buf);
-    if (dest_file == NULL) {
+    if (dest_file == nullptr) {
         fprintf(stderr, "Memory allocation failure\n");
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;
         goto out;
@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
         }
 
         source_files[i] = cb_strdup(buf);
-        if (source_files[i] == NULL) {
+        if (source_files[i] == nullptr) {
             fprintf(stderr, "Memory allocation failure\n");
             ret = COUCHSTORE_ERROR_ALLOC_FAIL;
             goto out;
@@ -136,7 +136,8 @@ int main(int argc, char *argv[])
 
     mapreduce_deinit();
     if (ret != COUCHSTORE_SUCCESS) {
-        if (error_info.error_msg != NULL && error_info.view_name != NULL) {
+        if (error_info.error_msg != nullptr &&
+            error_info.view_name != nullptr) {
             fprintf(stderr,
                     "%s Error building index for view `%s`, reason: %s\n",
                     error_info.idx_type,
@@ -147,7 +148,7 @@ int main(int argc, char *argv[])
     }
 
 out:
-    if (source_files != NULL) {
+    if (source_files != nullptr) {
         for (i = 0; i <= group_info->num_btrees; ++i) {
             cb_free(source_files[i]);
         }

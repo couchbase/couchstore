@@ -80,7 +80,7 @@ int view_id_btree_purge_kp(const node_pointer *ptr, void *ctx)
     int action;
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
     view_purger_ctx_t *purge_ctx = (view_purger_ctx_t *) ctx;
-    view_id_btree_reduction_t *r = NULL;
+    view_id_btree_reduction_t* r = nullptr;
 
     errcode = decode_view_id_btree_reduction(ptr->reduce_value.buf, &r);
     if (errcode != COUCHSTORE_SUCCESS) {

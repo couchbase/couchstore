@@ -35,7 +35,7 @@ static int read_record(FILE* f, void** buffer, void* ctx) {
     int* rec = (int*)cb_malloc(sizeof(int));
     (void)ctx;
 
-    if (rec == NULL) {
+    if (rec == nullptr) {
         return FILE_MERGER_ERROR_ALLOC;
     }
 
@@ -77,30 +77,30 @@ static void free_record(void* rec, void* ctx) {
 
 static unsigned long check_file_sorted(const char* file_path) {
     FILE* f;
-    void *a = NULL, *b;
+    void *a = nullptr, *b;
     int record_size;
     unsigned long num_records = 0;
 
     f = fopen(file_path, "rb");
-    cb_assert(f != NULL);
+    cb_assert(f != nullptr);
 
-    record_size = read_record(f, &a, NULL);
+    record_size = read_record(f, &a, nullptr);
     cb_assert(record_size > 0);
     num_records += 1;
 
     while (record_size > 0) {
-        record_size = read_record(f, &b, NULL);
+        record_size = read_record(f, &b, nullptr);
         cb_assert(record_size >= 0);
 
         if (record_size > 0) {
             num_records += 1;
-            cb_assert(compare_records(a, b, NULL) < 0);
-            free_record(a, NULL);
+            cb_assert(compare_records(a, b, nullptr) < 0);
+            free_record(a, nullptr);
             a = b;
         }
     }
 
-    free_record(a, NULL);
+    free_record(a, nullptr);
     fclose(f);
 
     return num_records;
@@ -135,7 +135,7 @@ int main() {
 
         remove(source_files[i]);
         f = fopen(source_files[i], "ab");
-        cb_assert(f != NULL);
+        cb_assert(f != nullptr);
 
         for (j = 0; j < MAX_RECORDS_PER_FILE; ++j) {
             if (batches[i][j] == 0) {
@@ -157,12 +157,12 @@ int main() {
                       dest_file.c_str(),
                       read_record,
                       write_record,
-                      NULL,
+                      nullptr,
                       compare_records,
-                      NULL,
+                      nullptr,
                       free_record,
                       0,
-                      NULL);
+                      nullptr);
 
     cb_assert(ret == FILE_MERGER_SUCCESS);
     cb_assert(check_file_sorted(dest_file.c_str()) == num_records);

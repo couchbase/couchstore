@@ -42,9 +42,9 @@ typedef struct {
 void* sorted_list_create(sorted_list_cmp_t cmp_fun) {
     sorted_list_t* list = (sorted_list_t*)cb_malloc(sizeof(sorted_list_t));
 
-    if (list != NULL) {
+    if (list != nullptr) {
         list->cmp_fun = cmp_fun;
-        list->head = NULL;
+        list->head = nullptr;
         list->length = 0;
     }
 
@@ -54,29 +54,29 @@ void* sorted_list_create(sorted_list_cmp_t cmp_fun) {
 int sorted_list_add(void* list, const void* elem, size_t elem_size) {
     sorted_list_t* l = (sorted_list_t*)list;
     sorted_list_node_t* n = l->head;
-    sorted_list_node_t* prev = NULL;
+    sorted_list_node_t* prev = nullptr;
     sorted_list_node_t* new_node;
     int cmp = 0;
 
     new_node = (sorted_list_node_t*)cb_malloc(sizeof(sorted_list_node_t));
-    if (new_node == NULL) {
+    if (new_node == nullptr) {
         return -1;
     }
     new_node->element = cb_malloc(elem_size);
-    if (new_node->element == NULL) {
+    if (new_node->element == nullptr) {
         cb_free(new_node);
         return -1;
     }
     memcpy(new_node->element, elem, elem_size);
 
-    if (l->head == NULL) {
-        new_node->next = NULL;
+    if (l->head == nullptr) {
+        new_node->next = nullptr;
         l->head = new_node;
         l->length += 1;
         return 0;
     }
 
-    while (n != NULL) {
+    while (n != nullptr) {
         cmp = l->cmp_fun(n->element, elem);
         if (cmp >= 0) {
             break;
@@ -85,7 +85,7 @@ int sorted_list_add(void* list, const void* elem, size_t elem_size) {
         n = n->next;
     }
 
-    if (prev != NULL) {
+    if (prev != nullptr) {
         prev->next = new_node;
     } else {
         l->head = new_node;
@@ -108,12 +108,12 @@ void* sorted_list_get(const void* list, const void* elem) {
     sorted_list_node_t* n = l->head;
     int cmp;
 
-    while (n != NULL) {
+    while (n != nullptr) {
         cmp = l->cmp_fun(n->element, elem);
         if (cmp == 0) {
             return n->element;
         } else if (cmp > 0) {
-            return NULL;
+            return nullptr;
         } else {
             n = n->next;
         }
@@ -125,13 +125,13 @@ void* sorted_list_get(const void* list, const void* elem) {
 void sorted_list_remove(void* list, const void* elem) {
     sorted_list_t* l = (sorted_list_t*)list;
     sorted_list_node_t* n = l->head;
-    sorted_list_node_t* prev = NULL;
+    sorted_list_node_t* prev = nullptr;
     int cmp;
 
-    while (n != NULL) {
+    while (n != nullptr) {
         cmp = l->cmp_fun(n->element, elem);
         if (cmp == 0) {
-            if (prev == NULL) {
+            if (prev == nullptr) {
                 cb_assert(n == l->head);
                 l->head = n->next;
             } else {
@@ -152,10 +152,10 @@ void sorted_list_remove(void* list, const void* elem) {
 
 void sorted_list_free(void* list) {
     sorted_list_t* l = (sorted_list_t*)list;
-    sorted_list_node_t* n = NULL;
+    sorted_list_node_t* n = nullptr;
 
-    if (l != NULL) {
-        while (l->head != NULL) {
+    if (l != nullptr) {
+        while (l->head != nullptr) {
             n = l->head;
             l->head = l->head->next;
             cb_free(n->element);
@@ -173,10 +173,10 @@ int sorted_list_size(const void* list) {
 
 void* sorted_list_iterator(const void* list) {
     const sorted_list_t* l = (const sorted_list_t*)list;
-    sorted_list_iterator_t* it = NULL;
+    sorted_list_iterator_t* it = nullptr;
 
     it = (sorted_list_iterator_t*)cb_malloc(sizeof(*it));
-    if (it != NULL) {
+    if (it != nullptr) {
         it->current = l->head;
     }
 
@@ -185,9 +185,9 @@ void* sorted_list_iterator(const void* list) {
 
 void* sorted_list_next(void* iterator) {
     sorted_list_iterator_t* it = (sorted_list_iterator_t*)iterator;
-    void* elem = NULL;
+    void* elem = nullptr;
 
-    if (it->current != NULL) {
+    if (it->current != nullptr) {
         elem = it->current->element;
         it->current = it->current->next;
     }

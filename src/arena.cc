@@ -59,7 +59,7 @@ static void* add_chunk(arena* a, size_t size)
     arena_chunk* chunk;
     chunk = static_cast<arena_chunk*>(cb_malloc(sizeof(arena_chunk) + chunk_size));
     if (!chunk) {
-        return NULL;
+        return nullptr;
     }
     chunk->prev_chunk = a->cur_chunk;
     chunk->size = chunk_size;
@@ -168,10 +168,11 @@ void arena_free_from_mark(arena *a, const arena_position *mark)
         cb_free(chunk);
         chunk = a->cur_chunk;
     }
-    cb_assert(chunk != NULL || mark == NULL);   // If this fails, mark was bogus
+    cb_assert(chunk != nullptr ||
+              mark == nullptr); // If this fails, mark was bogus
 
     a->next_block = static_cast<char*>((void*)mark);
-    a->end = static_cast<char*>(chunk ? chunk_end(chunk) : NULL);
+    a->end = static_cast<char*>(chunk ? chunk_end(chunk) : nullptr);
 #ifdef DEBUG
     memset(a->next_block, 0x55, (char*)a->end - (char*)a->next_block);
     // TODO: Somehow roll back blocks_allocated and bytes_allocated (how?)
@@ -180,5 +181,5 @@ void arena_free_from_mark(arena *a, const arena_position *mark)
 
 void arena_free_all(arena *a)
 {
-    arena_free_from_mark(a, NULL);
+    arena_free_from_mark(a, nullptr);
 }

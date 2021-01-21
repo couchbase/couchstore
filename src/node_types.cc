@@ -39,7 +39,7 @@ void* write_kv(void *buf, sized_buf key, sized_buf value)
 node_pointer *read_root(void *buf, int size)
 {
     if (size == 0) {
-        return NULL;
+        return nullptr;
     }
 
     raw_btree_root *raw = (raw_btree_root*)buf;
@@ -52,9 +52,9 @@ node_pointer *read_root(void *buf, int size)
     if (redsize > 0) {
         buf = (char *) memcpy(ptr + 1, raw + 1, redsize);
     } else {
-        buf = NULL;
+        buf = nullptr;
     }
-    ptr->key.buf = NULL;
+    ptr->key.buf = nullptr;
     ptr->key.size = 0;
     ptr->pointer = position;
     ptr->subtreesize = subtreesize;

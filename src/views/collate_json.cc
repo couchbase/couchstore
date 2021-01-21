@@ -254,7 +254,7 @@ static int convertUTF8toUChar(const char *src, UChar *dst, int len)
 
 icu_conv:
     status = U_ZERO_ERROR;
-    ucnv_toUnicode(cnv.get(), &p, p + len, &s, s + len, NULL, TRUE, &status);
+    ucnv_toUnicode(cnv.get(), &p, p + len, &s, s + len, nullptr, TRUE, &status);
 
     if (U_FAILURE(status)) {
         return -1;
@@ -295,7 +295,7 @@ static int compareUnicode(const char* str1, size_t len1,
 
     b1 = new UChar[len1 * sizeof(UChar)];
     b2 = new UChar[len2 * sizeof(UChar)];
-    if (b1 == NULL || b2 == NULL) {
+    if (b1 == nullptr || b2 == nullptr) {
         delete[] b1;
         delete[] b2;
         fprintf(stderr, "CouchStore CollateJSON: Couldn't allocate memory\n");

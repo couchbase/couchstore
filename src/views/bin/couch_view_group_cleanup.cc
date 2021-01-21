@@ -34,11 +34,11 @@
 
 int main(int argc, char *argv[])
 {
-    view_group_info_t *group_info = NULL;
+    view_group_info_t* group_info = nullptr;
     uint64_t purge_count;
     int ret = 2;
     uint64_t header_pos;
-    view_error_t error_info = {NULL, NULL, NULL};
+    view_error_t error_info = {nullptr, nullptr, nullptr};
     cb_thread_t exit_thread;
 
     (void) argc;
@@ -47,8 +47,8 @@ int main(int argc, char *argv[])
     /*
      * Disable buffering for stdout/stderr
      */
-    setvbuf(stdout, (char *) NULL, _IONBF, 0);
-    setvbuf(stderr, (char *) NULL, _IONBF, 0);
+    setvbuf(stdout, (char*)nullptr, _IONBF, 0);
+    setvbuf(stderr, (char*)nullptr, _IONBF, 0);
 
     if (set_binary_mode() < 0) {
         fprintf(stderr, "Error setting binary mode\n");
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
     }
 
     group_info = couchstore_read_view_group_info(stdin, stderr);
-    if (group_info == NULL) {
+    if (group_info == nullptr) {
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;
         goto out;
     }
@@ -75,7 +75,8 @@ int main(int argc, char *argv[])
     mapreduce_deinit();
 
     if (ret != COUCHSTORE_SUCCESS) {
-        if (error_info.error_msg != NULL && error_info.view_name != NULL) {
+        if (error_info.error_msg != nullptr &&
+            error_info.view_name != nullptr) {
             fprintf(stderr,
                     "Error cleaning up index for view `%s`, reason: %s\n",
                     error_info.view_name,

@@ -40,11 +40,8 @@ typedef enum {
     VIEW_REDUCER_ERROR_BAD_STATS_OBJECT = 2
 } builtin_reducer_error_t;
 
-static const char *builtin_reducer_error_msg[] = {
-    NULL,
-    "Value is not a number",
-    "Invalid _stats JSON object"
-};
+static const char* builtin_reducer_error_msg[] = {
+        nullptr, "Value is not a number", "Invalid _stats JSON object"};
 
 typedef struct {
     void  *parent_ctx;
@@ -190,7 +187,7 @@ static couchstore_error_t builtin_sum_reducer(const mapreduce_json_list_t *keys,
             reducer_private_t *priv = (reducer_private_t *) ctx->parent_ctx;
 
             priv->builtin_error = VIEW_REDUCER_ERROR_NOT_A_NUMBER;
-            if (keys == NULL) {
+            if (keys == nullptr) {
                 /* rereduce */
                 return COUCHSTORE_ERROR_REDUCER_FAILURE;
             } else {
@@ -198,7 +195,7 @@ static couchstore_error_t builtin_sum_reducer(const mapreduce_json_list_t *keys,
                 mapreduce_json_t *key = &keys->values[i];
                 char *error_key = (char *) cb_malloc(key->length + 1);
 
-                if (error_key == NULL) {
+                if (error_key == nullptr) {
                     return COUCHSTORE_ERROR_ALLOC_FAIL;
                 }
                 memcpy(error_key, key->json, key->length);
@@ -213,7 +210,7 @@ static couchstore_error_t builtin_sum_reducer(const mapreduce_json_list_t *keys,
     size = sprintf(red, DOUBLE_FMT, sum);
     cb_assert(size > 0);
     buf->buf = (char *) cb_malloc(size);
-    if (buf->buf == NULL) {
+    if (buf->buf == nullptr) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
     memcpy(buf->buf, red, size);
@@ -233,7 +230,7 @@ static couchstore_error_t builtin_count_reducer(const mapreduce_json_list_t *key
     char red[512];
 
     for (i = 0; i < values->length; ++i) {
-        if (keys == NULL) {
+        if (keys == nullptr) {
             /* rereduce */
             mapreduce_json_t *value = &values->values[i];
 
@@ -253,7 +250,7 @@ static couchstore_error_t builtin_count_reducer(const mapreduce_json_list_t *key
     size = sprintf(red, "%" PRIu64, count);
     cb_assert(size > 0);
     buf->buf = (char *) cb_malloc(size);
-    if (buf->buf == NULL) {
+    if (buf->buf == nullptr) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
     memcpy(buf->buf, red, size);
@@ -278,11 +275,11 @@ static couchstore_error_t builtin_stats_reducer(const mapreduce_json_list_t *key
     for (i = 0; i < values->length; ++i) {
         mapreduce_json_t *value = &values->values[i];
 
-        if (keys == NULL) {
+        if (keys == nullptr) {
             /* rereduce */
             char *value_buf = (char *) cb_malloc(value->length + 1);
 
-            if (value_buf == NULL) {
+            if (value_buf == nullptr) {
                 return COUCHSTORE_ERROR_ALLOC_FAIL;
             }
 
@@ -323,7 +320,7 @@ static couchstore_error_t builtin_stats_reducer(const mapreduce_json_list_t *key
                 reducer_private_t *priv = (reducer_private_t *) ctx->parent_ctx;
 
                 priv->builtin_error = VIEW_REDUCER_ERROR_NOT_A_NUMBER;
-                if (keys == NULL) {
+                if (keys == nullptr) {
                     /* rereduce */
                     return COUCHSTORE_ERROR_REDUCER_FAILURE;
                 } else {
@@ -331,7 +328,7 @@ static couchstore_error_t builtin_stats_reducer(const mapreduce_json_list_t *key
                     mapreduce_json_t *key = &keys->values[i];
                     char *error_key = (char *) cb_malloc(key->length + 1);
 
-                    if (error_key == NULL) {
+                    if (error_key == nullptr) {
                         return COUCHSTORE_ERROR_ALLOC_FAIL;
                     }
                     memcpy(error_key, key->json, key->length);
@@ -347,7 +344,7 @@ static couchstore_error_t builtin_stats_reducer(const mapreduce_json_list_t *key
     size = sprint_stats(red, s.sum, s.count, s.min, s.max, s.sumsqr);
     cb_assert(size > 0);
     buf->buf = (char *) cb_malloc(size);
-    if (buf->buf == NULL) {
+    if (buf->buf == nullptr) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
     memcpy(buf->buf, red, size);
@@ -363,12 +360,12 @@ static couchstore_error_t js_reducer(const mapreduce_json_list_t *keys,
                                      sized_buf *buf)
 {
     mapreduce_error_t ret;
-    char *error_msg = NULL;
+    char* error_msg = nullptr;
     reducer_private_t *priv = (reducer_private_t *) ctx->parent_ctx;
 
-    if (keys == NULL) {
+    if (keys == nullptr) {
         /* rereduce */
-        mapreduce_json_t *result = NULL;
+        mapreduce_json_t* result = nullptr;
 
         ret = mapreduce_rereduce(ctx->mapreduce_ctx, 1, values, &result, &error_msg);
         if (ret != MAPREDUCE_SUCCESS) {
@@ -377,7 +374,7 @@ static couchstore_error_t js_reducer(const mapreduce_json_list_t *keys,
             return COUCHSTORE_ERROR_REDUCER_FAILURE;
         }
         buf->buf = (char *) cb_malloc(result->length);
-        if (buf->buf == NULL) {
+        if (buf->buf == nullptr) {
             cb_free(result->json);
             cb_free(result);
             return COUCHSTORE_ERROR_ALLOC_FAIL;
@@ -388,7 +385,7 @@ static couchstore_error_t js_reducer(const mapreduce_json_list_t *keys,
         cb_free(result);
     } else {
         /* reduce */
-        mapreduce_json_list_t *results = NULL;
+        mapreduce_json_list_t* results = nullptr;
 
         ret = mapreduce_reduce_all(ctx->mapreduce_ctx,
                                    keys,
@@ -402,7 +399,7 @@ static couchstore_error_t js_reducer(const mapreduce_json_list_t *keys,
         }
         cb_assert(results->length == 1);
         buf->buf = (char *) cb_malloc(results->values[0].length);
-        if (buf->buf == NULL) {
+        if (buf->buf == nullptr) {
             mapreduce_free_json_list(results);
             return COUCHSTORE_ERROR_ALLOC_FAIL;
         }
@@ -439,19 +436,19 @@ view_reducer_ctx_t *make_view_reducer_ctx(const char *functions[],
     reducer_private_t *priv = (reducer_private_t*)cb_calloc(1, sizeof(*priv));
     view_reducer_ctx_t *ctx = (view_reducer_ctx_t*)cb_calloc(1, sizeof(*ctx));
 
-    if (ctx == NULL || priv == NULL) {
+    if (ctx == nullptr || priv == nullptr) {
         goto error;
     }
 
     priv->num_reducers = num_functions;
     priv->reducers = (reducer_fn_t*)cb_calloc(num_functions, sizeof(reducer_fn_t));
-    if (priv->reducers == NULL) {
+    if (priv->reducers == nullptr) {
         goto error;
     }
 
     priv->reducer_contexts = (reducer_ctx_t*)
                              cb_calloc(num_functions, sizeof(reducer_ctx_t));
-    if (priv->reducer_contexts == NULL) {
+    if (priv->reducer_contexts == nullptr) {
         goto error;
     }
 
@@ -466,7 +463,7 @@ view_reducer_ctx_t *make_view_reducer_ctx(const char *functions[],
             priv->reducers[i] = builtin_stats_reducer;
         } else {
             mapreduce_error_t mapred_error;
-            void *mapred_ctx = NULL;
+            void* mapred_ctx = nullptr;
 
             priv->reducers[i] = js_reducer;
             /* TODO: use single reduce context for all JS functions */
@@ -483,13 +480,13 @@ view_reducer_ctx_t *make_view_reducer_ctx(const char *functions[],
     priv->builtin_error = VIEW_REDUCER_SUCCESS;
     priv->mapreduce_error = MAPREDUCE_SUCCESS;
     ctx->priv = priv;
-    *error_msg = NULL;
+    *error_msg = nullptr;
 
     return ctx;
 
 error:
-    if (priv != NULL) {
-        if (priv->reducer_contexts != NULL) {
+    if (priv != nullptr) {
+        if (priv->reducer_contexts != nullptr) {
             for (i = 0; i < num_functions; ++i) {
                 mapreduce_free_context(priv->reducer_contexts[i].mapreduce_ctx);
             }
@@ -500,7 +497,7 @@ error:
     }
     cb_free(ctx);
 
-    return NULL;
+    return nullptr;
 }
 
 
@@ -509,7 +506,7 @@ void free_view_reducer_ctx(view_reducer_ctx_t *ctx)
     unsigned i;
     reducer_private_t *priv;
 
-    if (ctx == NULL) {
+    if (ctx == nullptr) {
         return;
     }
 
@@ -530,38 +527,38 @@ static void add_error_message(view_reducer_ctx_t *red_ctx, int rereduce)
    reducer_private_t *priv = (reducer_private_t *) red_ctx->priv;
    char *error_msg;
 
-   if (red_ctx->error != NULL) {
+   if (red_ctx->error != nullptr) {
        cb_free((void *) red_ctx->error);
-       red_ctx->error = NULL;
+       red_ctx->error = nullptr;
    }
 
    if (priv->builtin_error != VIEW_REDUCER_SUCCESS) {
        const char *base_msg = builtin_reducer_error_msg[priv->builtin_error];
 
        cb_assert(priv->mapreduce_error == MAPREDUCE_SUCCESS);
-       if (!rereduce && (priv->error_key != NULL)) {
+       if (!rereduce && (priv->error_key != nullptr)) {
            error_msg = (char *) cb_malloc(strlen(base_msg) + 12 + strlen(priv->error_key));
-           cb_assert(error_msg != NULL);
+           cb_assert(error_msg != nullptr);
            sprintf(error_msg, "%s (key %s)", base_msg, priv->error_key);
        } else {
            error_msg = cb_strdup(base_msg);
-           cb_assert(error_msg != NULL);
+           cb_assert(error_msg != nullptr);
        }
-       if (priv->error_key != NULL) {
+       if (priv->error_key != nullptr) {
            cb_free((void *) priv->error_key);
-           priv->error_key = NULL;
+           priv->error_key = nullptr;
        }
    } else {
        cb_assert(priv->mapreduce_error != MAPREDUCE_SUCCESS);
-       if (priv->error_msg != NULL) {
+       if (priv->error_msg != nullptr) {
            error_msg = priv->error_msg;
        } else {
            if (priv->mapreduce_error == MAPREDUCE_TIMEOUT) {
                error_msg = cb_strdup("function timeout");
-               cb_assert(error_msg != NULL);
+               cb_assert(error_msg != nullptr);
            } else {
                error_msg = (char*)cb_malloc(64);
-               cb_assert(error_msg != NULL);
+               cb_assert(error_msg != nullptr);
                sprintf(error_msg, "mapreduce error: %d", priv->mapreduce_error);
            }
        }
@@ -588,7 +585,7 @@ couchstore_error_t view_btree_reduce(char *dst,
     /* The reduce function is only called (in btree_modify.cc) if there
        are any items */
     cb_assert(count > 0);
-    cb_assert(leaflist != NULL);
+    cb_assert(leaflist != nullptr);
 
     std::vector<view_btree_value_t> values;
     try {
@@ -600,7 +597,7 @@ couchstore_error_t view_btree_reduce(char *dst,
     mapreduce_json_list_t key_list{};
     mapreduce_json_list_t value_list{};
 
-    for (n = leaflist, c = 0; n != NULL && c < count; n = n->next, ++c) {
+    for (n = leaflist, c = 0; n != nullptr && c < count; n = n->next, ++c) {
         ret = decode_view_btree_value(n->data.buf, n->data.size, values[c]);
         if (ret != COUCHSTORE_SUCCESS) {
             goto out;
@@ -611,18 +608,18 @@ couchstore_error_t view_btree_reduce(char *dst,
 
     value_list.values = (mapreduce_json_t*)cb_calloc(red.kv_count,
                                                      sizeof(mapreduce_json_t));
-    if (value_list.values == NULL) {
+    if (value_list.values == nullptr) {
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;
         goto out;
     }
     key_list.values = (mapreduce_json_t*)cb_calloc(red.kv_count,
                                                    sizeof(mapreduce_json_t));
-    if (key_list.values == NULL) {
+    if (key_list.values == nullptr) {
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;
         goto out;
     }
 
-    for (n = leaflist, c = 0; n != NULL && c < count; n = n->next, ++c) {
+    for (n = leaflist, c = 0; n != nullptr && c < count; n = n->next, ++c) {
         auto& v = values[c];
         sized_buf json_key{};
         auto ret =
@@ -643,7 +640,7 @@ couchstore_error_t view_btree_reduce(char *dst,
     if (priv->num_reducers > 0) {
         red.reduce_values =
                 (sized_buf*)cb_calloc(priv->num_reducers, sizeof(sized_buf));
-        if (red.reduce_values == NULL) {
+        if (red.reduce_values == nullptr) {
             ret = COUCHSTORE_ERROR_ALLOC_FAIL;
             goto out;
         }
@@ -667,7 +664,7 @@ couchstore_error_t view_btree_reduce(char *dst,
     ret = encode_view_btree_reduction(&red, dst, size_r);
 
  out:
-     if (red.reduce_values != NULL) {
+     if (red.reduce_values != nullptr) {
          for (i = 0; i < red.num_values; ++i) {
              cb_free(red.reduce_values[i].buf);
          }
@@ -712,7 +709,7 @@ couchstore_error_t view_btree_rereduce(char *dst,
     mapreduce_json_list_t value_list{};
     value_list.values = json_values_list.data();
 
-    for (n = leaflist, c = 0; n != NULL && c < count; n = n->next, ++c) {
+    for (n = leaflist, c = 0; n != nullptr && c < count; n = n->next, ++c) {
         ret = decode_view_btree_reduction(n->pointer->reduce_value.buf,
                                           n->pointer->reduce_value.size,
                                           reductions[c]);
@@ -728,7 +725,7 @@ couchstore_error_t view_btree_rereduce(char *dst,
     for (i = 0; i < red.num_values; ++i) {
         sized_buf buf{};
 
-        for (n = leaflist, c = 0; n != NULL && c < count; n = n->next, ++c) {
+        for (n = leaflist, c = 0; n != nullptr && c < count; n = n->next, ++c) {
             view_btree_reduction_t& r = reductions[c];
 
             value_list.values[value_list.length].json = r.reduce_values[i].buf;
@@ -739,7 +736,8 @@ couchstore_error_t view_btree_rereduce(char *dst,
         }
 
         reducer = priv->reducers[i];
-        ret = (*reducer)(NULL, &value_list, &priv->reducer_contexts[i], &buf);
+        ret = (*reducer)(
+                nullptr, &value_list, &priv->reducer_contexts[i], &buf);
         if (ret != COUCHSTORE_SUCCESS) {
             add_error_message(red_ctx, 1);
             return ret;

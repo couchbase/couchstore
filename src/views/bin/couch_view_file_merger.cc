@@ -61,8 +61,8 @@ int main(int argc, char *argv[])
      * Disable buffering for stdout/stderr since file merger messages needs
      * to be immediately available at erlang side
      */
-    setvbuf(stdout, (char *) NULL, _IONBF, 0);
-    setvbuf(stderr, (char *) NULL, _IONBF, 0);
+    setvbuf(stdout, (char*)nullptr, _IONBF, 0);
+    setvbuf(stderr, (char*)nullptr, _IONBF, 0);
 
     if (set_binary_mode() < 0) {
         fprintf(stderr, "Error setting binary mode\n");
@@ -99,14 +99,14 @@ int main(int argc, char *argv[])
     }
 
     view_files = (char **) cb_malloc(sizeof(char *) * num_files);
-    if (view_files == NULL) {
+    if (view_files == nullptr) {
         fprintf(stderr, "Memory allocation failure.\n");
         exit(EXIT_FAILURE);
     }
 
     for (i = 0; i < num_files; ++i) {
         view_files[i] = (char *) cb_malloc(LINE_BUF_SIZE);
-        if (view_files[i] == NULL) {
+        if (view_files[i] == nullptr) {
             for (j = 0; j < i; ++j) {
                 cb_free(view_files[j]);
             }

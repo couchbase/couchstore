@@ -38,7 +38,7 @@ static index_header_t *test_index_header_decoding_v1(const char *header_bin,
     uint16_t pending_active[] = { 11,15 };
     uint16_t pending_passive[] = { 58,61 };
     uint16_t pending_unindexable[] = { 15,58 };
-    index_header_t *header = NULL;
+    index_header_t* header = nullptr;
     bitmap_t expected_active, expected_passive, expected_cleanup;
     unsigned i;
     int ii;
@@ -50,7 +50,7 @@ static index_header_t *test_index_header_decoding_v1(const char *header_bin,
     int num_pending_unindexable;
 
     cb_assert(decode_index_header(header_bin, header_bin_size, &header) == COUCHSTORE_SUCCESS);
-    cb_assert(header != NULL);
+    cb_assert(header != nullptr);
 
     cb_assert(header->version == 1);
     cb_assert(memcmp(header->signature, header_bin, 16) == 0);
@@ -96,7 +96,7 @@ static index_header_t *test_index_header_decoding_v1(const char *header_bin,
         rs.part_id = jj;
 
         pseq = (part_seq_t *) sorted_list_get(header->seqs, &rs);
-        cb_assert(pseq != NULL);
+        cb_assert(pseq != nullptr);
         cb_assert(pseq->part_id == jj);
         cb_assert(pseq->seq == 1221);
     }
@@ -108,7 +108,7 @@ static index_header_t *test_index_header_decoding_v1(const char *header_bin,
         rs.part_id = unindexable[ii];
 
         pseq = (part_seq_t *) sorted_list_get(header->unindexable_seqs, &rs);
-        cb_assert(pseq != NULL);
+        cb_assert(pseq != nullptr);
         cb_assert(pseq->part_id == unindexable[ii]);
         cb_assert(pseq->seq == 1221);
     }
@@ -129,7 +129,7 @@ static index_header_t *test_index_header_decoding_v1(const char *header_bin,
     /* TODO: once view reduction decoding is done, test the exact reduction value. */
 
     cb_assert(header->has_replica == 1);
-    cb_assert(header->replicas_on_transfer != NULL);
+    cb_assert(header->replicas_on_transfer != nullptr);
 
     num_reps = (sizeof(replicas_on_transfer) / sizeof(replicas_on_transfer[0]));
 
@@ -138,7 +138,7 @@ static index_header_t *test_index_header_decoding_v1(const char *header_bin,
         uint16_t *part_id = (uint16_t*)
                             sorted_list_get(header->replicas_on_transfer,
                                             &replicas_on_transfer[ii]);
-        cb_assert(part_id != NULL);
+        cb_assert(part_id != nullptr);
         cb_assert(*part_id == replicas_on_transfer[ii]);
     }
 
@@ -148,7 +148,7 @@ static index_header_t *test_index_header_decoding_v1(const char *header_bin,
         uint16_t *part_id = (uint16_t*)
                             sorted_list_get(header->pending_transition.active,
                                             &pending_active[ii]);
-        cb_assert(part_id != NULL);
+        cb_assert(part_id != nullptr);
         cb_assert(*part_id == pending_active[ii]);
     }
 
@@ -158,7 +158,7 @@ static index_header_t *test_index_header_decoding_v1(const char *header_bin,
         uint16_t *part_id = (uint16_t*)
                             sorted_list_get(header->pending_transition.passive,
                                             &pending_passive[ii]);
-        cb_assert(part_id != NULL);
+        cb_assert(part_id != nullptr);
         cb_assert(*part_id == pending_passive[ii]);
     }
 
@@ -168,7 +168,7 @@ static index_header_t *test_index_header_decoding_v1(const char *header_bin,
         uint16_t *part_id = (uint16_t*)
                             sorted_list_get(header->pending_transition.unindexable,
                                             &pending_unindexable[ii]);
-        cb_assert(part_id != NULL);
+        cb_assert(part_id != nullptr);
         cb_assert(*part_id == pending_unindexable[ii]);
     }
 
@@ -186,7 +186,7 @@ static index_header_t *test_index_header_decoding_v2(const char *header_bin,
     uint16_t pending_active[] = { 14, 28 };
     uint16_t pending_passive[] = { 1 };
     uint16_t pending_unindexable[] = { 1, 28 };
-    index_header_t *header = NULL;
+    index_header_t* header = nullptr;
     bitmap_t expected_active, expected_passive, expected_cleanup;
     unsigned i;
     int ii;
@@ -198,7 +198,7 @@ static index_header_t *test_index_header_decoding_v2(const char *header_bin,
     int num_pending_unindexable;
 
     cb_assert(decode_index_header(header_bin, header_bin_size, &header) == COUCHSTORE_SUCCESS);
-    cb_assert(header != NULL);
+    cb_assert(header != nullptr);
 
     cb_assert(header->version == 2);
     cb_assert(memcmp(header->signature, header_bin, 16) == 0);
@@ -228,7 +228,7 @@ static index_header_t *test_index_header_decoding_v2(const char *header_bin,
         part_seq_t rs, *pseq;
         rs.part_id = jj;
         pseq = (part_seq_t *) sorted_list_get(header->seqs, &rs);
-        cb_assert(pseq != NULL);
+        cb_assert(pseq != nullptr);
         cb_assert(pseq->part_id == jj);
         cb_assert(pseq->seq == (uint64_t)jj * jj);
     }
@@ -240,7 +240,7 @@ static index_header_t *test_index_header_decoding_v2(const char *header_bin,
         rs.part_id = unindexable[ii];
 
         pseq = (part_seq_t *) sorted_list_get(header->unindexable_seqs, &rs);
-        cb_assert(pseq != NULL);
+        cb_assert(pseq != nullptr);
         cb_assert(pseq->part_id == unindexable[ii]);
         cb_assert(pseq->seq == (uint64_t)unindexable[ii] * unindexable[ii]);
     }
@@ -266,7 +266,7 @@ static index_header_t *test_index_header_decoding_v2(const char *header_bin,
         header->view_states[1]->reduce_value.size) == 0);
 
     cb_assert(header->has_replica == 0);
-    cb_assert(header->replicas_on_transfer != NULL);
+    cb_assert(header->replicas_on_transfer != nullptr);
 
     num_reps = (sizeof(replicas_on_transfer) / sizeof(replicas_on_transfer[0]));
 
@@ -275,7 +275,7 @@ static index_header_t *test_index_header_decoding_v2(const char *header_bin,
         uint16_t *part_id = (uint16_t*)
                             sorted_list_get(header->replicas_on_transfer,
                                             &replicas_on_transfer[ii]);
-        cb_assert(part_id != NULL);
+        cb_assert(part_id != nullptr);
         cb_assert(*part_id == replicas_on_transfer[ii]);
     }
 
@@ -285,7 +285,7 @@ static index_header_t *test_index_header_decoding_v2(const char *header_bin,
         uint16_t *part_id = (uint16_t*)
                             sorted_list_get(header->pending_transition.active,
                                             &pending_active[ii]);
-        cb_assert(part_id != NULL);
+        cb_assert(part_id != nullptr);
         cb_assert(*part_id == pending_active[ii]);
     }
 
@@ -295,7 +295,7 @@ static index_header_t *test_index_header_decoding_v2(const char *header_bin,
         uint16_t *part_id = (uint16_t*)
                             sorted_list_get(header->pending_transition.passive,
                                             &pending_passive[ii]);
-        cb_assert(part_id != NULL);
+        cb_assert(part_id != nullptr);
         cb_assert(*part_id == pending_passive[ii]);
     }
 
@@ -305,7 +305,7 @@ static index_header_t *test_index_header_decoding_v2(const char *header_bin,
         uint16_t *part_id = (uint16_t*)
                             sorted_list_get(header->pending_transition.unindexable,
                                             &pending_unindexable[ii]);
-        cb_assert(part_id != NULL);
+        cb_assert(part_id != nullptr);
         cb_assert(*part_id == pending_unindexable[ii]);
     }
 
@@ -314,7 +314,7 @@ static index_header_t *test_index_header_decoding_v2(const char *header_bin,
         part_version_t rs, *pver;
         rs.part_id = jj;
         pver = (part_version_t *) sorted_list_get(header->part_versions, &rs);
-        cb_assert(pver != NULL);
+        cb_assert(pver != nullptr);
         cb_assert(pver->part_id == jj);
         cb_assert(pver->num_failover_log == 2);
         cb_assert(memcmp(pver->failover_log[0].uuid, "auuid123", 8) == 0);
@@ -340,9 +340,9 @@ void test_index_headers_v1(void)
 {
     index_header_t*header;
     index_header_t *header2;
-    char *header_bin2 = NULL;
+    char* header_bin2 = nullptr;
     size_t header_bin2_size = 0;
-    char *header_bin3 = NULL;
+    char* header_bin3 = nullptr;
     size_t header_bin3_size = 0;
 
     unsigned char header_bin[] = {
@@ -392,9 +392,9 @@ void test_index_headers_v2(void)
 {
     index_header_t*header;
     index_header_t *header2;
-    char *header_bin2 = NULL;
+    char* header_bin2 = nullptr;
     size_t header_bin2_size = 0;
-    char *header_bin3 = NULL;
+    char* header_bin3 = nullptr;
     size_t header_bin3_size = 0;
 
     unsigned char header_bin[] = {

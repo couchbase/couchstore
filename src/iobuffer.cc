@@ -769,6 +769,6 @@ FileOpsInterface* couch_get_buffered_file_ops(couchstore_error_info_t* errinfo,
     if (*handle) {
         return &ops;
     } else {
-        return NULL;
+        return nullptr;
     }
 }

@@ -76,11 +76,11 @@ couchstore_error_t tree_file_open(tree_file* file,
 cleanup:
     if (errcode != COUCHSTORE_SUCCESS) {
         cb_free((char *) file->path);
-        file->path = NULL;
+        file->path = nullptr;
         if (file->ops) {
             file->ops->destructor(file->handle);
-            file->ops = NULL;
-            file->handle = NULL;
+            file->ops = nullptr;
+            file->handle = nullptr;
         }
     }
     return errcode;

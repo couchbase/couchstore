@@ -7,10 +7,10 @@
 
 static view_btree_key_t *test_view_btree_key_decoding(const char *key_bin, size_t len)
 {
-    view_btree_key_t *k = NULL;
+    view_btree_key_t* k = nullptr;
 
     cb_assert(decode_view_btree_key(key_bin, len, &k) == COUCHSTORE_SUCCESS);
-    cb_assert(k != NULL);
+    cb_assert(k != nullptr);
     cb_assert(k->json_key.size == 4);
     cb_assert(memcmp(k->json_key.buf, "\"23\"", k->json_key.size) == 0);
     cb_assert(k->doc_id.size == 12);
@@ -27,10 +27,10 @@ static view_btree_key_t *test_view_btree_key_decoding(const char *key_bin, size_
 
 static view_id_btree_key_t *test_view_id_btree_key_decoding(const char *id_btree_key_bin, size_t len)
 {
-    view_id_btree_key_t *k = NULL;
+    view_id_btree_key_t* k = nullptr;
 
     cb_assert(decode_view_id_btree_key(id_btree_key_bin, len, &k) == COUCHSTORE_SUCCESS);
-    cb_assert(k != NULL);
+    cb_assert(k != nullptr);
 
     cb_assert(k->partition == 57);
     cb_assert(k->doc_id.size == 12);
@@ -68,13 +68,13 @@ void test_keys()
     char id_btree_key_bin[] = {
         0,57,100,111,99,95,48,48,48,48,48,48,53,55
     };
-    char *k_bin2 = NULL;
+    char* k_bin2 = nullptr;
     size_t k_bin2_size = 0;
-    char *id_btree_k_bin2 = NULL;
+    char* id_btree_k_bin2 = nullptr;
     size_t id_btree_k_bin2_size = 0;
-    char *k_bin3 = NULL;
+    char* k_bin3 = nullptr;
     size_t k_bin3_size = 0;
-    char *id_btree_k_bin3 = NULL;
+    char* id_btree_k_bin3 = nullptr;
     size_t id_btree_k_bin3_size = 0;
     view_btree_key_t *k;
     view_id_btree_key_t *id_btree_k;

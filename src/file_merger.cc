@@ -104,7 +104,7 @@ file_merger_error_t merge_files(const char *source_files[],
     ctx.dedup_records = dedup_records;
 
     if (feed_record && skip_writeback) {
-        ctx.dest_file = NULL;
+        ctx.dest_file = nullptr;
     } else {
         ctx.dest_file = fopen(dest_file, "ab");
     }
@@ -113,14 +113,14 @@ file_merger_error_t merge_files(const char *source_files[],
         return FILE_MERGER_ERROR_ALLOC;
     }
 
-    if (feed_record == NULL && ctx.dest_file == NULL) {
+    if (feed_record == nullptr && ctx.dest_file == nullptr) {
         sorted_vector_destroy(&ctx.sorted_vector);
         return FILE_MERGER_ERROR_OPEN_FILE;
     }
 
     ctx.files = (FILE **) cb_malloc(sizeof(FILE *) * num_files);
 
-    if (ctx.files == NULL) {
+    if (ctx.files == nullptr) {
         sorted_vector_destroy(&ctx.sorted_vector);
         fclose(ctx.dest_file);
         return FILE_MERGER_ERROR_ALLOC;
@@ -129,7 +129,7 @@ file_merger_error_t merge_files(const char *source_files[],
     for (i = 0; i < num_files; ++i) {
         ctx.files[i] = fopen(source_files[i], "rb");
 
-        if (ctx.files[i] == NULL) {
+        if (ctx.files[i] == nullptr) {
             fprintf(stderr, "Error while opening file %s errcode %s\n",
                     source_files[i], strerror(errno));
             for (j = 0; j < i; ++j) {
@@ -146,7 +146,7 @@ file_merger_error_t merge_files(const char *source_files[],
     ret = do_merge_files(&ctx);
 
     for (i = 0; i < ctx.num_files; ++i) {
-        if (ctx.files[i] != NULL) {
+        if (ctx.files[i] != nullptr) {
             fclose(ctx.files[i]);
         }
     }
@@ -174,13 +174,13 @@ static file_merger_error_t do_merge_files(file_merger_ctx_t *ctx)
 
         if (record_len == 0) {
             fclose(f);
-            ctx->files[i] = NULL;
+            ctx->files[i] = nullptr;
         } else if (record_len < 0) {
             return (file_merger_error_t) record_len;
         } else {
             int rv;
             record = (record_t *) cb_malloc(sizeof(*record));
-            if (record == NULL) {
+            if (record == nullptr) {
                 return FILE_MERGER_ERROR_ALLOC;
             }
             record->data = record_data;
@@ -208,7 +208,7 @@ static file_merger_error_t do_merge_files(file_merger_ctx_t *ctx)
          * duplicated record came from and add them to the sort vector.
          */
         sorted_vector_pop(&ctx->sorted_vector, &records, &n);
-        cb_assert(records != NULL);
+        cb_assert(records != nullptr);
         cb_assert(n != 0);
 
         if (ctx->feed_record) {
@@ -218,7 +218,7 @@ static file_merger_error_t do_merge_files(file_merger_ctx_t *ctx)
                 return ret;
             }
         } else {
-            cb_assert(ctx->dest_file != NULL);
+            cb_assert(ctx->dest_file != nullptr);
         }
 
         if (ctx->dest_file) {
@@ -235,7 +235,7 @@ static file_merger_error_t do_merge_files(file_merger_ctx_t *ctx)
                                              ctx->user_ctx);
             if (record_len == 0) {
                 fclose(ctx->files[records[i]->file]);
-                ctx->files[records[i]->file] = NULL;
+                ctx->files[records[i]->file] = nullptr;
                 FREE_RECORD(ctx, records[i]);
 
             } else if (record_len < 0) {
@@ -274,7 +274,7 @@ static int init_sorted_vector(sorted_vector_t *sorted_vector,
                               file_merger_ctx_t *ctx)
 {
     sorted_vector->data = (record_t **) cb_malloc(sizeof(record_t *) * max_elements);
-    if (sorted_vector->data == NULL) {
+    if (sorted_vector->data == nullptr) {
         return 0;
     }
 
@@ -309,7 +309,7 @@ static void sorted_vector_pop(sorted_vector_t *sorted_vector,
     size_t i, j;
 
     if (sorted_vector->count == 0) {
-        *records = NULL;
+        *records = nullptr;
         *n = 0;
         return;
     }
@@ -320,7 +320,9 @@ static void sorted_vector_pop(sorted_vector_t *sorted_vector,
      * */
     head = sorted_vector->data[0];
 
-    for (i = 1; sorted_vector->ctx->dedup_records != NULL && i < sorted_vector->count; i++) {
+    for (i = 1; sorted_vector->ctx->dedup_records != nullptr &&
+                i < sorted_vector->count;
+         i++) {
         if (SORTED_VECTOR_CMP(sorted_vector, head, sorted_vector->data[i]) != 0) {
             break;
         }

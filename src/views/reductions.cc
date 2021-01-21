@@ -81,7 +81,7 @@ couchstore_error_t decode_view_btree_reduction(const char* bytes,
     }
 
     for (j = 0; j < r.num_values; ++j) {
-        r.reduce_values[j].buf = NULL;
+        r.reduce_values[j].buf = nullptr;
     }
 
     i = 0;
@@ -110,7 +110,7 @@ couchstore_error_t encode_view_btree_reduction(const view_btree_reduction_t *red
                                                char *buffer,
                                                size_t *buffer_size)
 {
-    char *b = NULL;
+    char* b = nullptr;
     size_t sz = 0;
     int i;
 
@@ -150,11 +150,11 @@ void free_view_btree_reduction(view_btree_reduction_t *reduction)
 {
     int i;
 
-    if (reduction == NULL) {
+    if (reduction == nullptr) {
         return;
     }
 
-    if (reduction->reduce_values != NULL){
+    if (reduction->reduce_values != nullptr) {
         for (i = 0; i < reduction->num_values; ++i) {
             cb_free(reduction->reduce_values[i].buf);
         }
@@ -168,10 +168,10 @@ void free_view_btree_reduction(view_btree_reduction_t *reduction)
 couchstore_error_t decode_view_id_btree_reduction(const char *bytes,
                                                   view_id_btree_reduction_t **reduction)
 {
-    view_id_btree_reduction_t *r = NULL;
+    view_id_btree_reduction_t* r = nullptr;
 
     r = (view_id_btree_reduction_t *) cb_malloc(sizeof(view_id_btree_reduction_t));
-    if (r == NULL) {
+    if (r == nullptr) {
         goto alloc_error;
     }
 
@@ -194,7 +194,7 @@ couchstore_error_t encode_view_id_btree_reduction(const view_id_btree_reduction_
                                                   char *buffer,
                                                   size_t *buffer_size)
 {
-    char *b = NULL;
+    char* b = nullptr;
     size_t sz = 0;
 
     sz += 5;                     /* kv_count */
@@ -218,7 +218,7 @@ couchstore_error_t encode_view_id_btree_reduction(const view_id_btree_reduction_
 
 void free_view_id_btree_reduction(view_id_btree_reduction_t *reduction)
 {
-    if (reduction == NULL) {
+    if (reduction == nullptr) {
         return;
     }
 

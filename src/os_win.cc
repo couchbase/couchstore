@@ -180,9 +180,14 @@ couchstore_error_t WindowsFileOps::open(couchstore_error_info_t *errinfo,
         creationflag = OPEN_ALWAYS;
     }
 
-    HANDLE os_handle = CreateFileA(path, GENERIC_READ | GENERIC_WRITE,
-                                   FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ,
-                                   NULL, creationflag, 0, NULL);
+    HANDLE os_handle =
+            CreateFileA(path,
+                        GENERIC_READ | GENERIC_WRITE,
+                        FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ,
+                        nullptr,
+                        creationflag,
+                        0,
+                        nullptr);
 
     if(os_handle == INVALID_HANDLE_VALUE) {
         DWORD last_error = save_windows_error(errinfo);

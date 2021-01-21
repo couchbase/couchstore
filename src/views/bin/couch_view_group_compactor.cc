@@ -41,15 +41,15 @@ static void stats_updater(uint64_t freq, uint64_t inserted)
 
 int main(int argc, char *argv[])
 {
-    view_group_info_t *group_info = NULL;
+    view_group_info_t* group_info = nullptr;
     char buf[BUF_SIZE];
-    char *target_file = NULL;
+    char* target_file = nullptr;
     couchstore_error_t ret = COUCHSTORE_SUCCESS;
-    sized_buf header_buf = {NULL, 0};
-    sized_buf header_outbuf = {NULL, 0};
+    sized_buf header_buf = {nullptr, 0};
+    sized_buf header_outbuf = {nullptr, 0};
     uint64_t total_changes = 0;
     uint64_t header_size = 0;
-    view_error_t error_info = {NULL, NULL, "GENERIC"};
+    view_error_t error_info = {nullptr, nullptr, "GENERIC"};
     cb_thread_t exit_thread;
     compactor_stats_t stats;
 
@@ -60,8 +60,8 @@ int main(int argc, char *argv[])
      * Disable buffering for stdout/stderr since progress stats needs to be
      * immediately available at erlang side
      */
-    setvbuf(stdout, (char *) NULL, _IONBF, 0);
-    setvbuf(stderr, (char *) NULL, _IONBF, 0);
+    setvbuf(stdout, (char*)nullptr, _IONBF, 0);
+    setvbuf(stderr, (char*)nullptr, _IONBF, 0);
 
     if (set_binary_mode() < 0) {
         fprintf(stderr, "Error setting binary mode\n");
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
     }
 
     target_file = cb_strdup(buf);
-    if (target_file == NULL) {
+    if (target_file == nullptr) {
         fprintf(stderr, "Memory allocation failure\n");
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;
         goto out;
@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
     }
 
     group_info = couchstore_read_view_group_info(stdin, stderr);
-    if (group_info == NULL) {
+    if (group_info == nullptr) {
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;
         goto out;
     }
@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
 
     header_buf.size = (size_t)header_size;
     header_buf.buf = (char*)cb_malloc(header_buf.size);
-    if (header_buf.buf == NULL) {
+    if (header_buf.buf == nullptr) {
         fprintf(stderr, "Memory allocation failure\n");
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;
         goto out;
@@ -147,7 +147,8 @@ int main(int argc, char *argv[])
     mapreduce_deinit();
 
     if (ret != COUCHSTORE_SUCCESS) {
-        if (error_info.error_msg != NULL && error_info.view_name != NULL) {
+        if (error_info.error_msg != nullptr &&
+            error_info.view_name != nullptr) {
             fprintf(stderr,
                     "%s Error compacting index for view `%s`, reason: %s\n",
                     error_info.idx_type,

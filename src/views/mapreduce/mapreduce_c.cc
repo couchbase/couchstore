@@ -72,7 +72,7 @@ mapreduce_error_t mapreduce_map(void *context,
     mapreduce_ctx_t *ctx = (mapreduce_ctx_t *) context;
 
     *result = (mapreduce_map_result_list_t *) cb_malloc(sizeof(**result));
-    if (*result == NULL) {
+    if (*result == nullptr) {
         return MAPREDUCE_ALLOC_ERROR;
     }
 
@@ -80,9 +80,9 @@ mapreduce_error_t mapreduce_map(void *context,
     size_t sz = sizeof(mapreduce_map_result_t) * num_funs;
     (*result)->list = (mapreduce_map_result_t *) cb_malloc(sz);
 
-    if ((*result)->list == NULL) {
+    if ((*result)->list == nullptr) {
         cb_free(*result);
-        *result = NULL;
+        *result = nullptr;
         return MAPREDUCE_ALLOC_ERROR;
     }
 
@@ -91,11 +91,11 @@ mapreduce_error_t mapreduce_map(void *context,
         mapDoc(ctx, *doc, *meta, *result);
     } catch (MapReduceError &e) {
         mapreduce_free_map_result_list(*result);
-        *result = NULL;
+        *result = nullptr;
         return e.getError();
     } catch (std::bad_alloc &) {
         mapreduce_free_map_result_list(*result);
-        *result = NULL;
+        *result = nullptr;
         return MAPREDUCE_ALLOC_ERROR;
     }
 
@@ -127,7 +127,7 @@ mapreduce_error_t mapreduce_reduce_all(void *context,
         cb_assert(sz == ctx->functions->size());
 
         *result = (mapreduce_json_list_t *) cb_malloc(sizeof(**result));
-        if (*result == NULL) {
+        if (*result == nullptr) {
             for ( ; it != list.end(); ++it) {
                 cb_free((*it).json);
             }
@@ -136,7 +136,7 @@ mapreduce_error_t mapreduce_reduce_all(void *context,
 
         (*result)->length = sz;
         (*result)->values = (mapreduce_json_t *) cb_malloc(sizeof(mapreduce_json_t) * sz);
-        if ((*result)->values == NULL) {
+        if ((*result)->values == nullptr) {
             cb_free(*result);
             for ( ; it != list.end(); ++it) {
                 cb_free((*it).json);
@@ -148,15 +148,15 @@ mapreduce_error_t mapreduce_reduce_all(void *context,
         }
     } catch (MapReduceError &e) {
         copy_error_msg(e.getMsg(), error_msg);
-        *result = NULL;
+        *result = nullptr;
         return e.getError();
     } catch (std::bad_alloc &) {
         copy_error_msg(MEM_ALLOC_ERROR_MSG, error_msg);
-        *result = NULL;
+        *result = nullptr;
         return MAPREDUCE_ALLOC_ERROR;
     }
 
-    *error_msg = NULL;
+    *error_msg = nullptr;
     return MAPREDUCE_SUCCESS;
 }
 
@@ -173,22 +173,22 @@ mapreduce_error_t mapreduce_reduce(void *context,
         mapreduce_json_t red = runReduce(ctx, reduceFunNum, *keys, *values);
 
         *result = (mapreduce_json_t *) cb_malloc(sizeof(**result));
-        if (*result == NULL) {
+        if (*result == nullptr) {
             cb_free(red.json);
             throw std::bad_alloc();
         }
         **result = red;
     } catch (MapReduceError &e) {
         copy_error_msg(e.getMsg(), error_msg);
-        *result = NULL;
+        *result = nullptr;
         return e.getError();
     } catch (std::bad_alloc &) {
         copy_error_msg(MEM_ALLOC_ERROR_MSG, error_msg);
-        *result = NULL;
+        *result = nullptr;
         return MAPREDUCE_ALLOC_ERROR;
     }
 
-    *error_msg = NULL;
+    *error_msg = nullptr;
     return MAPREDUCE_SUCCESS;
 }
 
@@ -204,28 +204,28 @@ mapreduce_error_t mapreduce_rereduce(void *context,
         mapreduce_json_t red = runRereduce(ctx, reduceFunNum, *reductions);
 
         *result = (mapreduce_json_t *) cb_malloc(sizeof(**result));
-        if (*result == NULL) {
+        if (*result == nullptr) {
             cb_free(red.json);
             throw std::bad_alloc();
         }
         **result = red;
     } catch (MapReduceError &e) {
         copy_error_msg(e.getMsg(), error_msg);
-        *result = NULL;
+        *result = nullptr;
         return e.getError();
     } catch (std::bad_alloc &) {
         copy_error_msg(MEM_ALLOC_ERROR_MSG, error_msg);
-        *result = NULL;
+        *result = nullptr;
         return MAPREDUCE_ALLOC_ERROR;
     }
 
-    *error_msg = NULL;
+    *error_msg = nullptr;
     return MAPREDUCE_SUCCESS;
 }
 
 void mapreduce_free_context(void *context)
 {
-    if (context != NULL) {
+    if (context != nullptr) {
         mapreduce_ctx_t *ctx = (mapreduce_ctx_t *) context;
 
         unregister_ctx(ctx);
@@ -236,7 +236,7 @@ void mapreduce_free_context(void *context)
 
 void mapreduce_free_json(mapreduce_json_t *value)
 {
-    if (value != NULL) {
+    if (value != nullptr) {
         cb_free(value->json);
         cb_free(value);
     }
@@ -244,7 +244,7 @@ void mapreduce_free_json(mapreduce_json_t *value)
 
 void mapreduce_free_json_list(mapreduce_json_list_t *list)
 {
-    if (list != NULL) {
+    if (list != nullptr) {
         for (int i = 0; i < list->length; ++i) {
             cb_free(list->values[i].json);
         }
@@ -255,7 +255,7 @@ void mapreduce_free_json_list(mapreduce_json_list_t *list)
 
 void mapreduce_free_map_result_list(mapreduce_map_result_list_t *list)
 {
-    if (list == NULL) {
+    if (list == nullptr) {
         return;
     }
 
@@ -303,7 +303,7 @@ static mapreduce_error_t start_context(const char *functions[],
                                        void **context,
                                        char **error_msg)
 {
-    mapreduce_ctx_t *ctx = NULL;
+    mapreduce_ctx_t* ctx = nullptr;
     mapreduce_error_t ret = MAPREDUCE_SUCCESS;
 
     try {
@@ -323,7 +323,7 @@ static mapreduce_error_t start_context(const char *functions[],
     if (ret == MAPREDUCE_SUCCESS) {
         register_ctx(ctx);
         *context = (void *) ctx;
-        *error_msg = NULL;
+        *error_msg = nullptr;
     } else {
         delete ctx;
     }
@@ -351,11 +351,11 @@ static void make_function_list(const char *sources[],
 
 static void copy_error_msg(const std::string &msg, char **to)
 {
-    if (to != NULL) {
+    if (to != nullptr) {
         size_t len = msg.length();
 
         *to = (char *) cb_malloc(len + 1);
-        if (*to != NULL) {
+        if (*to != nullptr) {
             msg.copy(*to, len);
             (*to)[len] = '\0';
         }
@@ -434,7 +434,7 @@ static void terminator_loop()
 
     while (!shutdown_terminator) {
         registryMutex.lock();
-        now = time(NULL);
+        now = time(nullptr);
         for (mapreduce_ctx_t *ctx : ctx_registry) {
             ctx->exitMutex.lock();
             if (ctx->taskStartTime >= 0) {

@@ -53,7 +53,7 @@ fatbuf *fatbuf_alloc(size_t bytes)
     memset(fb->buf, 0x44, bytes);
 #endif
     if (!fb) {
-        return NULL;
+        return nullptr;
     }
 
     fb->size = bytes;
@@ -64,7 +64,7 @@ fatbuf *fatbuf_alloc(size_t bytes)
 void *fatbuf_get(fatbuf *fb, size_t bytes)
 {
     if (fb->pos + bytes > fb->size) {
-        return NULL;
+        return nullptr;
     }
 #ifdef DEBUG
     if (fb->buf[fb->pos] != 0x44 && bytes > 0) {
@@ -91,12 +91,12 @@ void report_error(couchstore_error_t errcode, const char* file, int line) {
 sized_buf* arena_copy_buf(arena* a, const sized_buf *src)
 {
     sized_buf *nbuf = static_cast<sized_buf*>(arena_alloc(a, sizeof(sized_buf)));
-    if (nbuf == NULL) {
-        return NULL;
+    if (nbuf == nullptr) {
+        return nullptr;
     }
     nbuf->buf = static_cast<char*>(arena_alloc(a, src->size));
-    if (nbuf->buf == NULL) {
-        return NULL;
+    if (nbuf->buf == nullptr) {
+        return nullptr;
     }
     nbuf->size = src->size;
     memcpy(nbuf->buf, src->buf, src->size);
@@ -107,8 +107,8 @@ sized_buf* arena_special_copy_buf_and_revmeta(arena *a, const sized_buf *val,
                                               const DocInfo *docinfo)
 {
     sized_buf *nbuf = static_cast<sized_buf*>(arena_alloc(a, sizeof(sized_buf)));
-    if (nbuf == NULL) {
-        return NULL;
+    if (nbuf == nullptr) {
+        return nullptr;
     }
 
     const raw_seq_index_value *raw = (const raw_seq_index_value*)val->buf;
@@ -117,8 +117,8 @@ sized_buf* arena_special_copy_buf_and_revmeta(arena *a, const sized_buf *val,
 
     nbuf->size = sizeof(*raw) + idsize + docinfo->rev_meta.size;
     nbuf->buf = static_cast<char*>(arena_alloc(a, nbuf->size));
-    if (nbuf->buf == NULL) {
-        return NULL;
+    if (nbuf->buf == nullptr) {
+        return nullptr;
     }
     memcpy(nbuf->buf, val->buf, sizeof(*raw) + idsize);
     memcpy(nbuf->buf + sizeof(*raw) + idsize, docinfo->rev_meta.buf,

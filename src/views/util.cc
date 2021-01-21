@@ -110,7 +110,7 @@ int read_view_record(FILE *in, void **buf, void *ctx)
     }
 
     rec = (view_file_merge_record_t *) cb_malloc(sizeof(*rec) + klen + vlen);
-    if (rec == NULL) {
+    if (rec == nullptr) {
         return FILE_MERGER_ERROR_ALLOC;
     }
 
@@ -204,7 +204,7 @@ char *couchstore_read_line(FILE *in, char *buf, int size)
     size_t len;
 
     if (fgets(buf, size, in) != buf) {
-        return NULL;
+        return nullptr;
     }
 
     len = strlen(buf);
@@ -252,7 +252,7 @@ void set_error_info(const view_btree_info_t *info,
         const int buffersize = 128;
         char* buf = (char*)cb_malloc(buffersize);
 
-        if (buf != NULL) {
+        if (buf != nullptr) {
             size_t len = 0;
 
             switch (ret) {

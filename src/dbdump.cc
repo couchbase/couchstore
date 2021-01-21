@@ -154,12 +154,12 @@ extern const std::string collections_kvstore_schema;
 
 static int view_btree_cmp(const sized_buf *key1, const sized_buf *key2)
 {
-    return view_key_cmp(key1, key2, NULL);
+    return view_key_cmp(key1, key2, nullptr);
 }
 
 static void printsb(const sized_buf *sb)
 {
-    if (sb->buf == NULL) {
+    if (sb->buf == nullptr) {
         printf("null\n");
         return;
     }
@@ -177,7 +177,7 @@ static void printsbhex(const sized_buf *sb, int with_ascii)
 {
     size_t i;
 
-    if (sb->buf == NULL) {
+    if (sb->buf == nullptr) {
         printf("null\n");
         return;
     }
@@ -207,7 +207,7 @@ static void printjquote(const sized_buf *sb)
 {
     const char* i = sb->buf;
     const char* end = sb->buf + sb->size;
-    if (sb->buf == NULL) {
+    if (sb->buf == nullptr) {
         return;
     }
     for (; i < end; i++) {
@@ -334,7 +334,7 @@ static void printDocId(const char* prefix, const sized_buf* sb) {
 static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
 {
     int *count = (int *) ctx;
-    Doc *doc = NULL;
+    Doc* doc = nullptr;
     uint64_t cas;
     uint32_t expiry, flags;
     protocol_binary_datatype_t datatype = PROTOCOL_BINARY_RAW_BYTES;
@@ -841,7 +841,7 @@ static couchstore_error_t couchstore_print_local_docs(
     couchfile_lookup_request rq;
     couchstore_error_t errcode;
 
-    if (db->header.local_docs_root == NULL) {
+    if (db->header.local_docs_root == nullptr) {
         if (oneKey) {
             return COUCHSTORE_ERROR_DOC_NOT_FOUND;
         } else {
@@ -858,7 +858,7 @@ static couchstore_error_t couchstore_print_local_docs(
     rq.keys = &keylist;
     rq.callback_ctx = count;
     rq.fetch_callback = fetch_cb;
-    rq.node_callback = NULL;
+    rq.node_callback = nullptr;
     rq.fold = 1;
 
     if (oneKey) {
@@ -935,9 +935,11 @@ next_header:
         break;
     case DumpByID:
         if (dumpTree) {
-            errcode = couchstore_walk_id_tree(
-                    db, NULL, COUCHSTORE_TOLERATE_CORRUPTION,
-                    visit_node, &count);
+            errcode = couchstore_walk_id_tree(db,
+                                              nullptr,
+                                              COUCHSTORE_TOLERATE_CORRUPTION,
+                                              visit_node,
+                                              &count);
         } else if (oneKey) {
             DocInfo* info;
             errcode = couchstore_docinfo_by_id(db, dumpKey.buf, dumpKey.size, &info);
@@ -946,17 +948,17 @@ next_header:
                 couchstore_free_docinfo(info);
             }
         } else {
-            errcode = couchstore_all_docs(
-                    db, NULL, COUCHSTORE_TOLERATE_CORRUPTION,
-                    foldprint, &count);
+            errcode = couchstore_all_docs(db,
+                                          nullptr,
+                                          COUCHSTORE_TOLERATE_CORRUPTION,
+                                          foldprint,
+                                          &count);
         }
         break;
     case DumpLocals:
         if (dumpTree) {
-            errcode = couchstore_walk_local_tree(db,
-                                              NULL,
-                                              visit_node,
-                                              &count);
+            errcode =
+                    couchstore_walk_local_tree(db, nullptr, visit_node, &count);
         } else if (dumpJson) {
             errcode = couchstore_print_local_docs(
                     db, local_doc_print_json, &count);
@@ -979,8 +981,11 @@ next_header:
         // Note for the ID tree we specify a different (noop) callback; as we
         // don't want or need to read the document bodies again.
         trackingFileOps->setTree(db->file.handle, TrackingFileOps::Tree::Id);
-        couchstore_walk_id_tree(
-                db, NULL, COUCHSTORE_TOLERATE_CORRUPTION, noop_visit, &count);
+        couchstore_walk_id_tree(db,
+                                nullptr,
+                                COUCHSTORE_TOLERATE_CORRUPTION,
+                                noop_visit,
+                                &count);
 
         trackingFileOps->setTree(db->file.handle, TrackingFileOps::Tree::Local);
         int dummy = 0;
@@ -1096,12 +1101,12 @@ static int process_view_file(const char *file, int *total)
 {
     view_group_info_t *info;
     couchstore_error_t errcode;
-    index_header_t *header = NULL;
-    char *header_buf = NULL;
+    index_header_t* header = nullptr;
+    char* header_buf = nullptr;
     int header_len;
 
     info = (view_group_info_t *)cb_calloc(1, sizeof(view_group_info_t));
-    if (info == NULL) {
+    if (info == nullptr) {
         fprintf(stderr, "Unable to allocate memory\n");
         return -1;
     }
@@ -1144,7 +1149,7 @@ static int process_view_file(const char *file, int *total)
 
     for (int i = 0; i < header->num_views; ++i) {
         printf("\nKV pairs from index: %d\n", i);
-        sized_buf nullkey = {NULL, 0};
+        sized_buf nullkey = {nullptr, 0};
         sized_buf *lowkeys = &nullkey;
         couchfile_lookup_request rq;
 
@@ -1152,9 +1157,9 @@ static int process_view_file(const char *file, int *total)
         rq.file = &info->file;
         rq.num_keys = 1;
         rq.keys = &lowkeys;
-        rq.callback_ctx = NULL;
+        rq.callback_ctx = nullptr;
         rq.fetch_callback = lookup_callback;
-        rq.node_callback = NULL;
+        rq.node_callback = nullptr;
         rq.fold = 1;
 
         errcode = btree_lookup(&rq, header->view_states[i]->pointer);

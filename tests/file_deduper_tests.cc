@@ -42,7 +42,7 @@ static int read_record(FILE* f, void** buffer, void* ctx) {
     test_record_t* rec = (test_record_t*)cb_malloc(sizeof(test_record_t));
     (void)ctx;
 
-    if (rec == NULL) {
+    if (rec == nullptr) {
         return FILE_MERGER_ERROR_ALLOC;
     }
 
@@ -114,10 +114,10 @@ static void check_deduped_file(const char* file_path,
     unsigned long num_records = 0;
 
     f = fopen(file_path, "rb");
-    cb_assert(f != NULL);
+    cb_assert(f != nullptr);
 
     while (record_size > 0) {
-        record_size = read_record(f, (void**)&rec, NULL);
+        record_size = read_record(f, (void**)&rec, nullptr);
         cb_assert(record_size >= 0);
 
         if (record_size > 0) {
@@ -133,7 +133,7 @@ static void check_deduped_file(const char* file_path,
 
             cb_assert(expected_set[rec->key]);
             num_records++;
-            free_record((void*)rec, NULL);
+            free_record((void*)rec, nullptr);
         }
     }
 
@@ -171,7 +171,7 @@ int main() {
 
         remove(source_files[i]);
         f = fopen(source_files[i], "ab");
-        cb_assert(f != NULL);
+        cb_assert(f != nullptr);
 
         for (j = 0; j < MAX_RECORDS_PER_FILE; ++j) {
             key = multiples[i] * (j + 1);
@@ -190,12 +190,12 @@ int main() {
                       dest_file.c_str(),
                       read_record,
                       write_record,
-                      NULL,
+                      nullptr,
                       compare_records,
                       dedup_records,
                       free_record,
                       0,
-                      NULL);
+                      nullptr);
 
     cb_assert(ret == FILE_MERGER_SUCCESS);
     check_deduped_file(dest_file.c_str(), expected_result.data(), max_arr_size);

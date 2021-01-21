@@ -25,7 +25,7 @@ couchstore_error_t decode_view_btree_json_key(const char* bytes,
     key.size = sz;
     key.buf = (char*)cb_malloc(sz);
 
-    if (key.buf == NULL) {
+    if (key.buf == nullptr) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
 
@@ -38,16 +38,16 @@ couchstore_error_t decode_view_btree_key(const char *bytes,
                                          size_t len,
                                          view_btree_key_t **key)
 {
-    view_btree_key_t *k = NULL;
+    view_btree_key_t* k = nullptr;
     uint16_t sz;
 
     k = (view_btree_key_t *) cb_malloc(sizeof(view_btree_key_t));
-    if (k == NULL) {
+    if (k == nullptr) {
         goto alloc_error;
     }
 
-    k->json_key.buf = NULL;
-    k->doc_id.buf = NULL;
+    k->json_key.buf = nullptr;
+    k->doc_id.buf = nullptr;
 
     cb_assert(len >= 2);
     sz = dec_uint16(bytes);
@@ -58,7 +58,7 @@ couchstore_error_t decode_view_btree_key(const char *bytes,
     k->json_key.size = sz;
     k->json_key.buf = (char *) cb_malloc(sz);
 
-    if (k->json_key.buf == NULL) {
+    if (k->json_key.buf == nullptr) {
         goto alloc_error;
     }
 
@@ -72,8 +72,7 @@ couchstore_error_t decode_view_btree_key(const char *bytes,
 
     k->doc_id.buf = (char *) cb_malloc(len);
 
-
-    if (k->doc_id.buf == NULL) {
+    if (k->doc_id.buf == nullptr) {
         goto alloc_error;
     }
 
@@ -93,7 +92,7 @@ couchstore_error_t encode_view_btree_key(const view_btree_key_t *key,
                                          char **buffer,
                                          size_t *buffer_size)
 {
-    char *buf = NULL, *b = NULL;
+    char *buf = nullptr, *b = nullptr;
     size_t sz = 0;
 
     sz += 2;             /* size_t */
@@ -101,7 +100,7 @@ couchstore_error_t encode_view_btree_key(const view_btree_key_t *key,
     sz += key->doc_id.size;
 
     b = buf = (char *) cb_malloc(sz);
-    if (buf == NULL) {
+    if (buf == nullptr) {
         goto alloc_error;
     }
 
@@ -119,7 +118,7 @@ couchstore_error_t encode_view_btree_key(const view_btree_key_t *key,
 
  alloc_error:
     cb_free(buf);
-    *buffer = NULL;
+    *buffer = nullptr;
     *buffer_size = 0;
     return COUCHSTORE_ERROR_ALLOC_FAIL;
 }
@@ -127,7 +126,7 @@ couchstore_error_t encode_view_btree_key(const view_btree_key_t *key,
 
 void free_view_btree_key(view_btree_key_t *key)
 {
-    if (key == NULL) {
+    if (key == nullptr) {
         return;
     }
 
@@ -141,14 +140,14 @@ couchstore_error_t decode_view_id_btree_key(const char *bytes,
                                             size_t len,
                                             view_id_btree_key_t **key)
 {
-    view_id_btree_key_t *k = NULL;
+    view_id_btree_key_t* k = nullptr;
 
     k = (view_id_btree_key_t *) cb_malloc(sizeof(view_id_btree_key_t));
-    if (k == NULL) {
+    if (k == nullptr) {
         goto alloc_error;
     }
 
-    k->doc_id.buf = NULL;
+    k->doc_id.buf = nullptr;
 
     cb_assert(len >= 2);
     k->partition = dec_uint16(bytes);
@@ -159,7 +158,7 @@ couchstore_error_t decode_view_id_btree_key(const char *bytes,
 
     k->doc_id.buf = (char *) cb_malloc(len);
 
-    if (k->doc_id.buf == NULL) {
+    if (k->doc_id.buf == nullptr) {
         goto alloc_error;
     }
 
@@ -179,14 +178,14 @@ couchstore_error_t encode_view_id_btree_key(const view_id_btree_key_t *key,
                                             char **buffer,
                                             size_t *buffer_size)
 {
-    char *buf = NULL, *b = NULL;
+    char *buf = nullptr, *b = nullptr;
     size_t sz = 0;
 
     sz += 2;             /* uint16_t */
     sz += key->doc_id.size;
 
     b = buf = (char *) cb_malloc(sz);
-    if (buf == NULL) {
+    if (buf == nullptr) {
         goto alloc_error;
     }
 
@@ -202,7 +201,7 @@ couchstore_error_t encode_view_id_btree_key(const view_id_btree_key_t *key,
 
  alloc_error:
     cb_free(buf);
-    *buffer = NULL;
+    *buffer = nullptr;
     *buffer_size = 0;
     return COUCHSTORE_ERROR_ALLOC_FAIL;
 }
@@ -210,7 +209,7 @@ couchstore_error_t encode_view_id_btree_key(const view_id_btree_key_t *key,
 
 void free_view_id_btree_key(view_id_btree_key_t *key)
 {
-    if (key == NULL) {
+    if (key == nullptr) {
         return;
     }
 

@@ -239,7 +239,7 @@ static couchstore_error_t output_seqtree_item(const sized_buf *k,
     raw_id_index_value *raw;
     sized_buf *k_c = arena_copy_buf(ctx->transient_arena, k);
 
-    if (k_c == NULL) {
+    if (k_c == nullptr) {
         error_pass(COUCHSTORE_ERROR_READ);
     }
 
@@ -250,7 +250,7 @@ static couchstore_error_t output_seqtree_item(const sized_buf *k,
         v_c = arena_copy_buf(ctx->transient_arena, v);
     }
 
-    if (v_c == NULL) {
+    if (v_c == nullptr) {
         error_pass(COUCHSTORE_ERROR_READ);
     }
 
@@ -291,7 +291,7 @@ static couchstore_error_t compact_seq_fetchcb(couchfile_lookup_request *rq,
                                               const sized_buf *k,
                                               const sized_buf *v)
 {
-    DocInfo* info = NULL;
+    DocInfo* info = nullptr;
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
     compact_ctx *ctx = (compact_ctx *) rq->callback_ctx;
     raw_seq_index_value* rawSeq = (raw_seq_index_value*)v->buf;
@@ -367,7 +367,7 @@ static couchstore_error_t compact_seq_fetchcb(couchfile_lookup_request *rq,
     if (ret_val) {
         error_pass(output_seqtree_item(k, v, info, ctx));
     } else {
-        error_pass(output_seqtree_item(k, v, NULL, ctx));
+        error_pass(output_seqtree_item(k, v, nullptr, ctx));
     }
 
 cleanup:
@@ -394,10 +394,10 @@ static couchstore_error_t compact_seq_tree(Db* source, Db* target, compact_ctx *
                                       &seqcmp,
                                       by_seq_reduce,
                                       by_seq_rereduce,
-                                      NULL,
+                                      nullptr,
                                       source->file.options.kv_nodesize,
                                       source->file.options.kp_nodesize);
-    if (ctx->target_mr == NULL) {
+    if (ctx->target_mr == nullptr) {
         error_pass(COUCHSTORE_ERROR_ALLOC_FAIL);
     }
 
@@ -411,7 +411,7 @@ static couchstore_error_t compact_seq_tree(Db* source, Db* target, compact_ctx *
             (ctx->flags & COUCHSTORE_COMPACT_RECOVERY_MODE) != 0;
     srcfold.callback_ctx = ctx;
     srcfold.fetch_callback = compact_seq_fetchcb;
-    srcfold.node_callback = NULL;
+    srcfold.node_callback = nullptr;
 
     errcode = btree_lookup(&srcfold, source->header.by_seq_root->pointer);
     if (errcode == COUCHSTORE_SUCCESS || srcfold.tolerate_corruption) {
@@ -448,15 +448,20 @@ static couchstore_error_t compact_localdocs_tree(Db* source, Db* target, compact
     couchfile_lookup_request srcfold;
 
     sized_buf low_key;
-    low_key.buf = NULL;
+    low_key.buf = nullptr;
     low_key.size = 0;
     sized_buf *low_key_list = &low_key;
 
-    ctx->target_mr = new_btree_modres(ctx->persistent_arena, NULL, &target->file,
-                                      &idcmp, NULL, NULL, NULL,
+    ctx->target_mr = new_btree_modres(ctx->persistent_arena,
+                                      nullptr,
+                                      &target->file,
+                                      &idcmp,
+                                      nullptr,
+                                      nullptr,
+                                      nullptr,
                                       source->file.options.kv_nodesize,
                                       source->file.options.kp_nodesize);
-    if (ctx->target_mr == NULL) {
+    if (ctx->target_mr == nullptr) {
         error_pass(COUCHSTORE_ERROR_ALLOC_FAIL);
     }
 
@@ -468,7 +473,7 @@ static couchstore_error_t compact_localdocs_tree(Db* source, Db* target, compact
     srcfold.in_fold = 1;
     srcfold.callback_ctx = ctx;
     srcfold.fetch_callback = compact_localdocs_fetchcb;
-    srcfold.node_callback = NULL;
+    srcfold.node_callback = nullptr;
 
     errcode = btree_lookup(&srcfold, source->header.local_docs_root->pointer);
     if (errcode == COUCHSTORE_SUCCESS) {

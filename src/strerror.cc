@@ -37,6 +37,6 @@ const char *couchstore_strerror(couchstore_error_t errcode)
     case COUCHSTORE_ERROR_FILE_CLOSE:
         return "error closing file";
     default:
-        return NULL;
+        return nullptr;
     }
 }

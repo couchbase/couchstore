@@ -165,7 +165,7 @@ static int read_record(FILE* f, void** buffer, void* ctx) {
     int* rec = (int*)cb_malloc(sizeof(int));
     (void)ctx;
 
-    if (rec == NULL) {
+    if (rec == nullptr) {
         return FILE_MERGER_ERROR_ALLOC;
     }
 
@@ -207,27 +207,27 @@ static void free_record(void* rec, void* ctx) {
 
 static int check_file_sorted(const char* file_path) {
     FILE* f;
-    void* record = NULL;
+    void* record = nullptr;
     int record_size;
     unsigned nrecords = (unsigned)(sizeof(data) / sizeof(int));
     unsigned i;
 
     f = fopen(file_path, "rb");
-    cb_assert(f != NULL);
+    cb_assert(f != nullptr);
 
     for (i = 0; i < nrecords; ++i) {
-        record_size = read_record(f, &record, NULL);
+        record_size = read_record(f, &record, nullptr);
         cb_assert(record_size == sizeof(int));
         if (*((int*)record) != sorted_data[i]) {
             fclose(f);
-            free_record(record, NULL);
+            free_record(record, nullptr);
             return 0;
         }
-        free_record(record, NULL);
+        free_record(record, nullptr);
     }
 
     /* Check file has no extra (duplicated or garbage) records. */
-    cb_assert(read_record(f, &record, NULL) == 0);
+    cb_assert(read_record(f, &record, nullptr) == 0);
 
     fclose(f);
 
@@ -240,7 +240,7 @@ static void create_file() {
 
     remove(UNSORTED_FILE_PATH);
     f = fopen(UNSORTED_FILE_PATH, "ab");
-    cb_assert(f != NULL);
+    cb_assert(f != nullptr);
 
     for (i = 0; i < (sizeof(data) / sizeof(int)); ++i) {
         cb_assert(fwrite(&data[i], sizeof(int), 1, f) == 1);
@@ -320,7 +320,7 @@ int main(void) {
                     nrecords,
                     buffer_sizes[i],
                     temp_files[j]);
-            test_file_sort(buffer_sizes[i], temp_files[j], NULL, 0);
+            test_file_sort(buffer_sizes[i], temp_files[j], nullptr, 0);
         }
     }
 

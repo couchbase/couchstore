@@ -87,7 +87,7 @@ static couchstore_error_t count_rereduce(char *dst, size_t *size_r,
     (void) size_r;
     (void) ctx;
 
-    while (i != NULL && count > 0) {
+    while (i != nullptr && count > 0) {
         const int *reduce = (const int *) i->pointer->reduce_value.buf;
         total += *reduce;
         i = i->next;
@@ -452,7 +452,7 @@ static node_pointer *insert_items(tree_file *file, node_pointer *root,
     int i;
     couchfile_modify_request rq;
     couchfile_modify_action *acts;
-    node_pointer *nroot = NULL;
+    node_pointer* nroot = nullptr;
     int *arr1, *arr2;
     sized_buf *keys, *vals;
 
@@ -510,7 +510,7 @@ static couchfile_modify_request purge_request(tree_file *file, reduce_fn reduce,
 
     rq.cmp.compare = int_cmp;
     rq.file = file;
-    rq.actions = NULL;
+    rq.actions = nullptr;
     rq.num_actions = 0;
     rq.reduce = reduce;
     rq.rereduce = rereduce;
@@ -532,7 +532,7 @@ static couchstore_error_t iter_btree(tree_file *file, node_pointer *root,
                                                     fetch_callback_fn callback)
 {
     couchfile_lookup_request rq;
-    sized_buf k = {NULL, 0};
+    sized_buf k = {nullptr, 0};
     sized_buf *keys = &k;
 
     rq.cmp.compare = int_cmp;
@@ -541,7 +541,7 @@ static couchstore_error_t iter_btree(tree_file *file, node_pointer *root,
     rq.keys = &keys;
     rq.callback_ctx = ctx;
     rq.fetch_callback = callback;
-    rq.node_callback = NULL;
+    rq.node_callback = nullptr;
     rq.fold = 1;
 
     return btree_lookup(&rq, root->pointer);
@@ -557,8 +557,8 @@ void test_no_purge_items()
     int redval;
     int ctx[2];
     int purge_sum[2] = {0, 0};
-    Db *db = NULL;
-    node_pointer *root = NULL, *newroot = NULL;
+    Db* db = nullptr;
+    node_pointer *root = nullptr, *newroot = nullptr;
     couchfile_modify_request purge_rq;
     fprintf(stderr, "\nExecuting test_no_purge_items...\n");
 
@@ -567,8 +567,8 @@ void test_no_purge_items()
     ctx[1] = 1;
     remove(testpurgefile);
     try_to(couchstore_open_db(testpurgefile, COUCHSTORE_OPEN_FLAG_CREATE, &db));
-    root = insert_items(&db->file, NULL, count_reduce, count_rereduce, N);
-    cb_assert(root != NULL);
+    root = insert_items(&db->file, nullptr, count_reduce, count_rereduce, N);
+    cb_assert(root != nullptr);
 
     redval = red_intval(root, 0);
     cb_assert(redval == N);
@@ -604,16 +604,16 @@ void test_all_purge_items()
     int N;
     int redval;
     int purge_sum[2] = {0, 0};
-    Db *db = NULL;
-    node_pointer *root = NULL, *newroot = NULL;
+    Db* db = nullptr;
+    node_pointer *root = nullptr, *newroot = nullptr;
     couchfile_modify_request purge_rq;
     fprintf(stderr, "\nExecuting test_all_purge_items...\n");
 
     N = 211341;
     remove(testpurgefile);
     try_to(couchstore_open_db(testpurgefile, COUCHSTORE_OPEN_FLAG_CREATE, &db));
-    root = insert_items(&db->file, NULL, count_reduce, count_rereduce, N);
-    cb_assert(root != NULL);
+    root = insert_items(&db->file, nullptr, count_reduce, count_rereduce, N);
+    cb_assert(root != nullptr);
 
     redval = red_intval(root, 0);
     cb_assert(redval == N);
@@ -630,7 +630,7 @@ void test_all_purge_items()
     cb_assert(redval == 0);
     fprintf(stderr, "Reduce value after guided purge equals 0\n");
 
-    cb_assert(newroot == NULL);
+    cb_assert(newroot == nullptr);
     fprintf(stderr, "Btree is empty after guided purge\n");
 
 cleanup:
@@ -648,8 +648,8 @@ void test_partial_purge_items()
     int N;
     int exp_evenodd[2];
     int purge_count = 0;
-    Db *db = NULL;
-    node_pointer *root = NULL, *newroot = NULL;
+    Db* db = nullptr;
+    node_pointer *root = nullptr, *newroot = nullptr;
     couchfile_modify_request purge_rq;
     fprintf(stderr, "\nExecuting test_partial_purge_items...\n");
 
@@ -659,8 +659,9 @@ void test_partial_purge_items()
 
     remove(testpurgefile);
     try_to(couchstore_open_db(testpurgefile, COUCHSTORE_OPEN_FLAG_CREATE, &db));
-    root = insert_items(&db->file, NULL, evenodd_reduce, evenodd_rereduce, N);
-    cb_assert(root != NULL);
+    root = insert_items(
+            &db->file, nullptr, evenodd_reduce, evenodd_rereduce, N);
+    cb_assert(root != nullptr);
 
     cb_assert(exp_evenodd[0] == red_intval(root, 0) && exp_evenodd[1] == red_intval(root, 1));
     fprintf(stderr, "Initial reduce value equals {NumEven, NumOdd}\n");
@@ -675,7 +676,7 @@ void test_partial_purge_items()
     cb_assert(red_intval(newroot, 0) == exp_evenodd[0] && red_intval(newroot, 1) == 0);
     fprintf(stderr, "Reduce value after guided purge equals {NumEven, 0}\n");
 
-    try_to(iter_btree(&db->file, newroot, NULL, check_odd_callback));
+    try_to(iter_btree(&db->file, newroot, nullptr, check_odd_callback));
     fprintf(stderr, "Btree has no odd values after guided purge\n");
 
 cleanup:
@@ -690,8 +691,8 @@ void test_partial_purge_items2()
 {
     couchstore_error_t errcode;
     int N;
-    Db *db = NULL;
-    node_pointer *root = NULL, *newroot = NULL;
+    Db* db = nullptr;
+    node_pointer *root = nullptr, *newroot = nullptr;
     int range_start, range_end;
     int count, purge_count = 0, iter_context = -1;
     couchfile_modify_request purge_rq;
@@ -700,8 +701,8 @@ void test_partial_purge_items2()
     N = 320000;
     remove(testpurgefile);
     try_to(couchstore_open_db(testpurgefile, COUCHSTORE_OPEN_FLAG_CREATE, &db));
-    root = insert_items(&db->file, NULL, uniq_reduce, uniq_rereduce, N);
-    cb_assert(root != NULL);
+    root = insert_items(&db->file, nullptr, uniq_reduce, uniq_rereduce, N);
+    cb_assert(root != nullptr);
 
     count = red_intval(root, 1);
     range_start = red_intval(root, 2);
@@ -741,8 +742,8 @@ void test_partial_purge_with_stop()
     int N;
     int exp_evenodd[2];
     int purge_count = 0;
-    Db *db = NULL;
-    node_pointer *root = NULL, *newroot = NULL;
+    Db* db = nullptr;
+    node_pointer *root = nullptr, *newroot = nullptr;
     couchfile_modify_request purge_rq;
     fprintf(stderr, "\nExecuting test_partial_purge_items...\n");
 
@@ -752,8 +753,9 @@ void test_partial_purge_with_stop()
 
     remove(testpurgefile);
     try_to(couchstore_open_db(testpurgefile, COUCHSTORE_OPEN_FLAG_CREATE, &db));
-    root = insert_items(&db->file, NULL, evenodd_reduce, evenodd_rereduce, N);
-    cb_assert(root != NULL);
+    root = insert_items(
+            &db->file, nullptr, evenodd_reduce, evenodd_rereduce, N);
+    cb_assert(root != nullptr);
 
     cb_assert(exp_evenodd[0] == red_intval(root, 0) && exp_evenodd[1] == red_intval(root, 1));
     fprintf(stderr, "Initial reduce value equals {NumEven, NumOdd}\n");
@@ -769,7 +771,7 @@ void test_partial_purge_with_stop()
     cb_assert(red_intval(newroot, 1) == (exp_evenodd[1] - 4));
     fprintf(stderr, "Reduce value after guided purge equals {NumEven, NumOdd-4}\n");
 
-    try_to(iter_btree(&db->file, newroot, NULL, check_odd_stop_callback));
+    try_to(iter_btree(&db->file, newroot, nullptr, check_odd_stop_callback));
     fprintf(stderr, "Btree does not contain first 4 odd values after guided purge\n");
 
 cleanup:
@@ -786,12 +788,12 @@ void test_add_remove_purge()
     int N, i;
     int exp_evenodd[2];
     int purge_count = 0;
-    Db *db = NULL;
-    node_pointer *root = NULL, *newroot = NULL;
+    Db* db = nullptr;
+    node_pointer *root = nullptr, *newroot = nullptr;
     couchfile_modify_request purge_rq;
-    int *arr = NULL;
-    couchfile_modify_action *acts = NULL;
-    sized_buf *keys = NULL;
+    int* arr = nullptr;
+    couchfile_modify_action* acts = nullptr;
+    sized_buf* keys = nullptr;
     fprintf(stderr, "\nExecuting test_add_remove_purge...\n");
 
     N = 211341;
@@ -800,8 +802,9 @@ void test_add_remove_purge()
 
     remove(testpurgefile);
     try_to(couchstore_open_db(testpurgefile, COUCHSTORE_OPEN_FLAG_CREATE, &db));
-    root = insert_items(&db->file, NULL, evenodd_reduce, evenodd_rereduce, N);
-    cb_assert(root != NULL);
+    root = insert_items(
+            &db->file, nullptr, evenodd_reduce, evenodd_rereduce, N);
+    cb_assert(root != nullptr);
 
     cb_assert(exp_evenodd[0] == red_intval(root, 0) && exp_evenodd[1] == red_intval(root, 1));
     fprintf(stderr, "Initial reduce value equals {NumEven, NumOdd}\n");
@@ -847,7 +850,7 @@ void test_add_remove_purge()
     cb_assert(red_intval(newroot, 0) == (exp_evenodd[0] - 2) && red_intval(newroot, 1) == 0);
     fprintf(stderr, "Btree reduce value equals - {NumEven-2, 0}\n");
 
-    try_to(iter_btree(&db->file, newroot, NULL, check_odd2_callback));
+    try_to(iter_btree(&db->file, newroot, nullptr, check_odd2_callback));
     fprintf(stderr, "Btree has no odd values after guided purge\n");
     fprintf(stderr, "Keys 4,10,200000 are not in tree after guided purge\n");
 
@@ -868,16 +871,16 @@ void test_only_single_leafnode()
     int N;
     int redval;
     int purge_sum[2] = {0,0};
-    Db *db = NULL;
-    node_pointer *root = NULL, *newroot = NULL;
+    Db* db = nullptr;
+    node_pointer *root = nullptr, *newroot = nullptr;
     couchfile_modify_request purge_rq;
 
     fprintf(stderr, "\nExecuting test_only_single_leafnode...\n");
     N = 2;
     remove(testpurgefile);
     try_to(couchstore_open_db(testpurgefile, COUCHSTORE_OPEN_FLAG_CREATE, &db));
-    root = insert_items(&db->file, NULL, count_reduce, count_rereduce, N);
-    cb_assert(root != NULL);
+    root = insert_items(&db->file, nullptr, count_reduce, count_rereduce, N);
+    cb_assert(root != nullptr);
 
     redval = red_intval(root, 0);
     cb_assert(redval == N);
@@ -893,7 +896,7 @@ void test_only_single_leafnode()
     cb_assert(redval == 0);
     fprintf(stderr, "Reduce value after guided purge equals 0\n");
 
-    cb_assert(newroot == NULL);
+    cb_assert(newroot == nullptr);
     fprintf(stderr, "Btree is empty after guided purge\n");
 
 cleanup:

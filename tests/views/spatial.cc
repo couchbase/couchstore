@@ -155,7 +155,7 @@ void test_spatial_scale_factor()
     double mbb[] = {1.0, 3.0, 30.33, 31.33, 15.4, 138.7, 7.8, 7.8};
     uint16_t dim = (sizeof(mbb)/sizeof(double))/2;
     uint32_t max = ZCODE_MAX_VALUE;
-    scale_factor_t *sf = NULL;
+    scale_factor_t* sf = nullptr;
 
     fprintf(stderr, "Running spatial scale factor tests\n");
 
@@ -207,7 +207,7 @@ void test_spatial_scale_point()
     double point[] = {2.0, 31.0, 42.02, 7.8};
     uint16_t dim = (sizeof(mbb)/sizeof(double))/2;
     uint32_t max = ZCODE_MAX_VALUE;
-    scale_factor_t *sf = NULL;
+    scale_factor_t* sf = nullptr;
     uint32_t *scaled;
 
     fprintf(stderr, "Running spatial scale point tests\n");
@@ -403,10 +403,9 @@ void test_view_spatial_reduce()
     child.key.buf = encoded2;
 
     root.next = &child;
-    child.next = NULL;
+    child.next = nullptr;
 
     fprintf(stderr, "Running view_spatial_reduce test\n");
-    view_spatial_reduce(dst, &size, &root, 2, NULL);
-
+    view_spatial_reduce(dst, &size, &root, 2, nullptr);
 }
 

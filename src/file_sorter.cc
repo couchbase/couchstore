@@ -195,29 +195,29 @@ file_sorter_error_t sort_file(const char *source_file,
     }
 
     ctx.f = fopen(source_file, "rb");
-    if (ctx.f == NULL) {
+    if (ctx.f == nullptr) {
         return FILE_SORTER_ERROR_OPEN_FILE;
     }
 
     ctx.tmp_files = (tmp_file_t *) cb_malloc(sizeof(tmp_file_t) * num_tmp_files);
 
-    if (ctx.tmp_files == NULL) {
+    if (ctx.tmp_files == nullptr) {
         fclose(ctx.f);
         return FILE_SORTER_ERROR_ALLOC;
     }
 
     for (i = 0; i < num_tmp_files; ++i) {
-        ctx.tmp_files[i].name = NULL;
+        ctx.tmp_files[i].name = nullptr;
         ctx.tmp_files[i].level = 0;
     }
 
     ret = do_sort_file(&ctx);
 
-    if (ctx.f != NULL) {
+    if (ctx.f != nullptr) {
         fclose(ctx.f);
     }
     for (i = 0; i < ctx.active_tmp_files; ++i) {
-        if (ctx.tmp_files[i].name != NULL) {
+        if (ctx.tmp_files[i].name != nullptr) {
             remove(ctx.tmp_files[i].name);
             cb_free(ctx.tmp_files[i].name);
         }
@@ -285,7 +285,7 @@ static void sort_worker(void *args)
 
         if (s->job) {
             job = s->job;
-            s->job = NULL;
+            s->job = nullptr;
             s->free_workers -= 1;
             s->cond.notify_all();
 
@@ -328,7 +328,7 @@ static file_sorter_error_t parallel_sorter_add_job(parallel_sorter_t *s,
     sort_job_t *job;
     tmp_file_t *tmp_file = create_tmp_file(s->ctx);
 
-    if (tmp_file == NULL) {
+    if (tmp_file == nullptr) {
         free_n_records(s, records, n);
         return FILE_SORTER_ERROR_MK_TMP_FILE;
     }
@@ -419,18 +419,18 @@ static file_sorter_error_t do_sort_file(file_sort_ctx_t *ctx)
     // be responsible to free the memory in case of failures of success.
     void **records = (void **) cb_calloc(record_count, sizeof(void *));
 
-    if (records == NULL) {
+    if (records == nullptr) {
         cb_free(records);
         return FILE_SORTER_ERROR_ALLOC;
     }
 
     sorter = create_parallel_sorter(NSORT_THREADS, ctx);
-    if (sorter == NULL) {
+    if (sorter == nullptr) {
         cb_free(records);
         return FILE_SORTER_ERROR_ALLOC;
     }
 
-    ctx->feed_record = NULL;
+    ctx->feed_record = nullptr;
 
     i = 0;
     while (1) {
@@ -439,7 +439,7 @@ static file_sorter_error_t do_sort_file(file_sort_ctx_t *ctx)
            ret = (file_sorter_error_t) record_size;
            // If there's on error before a job got created, free the records
            // directly
-           if (sorter->job == NULL) {
+           if (sorter->job == nullptr) {
                cb_free(records);
            }
            goto failure;
@@ -447,9 +447,9 @@ static file_sorter_error_t do_sort_file(file_sort_ctx_t *ctx)
             break;
         }
 
-        if (records == NULL) {
+        if (records == nullptr) {
             records = (void **) cb_calloc(record_count, sizeof(void *));
-            if (records == NULL) {
+            if (records == nullptr) {
                 ret =  FILE_SORTER_ERROR_ALLOC;
                 goto failure;
             }
@@ -459,7 +459,7 @@ static file_sorter_error_t do_sort_file(file_sort_ctx_t *ctx)
         if (i == record_count) {
             record_count += NSORT_RECORD_INCR;
             records = (void **) cb_realloc(records, record_count * sizeof(void *));
-            if (records == NULL) {
+            if (records == nullptr) {
                 ret =  FILE_SORTER_ERROR_ALLOC;
                 goto failure;
             }
@@ -478,7 +478,7 @@ static file_sorter_error_t do_sort_file(file_sort_ctx_t *ctx)
                 goto failure;
             }
 
-            records = NULL;
+            records = nullptr;
             record_count = NSORT_RECORDS_INIT;
             buffer_size = 0;
             i = 0;
@@ -502,7 +502,7 @@ static file_sorter_error_t do_sort_file(file_sort_ctx_t *ctx)
     }
 
     fclose(ctx->f);
-    ctx->f = NULL;
+    ctx->f = nullptr;
 
     if (ctx->active_tmp_files == 0 && buffer_size == 0) {
         /* empty source file */
@@ -576,7 +576,7 @@ static file_sorter_error_t write_record_list(void **records,
 
     remove(tmp_file->name);
     f = fopen(tmp_file->name, "ab");
-    if (f == NULL) {
+    if (f == nullptr) {
         return FILE_SORTER_ERROR_MK_TMP_FILE;
     }
 
@@ -593,7 +593,7 @@ static file_sorter_error_t write_record_list(void **records,
         file_sorter_error_t err;
         err = static_cast<file_sorter_error_t>((*ctx->write_record)(f, records[i], ctx->user_ctx));
         (*ctx->free_record)(records[i], ctx->user_ctx);
-        records[i] = NULL;
+        records[i] = nullptr;
 
         if (err != FILE_SORTER_SUCCESS) {
             fclose(f);
@@ -612,13 +612,13 @@ static tmp_file_t *create_tmp_file(file_sort_ctx_t *ctx)
     unsigned i = ctx->active_tmp_files;
 
     cb_assert(ctx->active_tmp_files < ctx->num_tmp_files);
-    cb_assert(ctx->tmp_files[i].name == NULL);
+    cb_assert(ctx->tmp_files[i].name == nullptr);
     cb_assert(ctx->tmp_files[i].level == 0);
 
     ctx->tmp_files[i].name =
             sorter_tmp_file_path(ctx->tmp_dir, ctx->tmp_file_prefix.c_str());
-    if (ctx->tmp_files[i].name == NULL) {
-        return NULL;
+    if (ctx->tmp_files[i].name == nullptr) {
+        return nullptr;
     }
 
     ctx->tmp_files[i].level = 1;
@@ -707,22 +707,22 @@ static file_sorter_error_t merge_tmp_files(file_sort_ctx_t *ctx,
     const char **files;
     unsigned nfiles, i;
     file_sorter_error_t ret;
-    file_merger_feed_record_t feed_record = NULL;
+    file_merger_feed_record_t feed_record = nullptr;
 
     nfiles = end - start;
     files = (const char **) cb_malloc(sizeof(char *) * nfiles);
-    if (files == NULL) {
+    if (files == nullptr) {
         return FILE_SORTER_ERROR_ALLOC;
     }
     for (i = start; i < end; ++i) {
         files[i - start] = ctx->tmp_files[i].name;
-        cb_assert(files[i - start] != NULL);
+        cb_assert(files[i - start] != nullptr);
     }
 
     if (next_level == 0) {
         /* Final merge iteration. */
         if (ctx->skip_writeback) {
-            dest_tmp_file = NULL;
+            dest_tmp_file = nullptr;
         } else {
             dest_tmp_file = (char *) ctx->source_file;
         }
@@ -731,28 +731,28 @@ static file_sorter_error_t merge_tmp_files(file_sort_ctx_t *ctx,
     } else {
         dest_tmp_file = sorter_tmp_file_path(ctx->tmp_dir,
                                              ctx->tmp_file_prefix.c_str());
-        if (dest_tmp_file == NULL) {
+        if (dest_tmp_file == nullptr) {
             cb_free(files);
             return FILE_SORTER_ERROR_MK_TMP_FILE;
         }
     }
 
-    ret = (file_sorter_error_t) merge_files(files,
-                                            nfiles,
-                                            dest_tmp_file,
-                                            ctx->read_record,
-                                            ctx->write_record,
-                                            feed_record,
-                                            ctx->compare_records,
-                                            NULL,
-                                            ctx->free_record,
-                                            ctx->skip_writeback,
-                                            ctx->user_ctx);
+    ret = (file_sorter_error_t)merge_files(files,
+                                           nfiles,
+                                           dest_tmp_file,
+                                           ctx->read_record,
+                                           ctx->write_record,
+                                           feed_record,
+                                           ctx->compare_records,
+                                           nullptr,
+                                           ctx->free_record,
+                                           ctx->skip_writeback,
+                                           ctx->user_ctx);
 
     cb_free(files);
 
     if (ret != FILE_SORTER_SUCCESS) {
-        if (dest_tmp_file != NULL && dest_tmp_file != ctx->source_file) {
+        if (dest_tmp_file != nullptr && dest_tmp_file != ctx->source_file) {
             remove(dest_tmp_file);
             cb_free(dest_tmp_file);
         }
@@ -767,7 +767,7 @@ static file_sorter_error_t merge_tmp_files(file_sort_ctx_t *ctx,
             return FILE_SORTER_ERROR_DELETE_FILE;
         }
         cb_free(ctx->tmp_files[i].name);
-        ctx->tmp_files[i].name = NULL;
+        ctx->tmp_files[i].name = nullptr;
         ctx->tmp_files[i].level = 0;
     }
 
@@ -788,19 +788,19 @@ static file_sorter_error_t merge_tmp_files(file_sort_ctx_t *ctx,
 static file_sorter_error_t iterate_records_file(file_sort_ctx_t *ctx,
                                                const char *file)
 {
-    void *record_data = NULL;
+    void* record_data = nullptr;
     int record_len;
     FILE *f = fopen(file, "rb");
     int ret = FILE_SORTER_SUCCESS;
 
-    if (f == NULL) {
+    if (f == nullptr) {
         return FILE_SORTER_ERROR_OPEN_FILE;
     }
 
     while (1) {
         record_len = (*ctx->read_record)(f, &record_data, ctx->user_ctx);
         if (record_len == 0) {
-            record_data = NULL;
+            record_data = nullptr;
             break;
         } else if (record_len < 0) {
             ret = record_len;
@@ -817,7 +817,7 @@ static file_sorter_error_t iterate_records_file(file_sort_ctx_t *ctx,
 
 cleanup:
     (*ctx->free_record)(record_data, ctx->user_ctx);
-    if (f != NULL) {
+    if (f != nullptr) {
         fclose(f);
     }
 
@@ -847,8 +847,8 @@ char *sorter_tmp_file_path(const char *tmp_dir, const char *prefix) {
     total_len = tmp_dir_len + 1 + prefix_len + sizeof(SORTER_TMP_FILE_SUFFIX);
     file_path = (char *) cb_malloc(total_len);
 
-    if (file_path == NULL) {
-        return NULL;
+    if (file_path == nullptr) {
+        return nullptr;
     }
 
     memcpy(file_path, tmp_dir, tmp_dir_len);
@@ -859,7 +859,7 @@ char *sorter_tmp_file_path(const char *tmp_dir, const char *prefix) {
     if (sorter_random_name(file_path, total_len - 1,
                            sizeof(SORTER_TMP_FILE_SUFFIX) - 1) < 0) {
         cb_free(file_path);
-        return NULL;
+        return nullptr;
     }
 
     return file_path;

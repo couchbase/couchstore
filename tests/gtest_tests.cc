@@ -354,7 +354,7 @@ TEST_F(CouchstoreTest, dump_empty_db)
 
 TEST_F(CouchstoreTest, local_doc) {
     LocalDoc lDocWrite;
-    LocalDoc *lDocRead = NULL;
+    LocalDoc* lDocRead = nullptr;
 
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
     lDocWrite.id.buf = const_cast<char*>("_local/testlocal");
@@ -1304,9 +1304,9 @@ TEST_F(CouchstoreTest, test_changes_count) {
     /**
      * delete a few docs... count should stay the same
      */
-    ASSERT_EQ(
-            COUCHSTORE_SUCCESS,
-            couchstore_save_documents(db, NULL, documents.getDocInfos(), 2, 0));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_save_documents(
+                      db, nullptr, documents.getDocInfos(), 2, 0));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
 
     ASSERT_EQ(COUCHSTORE_SUCCESS,
