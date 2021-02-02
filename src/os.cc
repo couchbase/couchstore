@@ -15,14 +15,16 @@
  *   limitations under the License.
  */
 #include "couchstore_config.h"
-#include <fcntl.h>
-#include <errno.h>
+#include "crc32.h"
+#include "internal.h"
+
+#include <folly/FileUtil.h>
 #include <phosphor/phosphor.h>
 #include <platform/cbassert.h>
-#include <sys/types.h>
-#include "crc32.h"
 
-#include "internal.h"
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/types.h>
 
 #undef LOG_IO
 #ifdef LOG_IO
@@ -295,17 +297,10 @@ couchstore_error_t PosixFileOps::sync(couchstore_error_info_t* errinfo,
                                       couch_file_handle handle)
 {
     auto* file = to_file(handle);
-    int rv;
-    do {
-#ifdef __FreeBSD__
-        rv = fsync(file->fd);
-#else
-        rv = fdatasync(file->fd);
-#endif
-    } while (rv == -1 && errno == EINTR);
 
-    if (rv == -1) {
-        TRACE_INSTANT1("couchstore_write", "sync", "rv", rv);
+    // Note: Docs for fsync/fdatasync don't report EINTR as possible errno, but
+    // let folly automatically re-try the call in case.
+    if (folly::fdatasyncNoInt(file->fd) == -1) {
         save_errno(errinfo);
         return COUCHSTORE_ERROR_WRITE;
     }
