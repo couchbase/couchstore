@@ -15,6 +15,11 @@
  *   limitations under the License.
  */
 
+#include "test_fileops.h"
+
+#include <src/internal.h>
+
+#include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 #include <libcouchstore/couch_db.h>
 #include <nlohmann/json.hpp>
@@ -56,8 +61,9 @@ protected:
 
     UniqueDbPtr openDb(
             couchstore_open_flags flags = COUCHSTORE_OPEN_FLAG_CREATE |
-                                          COUCHSTORE_OPEN_FLAG_UNBUFFERED) {
-        auto [status, db] = openDatabase(filename, flags);
+                                          COUCHSTORE_OPEN_FLAG_UNBUFFERED,
+            FileOpsInterface* fileops = nullptr) {
+        auto [status, db] = openDatabase(filename, flags, fileops);
         if (status != COUCHSTORE_SUCCESS) {
             throw std::runtime_error(std::string{"Failed to open database: "} +
                                      couchstore_strerror(status));
@@ -322,4 +328,80 @@ TEST_F(CouchstoreCxxTest, ReplayOfDeletedDocuments) {
         ASSERT_EQ(COUCHSTORE_ERROR_DOC_NOT_FOUND, docstat);
         ASSERT_FALSE(doc);
     }
+}
+
+TEST_F(CouchstoreCxxTest, SyncHeaderFailure_NoCallback) {
+    ::testing::NiceMock<MockOps> ops(create_default_file_ops());
+    const auto flags =
+            COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED;
+    auto db = openDb(flags, &ops);
+
+    storeDocument(*db, "key", "value");
+
+    using namespace testing;
+    EXPECT_CALL(ops, sync(_, _))
+            .Times(2)
+            .WillOnce(Return(COUCHSTORE_SUCCESS)) // data
+            .WillOnce(Return(COUCHSTORE_ERROR_WRITE)); // header
+
+    // No callback, just return the error to the caller
+    EXPECT_EQ(COUCHSTORE_ERROR_WRITE, couchstore_commit(db.get()));
+}
+
+TEST_F(CouchstoreCxxTest, SyncHeaderFailure_CallbackNoRetry) {
+    ::testing::NiceMock<MockOps> ops(create_default_file_ops());
+    const auto flags =
+            COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED;
+    auto db = openDb(flags, &ops);
+
+    storeDocument(*db, "key", "value");
+
+    using namespace testing;
+    EXPECT_CALL(ops, sync(_, _))
+            .Times(2)
+            .WillOnce(Return(COUCHSTORE_SUCCESS)) // data
+            .WillOnce(Return(COUCHSTORE_ERROR_WRITE)); // header
+
+    // Callback instructs couchstore to just return the error to the caller
+    bool called = false;
+    const auto callback = [&called](const std::system_error&) -> bool {
+        called = true;
+        return false;
+    };
+
+    EXPECT_EQ(COUCHSTORE_ERROR_WRITE, couchstore_commit(db.get(), callback));
+    EXPECT_TRUE(called);
+}
+
+TEST_F(CouchstoreCxxTest, SyncHeaderFailure_CallbackRetry) {
+    ::testing::NiceMock<MockOps> ops(create_default_file_ops());
+    const auto flags =
+            COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED;
+    auto db = openDb(flags, &ops);
+
+    storeDocument(*db, "key", "value");
+
+    using namespace testing;
+    EXPECT_CALL(ops, sync(_, _))
+            .Times(AnyNumber())
+            .WillOnce(Return(COUCHSTORE_SUCCESS)) // data
+            .WillRepeatedly(Return(COUCHSTORE_ERROR_WRITE)); // header
+
+    // Callback instructs couchstore to re-try the operation 10 times before
+    // returning to the caller
+    size_t numRetries = 0;
+    const auto callback = [&numRetries](const std::system_error&) -> bool {
+        ++numRetries;
+
+        if (numRetries == 10) {
+            // Return error to caller
+            return false;
+        }
+
+        // Re-try
+        return true;
+    };
+
+    EXPECT_EQ(COUCHSTORE_ERROR_WRITE, couchstore_commit(db.get(), callback));
+    EXPECT_EQ(10, numRetries);
 }

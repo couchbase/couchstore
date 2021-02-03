@@ -351,34 +351,67 @@ couchstore_error_t precommit(Db *db)
     return errcode;
 }
 
-couchstore_error_t couchstore_commit(Db* db) {
+couchstore_error_t couchstore_commit(Db* db, const SysErrorCallback& callback) {
     return couchstore_commit_ex(
-            db, std::chrono::system_clock::now().time_since_epoch().count());
+            db,
+            std::chrono::system_clock::now().time_since_epoch().count(),
+            callback);
 }
 
-couchstore_error_t couchstore_commit_ex(Db* db, uint64_t timestamp) {
+couchstore_error_t couchstore_commit_ex(Db* db,
+                                        uint64_t timestamp,
+                                        const SysErrorCallback& callback) {
     COLLECT_LATENCY();
 
-    couchstore_error_t errcode = precommit(db);
+    // Extend file to contain the header and sync data to disk
+    auto res = precommit(db);
+    if (res != COUCHSTORE_SUCCESS) {
+        return res;
+    }
 
-    if (errcode == COUCHSTORE_SUCCESS) {
+    // Note: In general after a fsync failure, another call to fsync does not
+    // guarantee to sync the dirty blocks from a previous pwrite. That's why
+    // here we need to repeat write+sync when fsync fails.
+    while (true) {
+        const auto preflushPos = db->file.pos;
+
+        // Flush header to kernel buffer
         db->header.timestamp = timestamp;
-        errcode = db_write_header(db);
+        res = db_write_header(db);
+        if (res != COUCHSTORE_SUCCESS) {
+            return res;
+        }
+
+        // Sync header to disk
+        res = db->file.ops->sync(&db->file.lastError, db->file.handle);
+
+        if (res == COUCHSTORE_SUCCESS) {
+            // Success path, all done
+            break;
+        }
+
+        // Note: We need to maintain the original behaviour (just returning the
+        // failure to the caller) for components that don't pass a callback or
+        // components that explicitly ask couchstore to return the error code.
+        if (!callback ||
+            !callback(std::system_error(
+                    errno,
+                    std::system_category(),
+                    "couchstore_commit_ex: Failed to sync header to disk"))) {
+            return res;
+        }
+
+        // Sync has failed, reset the file pos and re-try write+sync
+        db->file.pos = preflushPos;
     }
 
-    if (errcode == COUCHSTORE_SUCCESS) {
-        errcode = db->file.ops->sync(&db->file.lastError, db->file.handle);
-    }
+    // BufferedFileOps allocates read and write buffers so that we can
+    // reduce syscalls. To allow us to cache Db objects in KV_Engine we need
+    // to free these buffers as they can use a substantial amount of memory
+    // and may not be useful for the next Db usage.
+    db->file.ops->free_buffers(db->file.handle);
 
-    if (errcode == COUCHSTORE_SUCCESS) {
-        // BufferedFileOps allocates read and write buffers so that we can
-        // reduce syscalls. To allow us to cache Db objects in KV_Engine we need
-        // to free these buffers as they can use a substantial amount of memory
-        // and may not be useful for the next Db usage.
-        db->file.ops->free_buffers(db->file.handle);
-    }
-
-    return errcode;
+    return COUCHSTORE_SUCCESS;
 }
 
 static tree_file_options get_tree_file_options_from_flags(couchstore_open_flags flags)

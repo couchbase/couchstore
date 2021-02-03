@@ -25,6 +25,8 @@
 #include <functional>
 #include <optional>
 
+#include <system_error>
+
 extern "C" {
 
     /*///////////////////  OPENING/CLOSING DATABASES: */
@@ -391,15 +393,27 @@ extern "C" {
             void* save_cb_ctx);
 
     /**
+     * User-defined callback that will be executed when couchstore_commit fails.
+     * Allows the user to decide whether they want couchstore to re-try the
+     * operation or just return to the caller.
+     *
+     * @return false if the user just wants couchstore to return the error code;
+     *         true if the user wants couchstore to re-try the operation
+     */
+    using SysErrorCallback = std::function<bool(const std::system_error&)>;
+
+    /**
      * Commit all pending changes and flush buffers to persistent storage
      * (and set the "timestamp" to the number of nanoseconds since epoch
      * reported by the steady clock)
      *
      * @param db database to perform the commit on
+     * @param callback Called if the sync-header phase fails
      * @return COUCHSTORE_SUCCESS on success
      */
     LIBCOUCHSTORE_API
-    couchstore_error_t couchstore_commit(Db *db);
+    couchstore_error_t couchstore_commit(Db* db,
+                                         const SysErrorCallback& callback = {});
 
     /**
      * Commit all pending changes and flush buffers to persistent storage.
@@ -407,10 +421,12 @@ extern "C" {
      * @param db database to perform the commit on
      * @param timestamp a "number" the application may use to represent
      *                  its logical "timestamp" of when the data was written.
+     * @param callback Called if the sync-header phase fails
      * @return COUCHSTORE_SUCCESS on success
      */
     LIBCOUCHSTORE_API
-    couchstore_error_t couchstore_commit_ex(Db* db, uint64_t timestamp);
+    couchstore_error_t couchstore_commit_ex(
+            Db* db, uint64_t timestamp, const SysErrorCallback& callback = {});
 
     /*////////////////////  RETRIEVING DOCUMENTS: */
 
