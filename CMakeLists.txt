@@ -113,7 +113,7 @@ SET_PROPERTY(TARGET couchstore_view_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 # libcouchstore, core couchstore library
 ADD_LIBRARY(couchstore SHARED $<TARGET_OBJECTS:couchstore_objs>)
-SET(COUCHSTORE_LIBS cbcompress dirutils platform phosphor)
+SET(COUCHSTORE_LIBS cbcompress platform phosphor)
 TARGET_LINK_LIBRARIES(couchstore ${COUCHSTORE_LIBS})
 
 GENERATE_EXPORT_HEADER(couchstore
@@ -164,22 +164,22 @@ ADD_EXECUTABLE(couch_compact src/compactor.cc)
 TARGET_LINK_LIBRARIES(couch_compact couchstore platform)
 
 ADD_EXECUTABLE(couch_view_file_merger src/views/bin/couch_view_file_merger.cc src/views/bin/util.cc)
-TARGET_LINK_LIBRARIES(couch_view_file_merger couchstore_views dirutils)
+TARGET_LINK_LIBRARIES(couch_view_file_merger couchstore_views platform)
 
 ADD_EXECUTABLE(couch_view_index_builder src/views/bin/couch_view_index_builder.cc src/views/bin/util.cc)
-TARGET_LINK_LIBRARIES(couch_view_index_builder couchstore_views dirutils)
+TARGET_LINK_LIBRARIES(couch_view_index_builder couchstore_views platform)
 TARGET_INCLUDE_DIRECTORIES(couch_view_index_builder PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couch_view_group_cleanup src/views/bin/couch_view_group_cleanup.cc src/views/bin/util.cc)
-TARGET_LINK_LIBRARIES(couch_view_group_cleanup couchstore_views dirutils)
+TARGET_LINK_LIBRARIES(couch_view_group_cleanup couchstore_views platform)
 TARGET_INCLUDE_DIRECTORIES(couch_view_group_cleanup PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couch_view_index_updater src/views/bin/couch_view_index_updater.cc src/views/bin/util.cc)
-TARGET_LINK_LIBRARIES(couch_view_index_updater couchstore_views dirutils)
+TARGET_LINK_LIBRARIES(couch_view_index_updater couchstore_views platform)
 TARGET_INCLUDE_DIRECTORIES(couch_view_index_updater PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couch_view_group_compactor src/views/bin/couch_view_group_compactor.cc src/views/bin/util.cc)
-TARGET_LINK_LIBRARIES(couch_view_group_compactor couchstore_views dirutils)
+TARGET_LINK_LIBRARIES(couch_view_group_compactor couchstore_views platform)
 TARGET_INCLUDE_DIRECTORIES(couch_view_group_compactor PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 ADD_EXECUTABLE(couch_create src/couch_create.cc src/crc32.cc)
@@ -263,7 +263,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
         ADD_EXECUTABLE(${name} ${ARGN})
         SET_TARGET_PROPERTIES(${name} PROPERTIES
                               COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
-        TARGET_LINK_LIBRARIES(${name} couchstore_views dirutils)
+        TARGET_LINK_LIBRARIES(${name} couchstore_views platform)
         TARGET_INCLUDE_DIRECTORIES(${name} PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
     ENDMACRO()
 
@@ -337,7 +337,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
     SET_TARGET_PROPERTIES(couchstore_gtest PROPERTIES
                           COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
     TARGET_INCLUDE_DIRECTORIES(couchstore_gtest PRIVATE ${COUCHSTORE_GTEST_INCLUDES})
-    TARGET_LINK_LIBRARIES(couchstore_gtest couchstore dirutils ${COUCHSTORE_GTEST_LIBRARIES})
+    TARGET_LINK_LIBRARIES(couchstore_gtest couchstore platform ${COUCHSTORE_GTEST_LIBRARIES})
 
     ADD_EXECUTABLE(couchstore_internal_gtest
                    tests/couchstoretest.cc
