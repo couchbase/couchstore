@@ -15,26 +15,21 @@
  *   limitations under the License.
  */
 
-#include "couchstore_config.h"
-#include "couch_btree.h"
 #include "internal.h"
 #include "util.h"
 
 #include <libcouchstore/couch_db.h>
-#include <platform/cb_malloc.h>
 
 #include <getopt.h>
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
+#include <cinttypes>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <iomanip>
-#include <string>
 #include <sstream>
+#include <string>
 
-static void usage(void) {
+static void usage() {
     printf("USAGE: couch_dbck [options] "
            "source_filename [destination_filename]\n");
     printf("\nOptions:\n");
@@ -53,8 +48,6 @@ struct recovery_options {
     std::string src_filename;
     // Destination (recovered) file name.
     std::string dst_filename;
-    // If set, check whether or not doc body is corrupted.
-    bool detect_corrupt_docbody = true;
     // If set, recover using old data from stale commits.
     bool enable_rewind = false;
     // If set, print out detailed messages.
@@ -91,13 +84,8 @@ std::string get_printable_string(const sized_buf& buf) {
     return ret;
 }
 
-static int recover_file_hook(Db* target,
-                             DocInfo *docinfo,
-                             sized_buf item,
-                             void *ctx) {
-    (void)item;
-    recover_file_hook_param* param =
-            reinterpret_cast<recover_file_hook_param*>(ctx);
+static int recover_file_hook(Db*, DocInfo* docinfo, sized_buf, void* ctx) {
+    auto* param = reinterpret_cast<recover_file_hook_param*>(ctx);
     if (!docinfo) {
         // End of compaction.
         return 0;
@@ -177,14 +165,13 @@ struct rewind_hook_param {
     uint64_t num_docs_recovered = 0;
 };
 
-static int rewind_hook(Db *db,
-                       int depth,
+static int rewind_hook(Db*,
+                       int,
                        const DocInfo* doc_info,
-                       uint64_t subtree_size,
-                       const sized_buf* reduce_value,
-                       void *ctx) {
-    rewind_hook_param* param =
-            reinterpret_cast<rewind_hook_param*>(ctx);
+                       uint64_t,
+                       const sized_buf*,
+                       void* ctx) {
+    auto* param = reinterpret_cast<rewind_hook_param*>(ctx);
     if (!doc_info) {
         return 0;
     }
@@ -308,8 +295,8 @@ static int recover_file(recovery_options& options) {
     // Another handle for source DB.
     Db *db_src_alt = nullptr;
 
-    couchstore_error_t errcode = COUCHSTORE_SUCCESS;
-    couchstore_error_t errcode_compaction = COUCHSTORE_SUCCESS;
+    couchstore_error_t errcode;
+    couchstore_error_t errcode_compaction;
     bool error_detected = false;
 
     recover_file_hook_param param;
@@ -408,21 +395,18 @@ cleanup:
     return errcode;
 }
 
-int main(int argc, char **argv)
-{
-    struct option long_options[] =
-    {
-        {"stale",   no_argument, 0, 's'},
-        {"verbose", no_argument, 0, 'v'},
-        {"json",    no_argument, 0, 'j'},
-        {nullptr,   0,           0, 0}
-    };
+int main(int argc, char** argv) {
+    const std::vector<option> long_options = {
+            {"stale", no_argument, nullptr, 's'},
+            {"verbose", no_argument, nullptr, 'v'},
+            {"json", no_argument, nullptr, 'j'},
+            {nullptr, 0, nullptr, 0}};
 
     recovery_options options;
     int opt;
 
-    while ( (opt = getopt_long(argc, argv, "svj",
-                               long_options, nullptr)) != -1 )  {
+    while ((opt = getopt_long(
+                    argc, argv, "svj", long_options.data(), nullptr)) != -1) {
         switch (opt) {
         case 's': // stale
             options.enable_rewind = true;
@@ -461,4 +445,3 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 }
-
