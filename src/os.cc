@@ -298,9 +298,13 @@ couchstore_error_t PosixFileOps::sync(couchstore_error_info_t* errinfo,
 {
     auto* file = to_file(handle);
 
-    // Note: Docs for fsync/fdatasync don't report EINTR as possible errno, but
-    // let folly automatically re-try the call in case.
-    if (folly::fdatasyncNoInt(file->fd) == -1) {
+    // Notes:
+    // 1. Docs for fsync/fdatasync don't report EINTR as possible errno, so no
+    //    need to handle that here
+    // 2. We used to call fsync for FreeBSD as fdatasync doesn't guarantee data
+    //    on disk before it returns on that platform. FreeBSD is not officially
+    //    supported now so just call fdatasync
+    if (fdatasync(file->fd) == -1) {
         save_errno(errinfo);
         return COUCHSTORE_ERROR_WRITE;
     }
