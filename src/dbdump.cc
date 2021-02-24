@@ -173,6 +173,52 @@ static void printsbhexraw(const sized_buf* sb) {
     }
 }
 
+static void printbuf(const char *buf, size_t len)
+{
+    size_t i;
+
+    if (buf == nullptr) {
+        printf("null");
+        return;
+    }
+    for (i = 0; i < len; ++i) {
+        char c = buf[i];
+        if (isgraph(c)) {
+            printf("%c", c);
+        }
+        else {
+            switch (c) {
+            case '\a':
+                printf("\\a");
+                break;
+            case '\b':
+                printf("\\b");
+                break;
+            case '\f':
+                printf("\\f");
+                break;
+            case '\n':
+                printf("\\n");
+                break;
+            case '\r':
+                printf("\\r");
+                break;
+            case '\t':
+                printf("\\t");
+                break;
+            case '\v':
+                printf("\\v");
+                break;
+            case '\0':
+                printf("\\0");
+                break;
+            default:
+                printf("\\x%X", c);
+            }
+        }
+    }
+}
+
 static void printsbhex(const sized_buf *sb, int with_ascii)
 {
     size_t i;
@@ -270,65 +316,70 @@ static std::string getNamespaceString(uint32_t ns) {
     }
 }
 
-static void printDocId(const char* prefix, const sized_buf* sb) {
-    if (decodeNamespace && sb->size >= sizeof(uint32_t)) {
-        // Decode the collection-ID of the key
-        auto [cid, rawKey] = cb::mcbp::unsigned_leb128<uint32_t>::decode(
-                {reinterpret_cast<uint8_t*>(sb->buf), sb->size});
+static std::string buildCollectionInfoId(const sized_buf* sb){
+    // Decode the collection-ID of the key
+    auto [cid, rawKey] = cb::mcbp::unsigned_leb128<uint32_t>::decode(
+            {reinterpret_cast<uint8_t*>(sb->buf), sb->size});
 
-        auto collectionInfo = getNamespaceString(cid);
+    auto collectionInfo = getNamespaceString(cid);
 
-        if (cid == 2) {
-            // Synchronous Replication 'Prepare' namespace prefix.
-            // Decode again.
-            auto [newCid, newRawKey] =
-                    cb::mcbp::unsigned_leb128<uint32_t>::decode(rawKey);
-            cid = newCid;
-            rawKey = newRawKey;
-            collectionInfo += getNamespaceString(cid);
-        }
-
-        // Some keys in the system event namespace have a format we can decode:
-        // \1_collection:<affected collection-id leb128>
-        // \1_scope:<affected scope-id leb128>
-        std::string collectionsPrefix("_collection");
-        std::string scopePrefix("_scope");
-        std::string key{reinterpret_cast<const char*>(rawKey.data()),
-                        rawKey.size()};
-        if (cid == 1) {
-            auto [systemType, systemKey] =
-                    cb::mcbp::unsigned_leb128<uint32_t>::decode(
-                            {reinterpret_cast<const uint8_t*>(rawKey.data()),
-                             rawKey.size()});
-
-            // System event namespace
-            if (systemType == 0 &&
-                key.find(collectionsPrefix) != std::string::npos) {
-                auto [affectedCid, keyRemainder] =
-                        cb::mcbp::unsigned_leb128<uint32_t>::decode(systemKey);
-                key = std::string{
-                        reinterpret_cast<const char*>(keyRemainder.data()),
-                        keyRemainder.size()};
-                std::stringstream ss;
-                ss << collectionInfo << "collection:0x" << std::hex
-                   << affectedCid;
-                collectionInfo = ss.str();
-            } else if (systemType == 1 &&
-                       key.find(scopePrefix) != std::string::npos) {
-                auto [affectedSid, keyRemainder] =
-                        cb::mcbp::unsigned_leb128<uint32_t>::decode(systemKey);
-                key = std::string{
-                        reinterpret_cast<const char*>(keyRemainder.data()),
-                        keyRemainder.size()};
-                std::stringstream ss;
-                ss << collectionInfo << "scope:0x" << std::hex << affectedSid;
-                collectionInfo = ss.str();
-            }
-        }
-        printf("%s(%s) %s\n", prefix, collectionInfo.c_str(), key.c_str());
-    } else {
-        printf("%s%.*s\n", prefix, (int)sb->size, sb->buf);
+    if (cid == 2) {
+        // Synchronous Replication 'Prepare' namespace prefix.
+        // Decode again.
+        auto [newCid, newRawKey] =
+                cb::mcbp::unsigned_leb128<uint32_t>::decode(rawKey);
+        cid = newCid;
+        rawKey = newRawKey;
+        collectionInfo += getNamespaceString(cid);
     }
+
+    // Some keys in the system event namespace have a format we can decode:
+    // \1_collection:<affected collection-id leb128>
+    // \1_scope:<affected scope-id leb128>
+    std::string collectionsPrefix("_collection");
+    std::string scopePrefix("_scope");
+    std::string key{reinterpret_cast<const char*>(rawKey.data()),
+                    rawKey.size()};
+    if (cid == 1) {
+        auto [systemType, systemKey] =
+                cb::mcbp::unsigned_leb128<uint32_t>::decode(
+                        {reinterpret_cast<const uint8_t*>(rawKey.data()),
+                         rawKey.size()});
+
+        // System event namespace
+        if (systemType == 0 &&
+            key.find(collectionsPrefix) != std::string::npos) {
+            auto [affectedCid, keyRemainder] =
+                    cb::mcbp::unsigned_leb128<uint32_t>::decode(systemKey);
+            key = std::string{
+                    reinterpret_cast<const char*>(keyRemainder.data()),
+                    keyRemainder.size()};
+            std::stringstream ss;
+            ss << collectionInfo << "collection:0x" << std::hex << affectedCid;
+            collectionInfo = ss.str();
+        } else if (systemType == 1 &&
+                   key.find(scopePrefix) != std::string::npos) {
+            auto [affectedSid, keyRemainder] =
+                    cb::mcbp::unsigned_leb128<uint32_t>::decode(systemKey);
+            key = std::string{
+                    reinterpret_cast<const char*>(keyRemainder.data()),
+                    keyRemainder.size()};
+            std::stringstream ss;
+            ss << collectionInfo << "scope:0x" << std::hex << affectedSid;
+            collectionInfo = ss.str();
+        }
+    }
+    return std::string ("(") + collectionInfo + std::string(")") + key;
+}
+static void printDocId(const char* prefix, const sized_buf* sb) {
+    printf("%s", prefix);
+    if (decodeNamespace && sb->size >= sizeof(uint32_t)) {
+        auto expandedDocId = buildCollectionInfoId(sb);
+        printbuf(expandedDocId.c_str(), expandedDocId.size());
+    } else {
+        printbuf(sb->buf, sb->size);
+    }
+    printf("\n");
 }
 
 static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
@@ -344,7 +395,13 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
 
     if (dumpJson) {
         printf("{\"seq\":%" PRIu64 ",\"id\":\"", docinfo->db_seq);
-        printjquote(&docinfo->id);
+        if (decodeNamespace && docinfo->id.size >= sizeof(uint32_t)) {
+            auto expandedDocId = buildCollectionInfoId(&docinfo->id);
+            sized_buf expandedDoc = sized_buf{expandedDocId.data(), expandedDocId.size()};
+            printjquote(&expandedDoc);
+        } else {
+            printjquote(&docinfo->id);
+        }
         printf("\",");
     } else {
         if (mode == DumpBySequence) {
@@ -1182,7 +1239,7 @@ static void usage(void) {
     printf("    --byid       sort output by document ID\n");
     printf("    --byseq      sort output by document sequence number (default)\n");
     printf("    --json       dump data as JSON objects (one per line)\n");
-    printf("    --no-namespace  don't decode namespaces\n");
+    printf("    --no-namespace  dump documents for files that do not use namespaces\n");
     printf("    --iterate-headers  Iterate through all headers\n");
     printf("    --dump-headers  Dump the file header structure\n");
     printf("    --header-offset <offset> Use the header at file offset\n");
