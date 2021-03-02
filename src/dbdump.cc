@@ -421,12 +421,13 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         return 0;
     }
     if (dumpJson) {
-        printf("\"rev\":%" PRIu64 ",\"content_meta\":%d,", docinfo->rev_seq,
-                                                         docinfo->content_meta);
+        printf("\"rev\":%" PRIu64 ",\"content_meta\":%#02x,",
+               docinfo->rev_seq,
+               docinfo->content_meta);
         printf("\"physical_size\":%" PRIu64 ",", (uint64_t)docinfo->physical_size);
     } else {
         printf("     rev: %" PRIu64 "\n", docinfo->rev_seq);
-        printf("     content_meta: %d\n", docinfo->content_meta);
+        printf("     content_meta: %#02x\n", docinfo->content_meta);
         printf("     size (on disk): %" PRIu64 "\n", (uint64_t)docinfo->physical_size);
     }
 
