@@ -17,25 +17,26 @@
 
 #include "couchstore_config.h"
 
-#include <assert.h>
-#include <fcntl.h>
-#include <platform/cb_malloc.h>
-#include <platform/cbassert.h>
-#include <platform/platform_socket.h>
-#include <platform/string_hex.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <cstddef>
-#include <string>
-
 #include "bitfield.h"
 #include "couch_btree.h"
+#include "couch_latency_internal.h"
 #include "internal.h"
 #include "node_types.h"
 #include "reduces.h"
 #include "util.h"
 
-#include "couch_latency_internal.h"
+#include <gsl/gsl-lite.h>
+#include <platform/cb_malloc.h>
+#include <platform/cbassert.h>
+#include <platform/platform_socket.h>
+#include <platform/string_hex.h>
+
+#include <assert.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <cstddef>
+#include <string>
 
 #define ROOT_BASE_SIZE 12
 #define HEADER_BASE_SIZE 25
@@ -534,6 +535,14 @@ couchstore_error_t couchstore_open_db_ex(const char *filename,
 
     if (flags & COUCHSTORE_OPEN_FLAG_CREATE) {
         openflags |= O_CREAT;
+    }
+
+    if (flags & COUCHSTORE_OPEN_FLAG_EXCL) {
+        if (!(flags & COUCHSTORE_OPEN_FLAG_CREATE)) {
+            errcode = COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+            goto cleanup;
+        }
+        openflags |= O_EXCL;
     }
 
     // open with CRC unknown, CRC will be selected when header is read/or not found.

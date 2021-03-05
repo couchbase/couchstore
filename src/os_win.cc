@@ -179,6 +179,9 @@ couchstore_error_t WindowsFileOps::open(couchstore_error_info_t *errinfo,
     if(oflag & O_CREAT) {
         creationflag = OPEN_ALWAYS;
     }
+    if (oflag & O_EXCL) {
+        creationflag = CREATE_NEW;
+    }
 
     HANDLE os_handle =
             CreateFileA(path,

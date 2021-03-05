@@ -66,6 +66,15 @@ extern "C" {
     const uint64_t COUCHSTORE_OPEN_FLAG_UNBUFFERED = 8;
 
     /**
+     * Ensures that the call to open() creates the file.
+     * If the file already exists then open() fails with the error EEXIST.
+     *
+     * !! Note: Must be used in conjunction with O_CREAT, the behaviour of
+     * open() is undefined otherwise.
+     */
+    const uint64_t COUCHSTORE_OPEN_FLAG_EXCL = 16;
+
+    /**
      * Customize IO buffer configurations.
      *
      * This specifies the capacity of a read buffer and its count.

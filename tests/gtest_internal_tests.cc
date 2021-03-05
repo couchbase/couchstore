@@ -29,6 +29,7 @@
 #include "documents.h"
 
 #include <libcouchstore/couch_db.h>
+#include <platform/dirutils.h>
 
 /**
  * Note: below internal Couchstore header files should be located
@@ -621,6 +622,36 @@ TEST_F(CouchstoreInternalTest, couch_dbck)
     remove(recovered_file.c_str());
 
     db = nullptr;
+}
+
+/**
+ * Verifies that couchstore_open fails if EXCL is specifies without CREAT
+ */
+TEST_F(CouchstoreInternalTest, OpenFails_EXCL) {
+    ASSERT_FALSE(cb::io::isFile(filePath));
+    EXPECT_EQ(COUCHSTORE_ERROR_INVALID_ARGUMENTS,
+              couchstore_open_db(
+                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_EXCL, &db));
+    EXPECT_FALSE(cb::io::isFile(filePath));
+}
+
+TEST_F(CouchstoreInternalTest, OpenFails_FileAlreadyExists) {
+    ASSERT_FALSE(cb::io::isFile(filePath));
+
+    // Create the file
+    const auto flags = COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_EXCL;
+    EXPECT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(filePath.c_str(), flags, &db));
+    EXPECT_TRUE(cb::io::isFile(filePath));
+
+    // Try to create it again
+    EXPECT_EQ(COUCHSTORE_ERROR_OPEN_FILE,
+              couchstore_open_db(filePath.c_str(), flags, &db));
+#ifdef WIN32
+    EXPECT_EQ(ERROR_FILE_EXISTS, GetLastError());
+#else
+    EXPECT_EQ(EEXIST, errno);
+#endif
 }
 
 /**
