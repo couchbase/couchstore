@@ -25,17 +25,14 @@
 #include "reduces.h"
 #include "util.h"
 
-#include <gsl/gsl-lite.h>
 #include <platform/cb_malloc.h>
-#include <platform/cbassert.h>
 #include <platform/platform_socket.h>
 #include <platform/string_hex.h>
 
-#include <assert.h>
 #include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 
 #define ROOT_BASE_SIZE 12
@@ -575,7 +572,6 @@ couchstore_error_t couchstore_open_db_ex(const char *filename,
         if (db->header.disk_version <= COUCH_DISK_VERSION_11) {
             db->file.crc_mode = CRC32;
         } else {
-            cb_assert(db->header.disk_version >= COUCH_DISK_VERSION_12);
             db->file.crc_mode = CRC32C;
         }
 
