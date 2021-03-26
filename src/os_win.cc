@@ -183,9 +183,16 @@ couchstore_error_t WindowsFileOps::open(couchstore_error_info_t *errinfo,
         creationflag = CREATE_NEW;
     }
 
+    DWORD desiredAccess = GENERIC_READ;
+    if (oflag & O_WRONLY) {
+        desiredAccess = GENERIC_WRITE;
+    } else if (oflag & O_RDWR) {
+        desiredAccess |= GENERIC_WRITE;
+    }
+
     HANDLE os_handle =
             CreateFileA(path,
-                        GENERIC_READ | GENERIC_WRITE,
+                        desiredAccess,
                         FILE_SHARE_DELETE | FILE_SHARE_WRITE | FILE_SHARE_READ,
                         nullptr,
                         creationflag,
