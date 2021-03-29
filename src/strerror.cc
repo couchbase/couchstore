@@ -36,7 +36,9 @@ const char *couchstore_strerror(couchstore_error_t errcode)
         return "this db handle could have its file reopened and must be closed";
     case COUCHSTORE_ERROR_FILE_CLOSE:
         return "error closing file";
+    case COUCHSTORE_ERROR_CANCEL:
+        return "error cancel";
     default:
-        return nullptr;
+        return "couchstore_strerror unknown errcode";
     }
 }

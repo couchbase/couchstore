@@ -90,6 +90,19 @@ protected:
         }
     }
 
+    void storeLocalDocument(Db& db,
+                            std::string_view key,
+                            std::string_view value,
+                            bool deleted = false) {
+        LocalDoc doc{};
+        doc.id = {const_cast<char*>(key.data()), key.size()};
+        doc.json = {const_cast<char*>(value.data()), value.size()};
+        doc.deleted = deleted;
+
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_save_local_document(&db, &doc));
+    }
+
     std::string filename;
     std::vector<std::string> dbfiles;
     std::vector<cs_off_t> headers;
@@ -328,6 +341,54 @@ TEST_F(CouchstoreCxxTest, ReplayOfDeletedDocuments) {
         ASSERT_EQ(COUCHSTORE_ERROR_DOC_NOT_FOUND, docstat);
         ASSERT_FALSE(doc);
     }
+}
+
+// Validate the pre-copy hook copies local documents before regular ones
+TEST_F(CouchstoreCxxTest, ReplayOfLocalDocumentsBeforeRegularDocuments) {
+    auto source = openDb();
+    auto start = cb::couchstore::getHeader(*source);
+
+    // Store normal document and local document
+    storeDocument(*source, "regular1", "bar");
+    storeLocalDocument(*source, "local1", "l1");
+    storeLocalDocument(*source, "local2", "l2");
+    storeDocument(*source, "regular2", "bar");
+
+    couchstore_commit(source.get());
+    auto end = cb::couchstore::getHeader(*source);
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::seek(*source, start.headerPosition));
+
+    const std::string targetdb = filename + ".ex";
+    dbfiles.emplace_back(targetdb);
+
+    auto [status, target] = openDatabase(
+            targetdb,
+            COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED);
+    ASSERT_EQ(COUCHSTORE_SUCCESS, status) << "Failed to open target db";
+
+    int local{0}, regular{0};
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::replay(
+                      *source,
+                      *target,
+                      uint64_t(-1),
+                      end.headerPosition,
+                      [&local, &regular](Db&,
+                                         Db&,
+                                         const DocInfo* docInfo,
+                                         const DocInfo* localDocInfo) {
+                          if (localDocInfo) {
+                              local++;
+                              EXPECT_EQ(0, regular);
+                              return COUCHSTORE_SUCCESS;
+                          }
+                          regular++;
+                          return COUCHSTORE_SUCCESS;
+                      },
+                      {}));
+    EXPECT_EQ(2, regular);
+    EXPECT_EQ(2, local);
 }
 
 TEST_F(CouchstoreCxxTest, SyncHeaderFailure_NoCallback) {

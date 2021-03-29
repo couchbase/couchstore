@@ -1404,6 +1404,7 @@ couchstore_error_t compact(Db& source,
  *              within the same delta will be deduped)
  * @param sourceHeaderEndOffset The last header to include
  * @param preCopyHook The hook to be called before each document is copied over
+ *        replay will copy localdocs before 'normal' documents
  * @param precommitHook The hook to call before each commit
  */
 LIBCOUCHSTORE_API

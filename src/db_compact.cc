@@ -804,6 +804,14 @@ couchstore_error_t replay(Db& source,
         header = cb::couchstore::getHeader(source);
         next = header.timestamp - (header.timestamp % delta) + delta;
 
+        status = couchstore_walk_local_tree(
+                &source, nullptr, couchstore_walk_local_tree_callback, &ctx);
+        if (status != COUCHSTORE_SUCCESS) {
+            throw std::runtime_error(
+                    std::string{"couchstore_walk_local_tree() Failed: "} +
+                    couchstore_strerror(status));
+        }
+
         ++ctx.highest;
         status = couchstore_changes_since(
                 &source, ctx.highest, 0, couchstore_changes_callback, &ctx);
@@ -814,14 +822,6 @@ couchstore_error_t replay(Db& source,
         }
 
         ctx.flush();
-
-        status = couchstore_walk_local_tree(
-                &source, nullptr, couchstore_walk_local_tree_callback, &ctx);
-        if (status != COUCHSTORE_SUCCESS) {
-            throw std::runtime_error(
-                    std::string{"couchstore_walk_local_tree() Failed: "} +
-                    couchstore_strerror(status));
-        }
 
         couchstore_set_purge_seq(ctx.target, source.header.purge_seq);
         if (precommitHook) {
