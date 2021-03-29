@@ -75,8 +75,8 @@
 
     /** A generic data blob. Nothing is implied about ownership of the block pointed to. */
     struct sized_buf {
-        char *buf;
-        size_t size;
+        char* buf{nullptr};
+        size_t size{0};
     };
 
     /** A CouchStore document, consisting of an ID (key) and data, each of which is a blob. */
@@ -87,15 +87,28 @@
 
     /** Metadata of a CouchStore document. */
     struct DocInfo {
-        sized_buf id;               /**< Document ID (key) */
-        uint64_t db_seq;            /**< Sequence number in database */
-        uint64_t rev_seq;           /**< Revision number of document */
-        sized_buf rev_meta;         /**< Revision metadata; uninterpreted by CouchStore.
-                                         Needs to be kept small enough to fit in a B-tree index.*/
-        int deleted;                /**< Is this a deleted revision? */
-        couchstore_content_meta_flags content_meta;  /**< Content metadata flags */
-        uint64_t bp;                /**< Byte offset of document data in file */
-        size_t physical_size;       /**< Physical space occupied by data (*not* its length) */
+        /// @return the total size, that is value+key+metadata
+        size_t getTotalSize() const {
+            return physical_size + id.size + rev_meta.size;
+        }
+
+        /**< Document ID (key) */
+        sized_buf id;
+        /**< Sequence number in database */
+        uint64_t db_seq{0};
+        /**< Revision number of document */
+        uint64_t rev_seq{0};
+        /**< Revision metadata; uninterpreted by CouchStore.
+           Needs to be kept small enough to fit in a B-tree index.*/
+        sized_buf rev_meta;
+        /**< Is this a deleted revision? */
+        int deleted{0};
+        /**< Content metadata flags */
+        couchstore_content_meta_flags content_meta{0};
+        /**< Byte offset of document data in file */
+        uint64_t bp{0};
+        /**< Physical space occupied by data (*not* its length) */
+        size_t physical_size{0};
     };
 
 #define DOC_INITIALIZER { {0, 0}, {0, 0} }
