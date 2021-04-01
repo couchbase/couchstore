@@ -57,7 +57,7 @@ static nodelist *make_nodelist(arena* a, size_t bufsize)
     if (!r) {
         return nullptr;
     }
-    memset(r, 0, sizeof(nodelist));
+    *r = {};
     r->data.size = bufsize;
     r->data.buf = ((char *) r) + (sizeof(nodelist));
     return r;

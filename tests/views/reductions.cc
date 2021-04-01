@@ -22,7 +22,6 @@ static void test_view_btree_reduction_decoding(const char* reduction_bin,
 
     cb_assert(r.kv_count == 1582);
 
-    memset(&expected_part_bitmap, 0, sizeof(expected_part_bitmap));
     for (i = 0; i < (sizeof(partition_bitset) / sizeof(partition_bitset[0])); ++i) {
         set_bit(&expected_part_bitmap, partition_bitset[i]);
     }
@@ -50,7 +49,6 @@ static view_id_btree_reduction_t *test_view_id_btree_reduction_decoding(const ch
     cb_assert(decode_view_id_btree_reduction(id_btree_reduction_bin, &r) == COUCHSTORE_SUCCESS);
     cb_assert(r != nullptr);
     cb_assert(r->kv_count == 3026);
-    memset(&expected_part_bitmap, 0, sizeof(expected_part_bitmap));
     for (i = 0; i < (sizeof(partition_bitset) / sizeof(partition_bitset[0])); ++i) {
         set_bit(&expected_part_bitmap, partition_bitset[i]);
     }

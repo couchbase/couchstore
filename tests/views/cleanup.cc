@@ -36,7 +36,6 @@ static void test_view_id_btree_cleanup()
     size_t reduction_bin1_size = 0;
     node_pointer np;
 
-    memset(&purge_ctx, 0, sizeof(purge_ctx));
     set_bit(&purge_ctx.cbitmask, 64);
 
     /* Purge kv tests */
@@ -71,7 +70,6 @@ static void test_view_id_btree_cleanup()
 
     /* Purge kp tests */
     reduction1.kv_count = 11;
-    memset(&reduction1.partitions_bitmap, 0, sizeof(reduction1.partitions_bitmap));
 
     cb_assert(encode_view_id_btree_reduction(&reduction1, reduction_bin1, &reduction_bin1_size) == COUCHSTORE_SUCCESS);
     np.reduce_value.buf = reduction_bin1;
@@ -110,7 +108,6 @@ static void test_view_btree_cleanup()
     size_t reduction_bin1_size = 0;
     node_pointer np;
 
-    memset(&purge_ctx, 0, sizeof(purge_ctx));
     set_bit(&purge_ctx.cbitmask, 64);
 
     /* Purge KV tests */
@@ -147,7 +144,6 @@ static void test_view_btree_cleanup()
     reduction1.reduce_values = (sized_buf *) cb_malloc(sizeof(sized_buf));
     reduction1.reduce_values[0].buf = (char*)"value";
     reduction1.reduce_values[0].size = sizeof("value") - 1;
-    memset(&reduction1.partitions_bitmap, 0, sizeof(reduction1.partitions_bitmap));
 
     cb_assert(encode_view_btree_reduction(&reduction1, reduction_bin1, &reduction_bin1_size) == COUCHSTORE_SUCCESS);
     np.reduce_value.buf = reduction_bin1;

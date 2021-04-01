@@ -138,13 +138,11 @@ static void test_view_id_btree_reducer(void)
     free_id_value(&data2);
 
     reduction1.kv_count = 11;
-    memset(&reduction1.partitions_bitmap, 0, sizeof(reduction1.partitions_bitmap));
     set_bit(&reduction1.partitions_bitmap, 10);
     set_bit(&reduction1.partitions_bitmap, 1001);
     cb_assert(encode_view_id_btree_reduction(&reduction1, reduction_bin1, &reduction_bin1_size) == COUCHSTORE_SUCCESS);
 
     reduction2.kv_count = 22;
-    memset(&reduction2.partitions_bitmap, 0, sizeof(reduction2.partitions_bitmap));
     set_bit(&reduction2.partitions_bitmap, 7);
     set_bit(&reduction2.partitions_bitmap, 77);
     cb_assert(encode_view_id_btree_reduction(&reduction2, reduction_bin2, &reduction_bin2_size) == COUCHSTORE_SUCCESS);
@@ -371,7 +369,6 @@ static void test_view_btree_sum_reducer(void)
     /* Test _sum rereduce */
 
     reduction1.kv_count = 11;
-    memset(&reduction1.partitions_bitmap, 0, sizeof(reduction1.partitions_bitmap));
     set_bit(&reduction1.partitions_bitmap, 10);
     set_bit(&reduction1.partitions_bitmap, 1011);
     reduction1.num_values = 1;
@@ -382,7 +379,6 @@ static void test_view_btree_sum_reducer(void)
     cb_assert(encode_view_btree_reduction(&reduction1, reduction1_bin, &reduction1_bin_size) == COUCHSTORE_SUCCESS);
 
     reduction2.kv_count = 44;
-    memset(&reduction2.partitions_bitmap, 0, sizeof(reduction2.partitions_bitmap));
     set_bit(&reduction2.partitions_bitmap, 10);
     set_bit(&reduction2.partitions_bitmap, 777);
     set_bit(&reduction2.partitions_bitmap, 333);
@@ -584,7 +580,6 @@ static void test_view_btree_count_reducer(void)
     }
 
     reduction1.kv_count = 11;
-    memset(&reduction1.partitions_bitmap, 0, sizeof(reduction1.partitions_bitmap));
     set_bit(&reduction1.partitions_bitmap, 10);
     set_bit(&reduction1.partitions_bitmap, 1011);
     reduction1.num_values = 1;
@@ -595,7 +590,6 @@ static void test_view_btree_count_reducer(void)
     cb_assert(encode_view_btree_reduction(&reduction1, reduction1_bin, &reduction1_bin_size) == COUCHSTORE_SUCCESS);
 
     reduction2.kv_count = 44;
-    memset(&reduction2.partitions_bitmap, 0, sizeof(reduction2.partitions_bitmap));
     set_bit(&reduction2.partitions_bitmap, 10);
     set_bit(&reduction2.partitions_bitmap, 777);
     set_bit(&reduction2.partitions_bitmap, 333);
@@ -809,7 +803,6 @@ static void test_view_btree_stats_reducer(void)
     /* Test successful rereduce */
 
     reduction1.kv_count = 11;
-    memset(&reduction1.partitions_bitmap, 0, sizeof(reduction1.partitions_bitmap));
     set_bit(&reduction1.partitions_bitmap, 10);
     set_bit(&reduction1.partitions_bitmap, 1011);
     reduction1.num_values = 1;
@@ -821,7 +814,6 @@ static void test_view_btree_stats_reducer(void)
     cb_assert(encode_view_btree_reduction(&reduction1, reduction1_bin, &reduction1_bin_size) == COUCHSTORE_SUCCESS);
 
     reduction2.kv_count = 44;
-    memset(&reduction2.partitions_bitmap, 0, sizeof(reduction2.partitions_bitmap));
     set_bit(&reduction2.partitions_bitmap, 10);
     set_bit(&reduction2.partitions_bitmap, 777);
     set_bit(&reduction2.partitions_bitmap, 333);
@@ -1033,7 +1025,6 @@ static void test_view_btree_js_reducer(void)
     /* Test JS rereduce */
 
     reduction1.kv_count = 11;
-    memset(&reduction1.partitions_bitmap, 0, sizeof(reduction1.partitions_bitmap));
     set_bit(&reduction1.partitions_bitmap, 10);
     set_bit(&reduction1.partitions_bitmap, 1011);
     reduction1.num_values = 1;
@@ -1044,7 +1035,6 @@ static void test_view_btree_js_reducer(void)
     cb_assert(encode_view_btree_reduction(&reduction1, reduction1_bin, &reduction1_bin_size) == COUCHSTORE_SUCCESS);
 
     reduction2.kv_count = 44;
-    memset(&reduction2.partitions_bitmap, 0, sizeof(reduction2.partitions_bitmap));
     set_bit(&reduction2.partitions_bitmap, 10);
     set_bit(&reduction2.partitions_bitmap, 777);
     set_bit(&reduction2.partitions_bitmap, 333);
@@ -1262,7 +1252,6 @@ static void test_view_btree_multiple_reducers(void)
     /* Test JS rereduce */
 
     reduction1.kv_count = 11;
-    memset(&reduction1.partitions_bitmap, 0, sizeof(reduction1.partitions_bitmap));
     set_bit(&reduction1.partitions_bitmap, 10);
     set_bit(&reduction1.partitions_bitmap, 1011);
     reduction1.num_values = 3;
@@ -1277,7 +1266,6 @@ static void test_view_btree_multiple_reducers(void)
     cb_assert(encode_view_btree_reduction(&reduction1, reduction1_bin, &reduction1_bin_size) == COUCHSTORE_SUCCESS);
 
     reduction2.kv_count = 44;
-    memset(&reduction2.partitions_bitmap, 0, sizeof(reduction2.partitions_bitmap));
     set_bit(&reduction2.partitions_bitmap, 10);
     set_bit(&reduction2.partitions_bitmap, 777);
     set_bit(&reduction2.partitions_bitmap, 333);
@@ -1474,7 +1462,6 @@ static void test_view_btree_no_reducers(void)
     /* Test rereduce */
 
     reduction1.kv_count = 11;
-    memset(&reduction1.partitions_bitmap, 0, sizeof(reduction1.partitions_bitmap));
     set_bit(&reduction1.partitions_bitmap, 10);
     set_bit(&reduction1.partitions_bitmap, 1011);
     reduction1.num_values = 0;
@@ -1482,7 +1469,6 @@ static void test_view_btree_no_reducers(void)
     cb_assert(encode_view_btree_reduction(&reduction1, reduction1_bin, &reduction1_bin_size) == COUCHSTORE_SUCCESS);
 
     reduction2.kv_count = 44;
-    memset(&reduction2.partitions_bitmap, 0, sizeof(reduction2.partitions_bitmap));
     set_bit(&reduction2.partitions_bitmap, 10);
     set_bit(&reduction2.partitions_bitmap, 777);
     set_bit(&reduction2.partitions_bitmap, 333);
@@ -1639,7 +1625,6 @@ static void test_view_btree_large_reducer(void)
     nl2->next = nullptr;
 
     reduction1.kv_count = 11;
-    memset(&reduction1.partitions_bitmap, 0, sizeof(reduction1.partitions_bitmap));
     set_bit(&reduction1.partitions_bitmap, 10);
     set_bit(&reduction1.partitions_bitmap, 1011);
     reduction1.num_values = 1;
@@ -1651,7 +1636,6 @@ static void test_view_btree_large_reducer(void)
         == COUCHSTORE_SUCCESS);
 
     reduction2.kv_count = 44;
-    memset(&reduction2.partitions_bitmap, 0, sizeof(reduction2.partitions_bitmap));
     set_bit(&reduction2.partitions_bitmap, 10);
     set_bit(&reduction2.partitions_bitmap, 777);
     set_bit(&reduction2.partitions_bitmap, 333);

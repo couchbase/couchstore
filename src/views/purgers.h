@@ -31,7 +31,7 @@
 
 struct view_purger_ctx_t {
     bitmap_t cbitmask;
-    uint64_t count;
+    uint64_t count{0};
 };
 
 int view_id_btree_purge_kv(const sized_buf* key,

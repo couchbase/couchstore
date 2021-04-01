@@ -720,7 +720,7 @@ DocInfo* couchstore_alloc_docinfo(const sized_buf *id, const sized_buf *rev_meta
     if (!docInfo) {
         return nullptr;
     }
-    memset(docInfo, 0, sizeof(DocInfo));
+    *docInfo = {};
     char *extra = (char *)docInfo + sizeof(DocInfo);
     if (id) {
         memcpy(extra, id->buf, id->size);

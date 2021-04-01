@@ -77,8 +77,8 @@
     typedef struct nodelist {
         sized_buf data;
         sized_buf key;
-        node_pointer *pointer;
-        struct nodelist *next;
+        node_pointer *pointer{nullptr};
+        struct nodelist *next{nullptr};
     } nodelist;
 
     /* Reduce function gets items and places reduce value in dst buffer */

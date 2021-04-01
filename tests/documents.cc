@@ -231,10 +231,7 @@ int Documents::docMapUpdateCallback(Db *db, DocInfo *info, void *ctx) {
     return 0;
 }
 
-Documents::Document::Document() {
-    std::memset(&doc, 0, sizeof(Doc));
-    std::memset(&docInfo, 0, sizeof(DocInfo));
-}
+Documents::Document::Document() = default;
 
 Documents::Document::~Document() {
     documentId.clear();

@@ -29,7 +29,6 @@ void test_bitmaps(void)
     uint16_t i, j;
 
     fprintf(stderr, "Running view bitmap tests\n");
-    memset(&bm, 0, sizeof(bitmap_t));
     for (j = 0; j < (sizeof(one_bits) / sizeof(uint16_t)); ++j) {
         set_bit(&bm, one_bits[j]);
     }
@@ -53,7 +52,7 @@ void test_bitmaps(void)
         cb_assert(!is_bit_set(&bm, i));
     }
 
-    memset(&bm, 0, sizeof(bitmap_t));
+    bm = {};
     set_bit(&bm, 1023);
     set_bit(&bm, 514);
     set_bit(&bm, 0);
@@ -73,8 +72,6 @@ void test_bitmaps(void)
         }
     }
 
-    memset(&bm1, 0, sizeof(bitmap_t));
-    memset(&bm2, 0, sizeof(bitmap_t));
     set_bit(&bm1, 1023);
     set_bit(&bm2, 0);
 
@@ -83,8 +80,8 @@ void test_bitmaps(void)
     cb_assert(bm1.chunks[127] == 0x01);
 
     /* Tests for intersection operation */
-    memset(&bm1, 0, sizeof(bitmap_t));
-    memset(&bm2, 0, sizeof(bitmap_t));
+    bm1 = {};
+    bm2 = {};
     set_bit(&bm1, 0);
     set_bit(&bm1, 7);
     set_bit(&bm2, 800);
@@ -103,8 +100,8 @@ void test_bitmaps(void)
     cb_assert(bm1.chunks[127] == 0x0);
 
     /* Tests for is_equal operation */
-    memset(&bm1, 0, sizeof(bitmap_t));
-    memset(&bm2, 0, sizeof(bitmap_t));
+    bm1 = {};
+    bm2 = {};
     cb_assert(is_equal_bitmap(&bm1, &bm2));
     set_bit(&bm1, 7);
     set_bit(&bm1, 500);

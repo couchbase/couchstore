@@ -519,8 +519,6 @@ public:
         key = new char[klen];
         data = new char[dlen];
         set_doc(k, klen, dlen);
-        memset(&doc_info, 0, sizeof(DocInfo));
-        memset(&doc, 0, sizeof(Doc));
         doc.id.buf = key;
         doc.id.size = klen;
         doc.data.buf = data;

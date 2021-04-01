@@ -50,7 +50,7 @@ node_pointer *read_root(void *buf, int size)
 
     ptr = (node_pointer *) cb_malloc(sizeof(node_pointer) + redsize);
     if (redsize > 0) {
-        buf = (char *) memcpy(ptr + 1, raw + 1, redsize);
+        buf = memcpy(reinterpret_cast<void*>(ptr + 1), raw + 1, redsize);
     } else {
         buf = nullptr;
     }
