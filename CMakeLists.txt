@@ -34,8 +34,7 @@ INCLUDE_DIRECTORIES(AFTER
 
 INCLUDE_DIRECTORIES(AFTER SYSTEM ${ICU_INCLUDE_DIR}
                           ${V8_INCLUDE_DIR}
-                          ${SNAPPY_INCLUDE_DIR}
-                          ${FOLLY_INCLUDE_DIR})
+                          ${SNAPPY_INCLUDE_DIR})
 
 CHECK_INCLUDE_FILES("netinet/in.h" HAVE_NETINET_IN_H)
 CHECK_INCLUDE_FILES("inttypes.h" HAVE_INTTYPES_H)
@@ -85,6 +84,7 @@ ADD_LIBRARY(couchstore_objs OBJECT
         src/util.cc
         ${COUCHSTORE_FILE_OPS})
 TARGET_COMPILE_DEFINITIONS(couchstore_objs PUBLIC -Dcouchstore_EXPORTS)
+TARGET_LINK_LIBRARIES(couchstore_objs PUBLIC Folly::headers)
 SET_PROPERTY(TARGET couchstore_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 # second object library is for the view specific code
@@ -109,6 +109,7 @@ ADD_LIBRARY(couchstore_view_objs OBJECT
         src/views/compaction.cc
         $<TARGET_OBJECTS:couchstore_objs>)
 TARGET_COMPILE_DEFINITIONS(couchstore_view_objs PUBLIC -Dcouchstore_EXPORTS)
+TARGET_LINK_LIBRARIES(couchstore_view_objs PUBLIC Folly::headers)
 SET_PROPERTY(TARGET couchstore_view_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 # libcouchstore, core couchstore library
