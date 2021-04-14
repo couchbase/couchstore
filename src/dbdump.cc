@@ -1060,6 +1060,11 @@ next_header:
             printf("\n");
             goto next_header;
         }
+
+        if (errcode == COUCHSTORE_ERROR_NO_HEADER) {
+            // We've reached the beginning of the file and don't want an error
+            errcode = COUCHSTORE_SUCCESS;
+        }
     }
 
     if (errcode < 0) {
