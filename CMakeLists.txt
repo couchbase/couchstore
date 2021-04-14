@@ -123,9 +123,13 @@ GENERATE_EXPORT_HEADER(couchstore
                        NO_EXPORT_MACRO_NAME STATIC
                        STATIC_DEFINE LIBCOUCHSTORE_NO_VISIBILITY)
 
+ADD_LIBRARY(couchstore_static STATIC $<TARGET_OBJECTS:couchstore_objs>)
+TARGET_LINK_LIBRARIES(couchstore_static ${COUCHSTORE_LIBS})
+
 TARGET_INCLUDE_DIRECTORIES(couchstore_objs PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_INCLUDE_DIRECTORIES(couchstore_view_objs PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_INCLUDE_DIRECTORIES(couchstore PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
+TARGET_INCLUDE_DIRECTORIES(couchstore_static PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 # libcouchstore_views - core couchstore library + view code and is dependent on
 # v8 and icu libraries
