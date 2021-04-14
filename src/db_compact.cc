@@ -794,7 +794,7 @@ couchstore_error_t replay(Db& source,
         ctx.preCopyHook = std::move(preCopyHook);
     }
     auto header = cb::couchstore::getHeader(source);
-    ctx.highest = header.updateSeqNum;
+    auto lastUpdateSeqno = ctx.highest = header.updateSeqNum;
     ctx.target = &target;
     couchstore_error_t status;
 
@@ -812,13 +812,16 @@ couchstore_error_t replay(Db& source,
                     couchstore_strerror(status));
         }
 
-        ++ctx.highest;
-        status = couchstore_changes_since(
-                &source, ctx.highest, 0, couchstore_changes_callback, &ctx);
-        if (status != COUCHSTORE_SUCCESS) {
-            throw std::runtime_error(
-                    std::string{"couchstore_changes_since() Failed: "} +
-                    couchstore_strerror(status));
+        if (header.updateSeqNum != lastUpdateSeqno) {
+            ++ctx.highest;
+            lastUpdateSeqno = header.updateSeqNum;
+            status = couchstore_changes_since(
+                    &source, ctx.highest, 0, couchstore_changes_callback, &ctx);
+            if (status != COUCHSTORE_SUCCESS) {
+                throw std::runtime_error(
+                        std::string{"couchstore_changes_since() Failed: "} +
+                        couchstore_strerror(status));
+            }
         }
 
         ctx.flush();

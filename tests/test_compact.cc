@@ -65,6 +65,15 @@ protected:
                   couchstore_save_document(&db, &doc, &docInfo, 0));
     }
 
+    void storeLocalDocument(Db& db, std::string_view key, std::string_view value) {
+        LocalDoc localDoc;
+        localDoc.deleted = 0;
+        localDoc.id = {const_cast<char*>(key.data()), key.size()};
+        localDoc.json = {const_cast<char*>(value.data()), value.size()};
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_save_local_document(&db, &localDoc));
+    }
+
     std::string sourceFilename;
     std::string targetFilename;
 };
@@ -701,4 +710,73 @@ TEST_F(CouchstoreCompactTest, CheckMultipleMissingInBeginning) {
     ASSERT_EQ(COUCHSTORE_SUCCESS, seek(*db, Direction::Backward));
     ASSERT_EQ(now, cb::couchstore::getHeader(*db).timestamp);
     ASSERT_EQ(COUCHSTORE_ERROR_NO_HEADER, seek(*db, Direction::Backward));
+}
+
+/// Test that we don't get out of sync trying to replay the changes
+/// when we encounter multiple succeeding headers with the same update
+/// sequence number
+TEST_F(CouchstoreCompactTest, MB45636) {
+    auto db = openSourceDb();
+    storeLocalDocument(*db, "_local/foo", R"({"foo":1})");
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
+    storeLocalDocument(*db, "_local/foo", R"({"foo":2})");
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
+    storeDocument(*db, "PitrCompaction", "3");
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
+    storeLocalDocument(*db, "_local/foo", R"({"foo":4})");
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::compact(*db,
+                                      targetFilename.c_str(),
+                                      COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                      {},
+                                      {},
+                                      couchstore_get_default_file_ops(),
+                                      {},
+                                      0,
+                                      1,
+                                      {},
+                                      {},
+                                      {},
+                                      {}));
+
+    db = openTargetDb();
+
+    auto verifyDocument =
+            [](Db& db, std::string_view expectedValue) -> void {
+                  auto [status, doc] =
+                  cb::couchstore::openDocument(db, "PitrCompaction");
+                  ASSERT_EQ(COUCHSTORE_SUCCESS, status);
+                 ASSERT_EQ(expectedValue, std::string(doc->data.buf, doc->data.size));
+            };
+    auto verifyLocalDocument =
+            [](Db& db, std::string_view expectedValue) -> void {
+              auto [status, doc] =
+              cb::couchstore::openLocalDocument(db, "_local/foo");
+              ASSERT_EQ(COUCHSTORE_SUCCESS, status);
+              ASSERT_EQ(0, doc->deleted);
+              ASSERT_EQ(expectedValue, std::string(doc->json.buf, doc->json.size));
+            };
+
+    verifyDocument(*db, "3");
+    verifyLocalDocument(*db, R"({"foo":4})");
+    ASSERT_EQ(COUCHSTORE_SUCCESS, cb::couchstore::seek(*db, cb::couchstore::Direction::Backward));
+    verifyDocument(*db, "3");
+    verifyLocalDocument(*db, R"({"foo":2})");
+    ASSERT_EQ(COUCHSTORE_SUCCESS, cb::couchstore::seek(*db, cb::couchstore::Direction::Backward));
+    {
+        auto [status, doc] = cb::couchstore::openDocument(*db, "PitrCompaction");
+        ASSERT_EQ(COUCHSTORE_ERROR_DOC_NOT_FOUND, status);
+        ASSERT_FALSE(doc);
+    }
+    verifyLocalDocument(*db, R"({"foo":2})");
+    ASSERT_EQ(COUCHSTORE_SUCCESS, cb::couchstore::seek(*db, cb::couchstore::Direction::Backward));
+    verifyLocalDocument(*db, R"({"foo":1})");
+    ASSERT_EQ(COUCHSTORE_SUCCESS, cb::couchstore::seek(*db, cb::couchstore::Direction::Backward));
+    {
+        auto [status, doc] = cb::couchstore::openLocalDocument(*db, "_local/foo");
+        ASSERT_EQ(COUCHSTORE_ERROR_DOC_NOT_FOUND, status);
+        ASSERT_FALSE(doc);
+    }
 }
