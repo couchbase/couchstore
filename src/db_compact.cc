@@ -525,8 +525,6 @@ struct Context {
         return COUCHSTORE_SUCCESS;
     };
 
-    uint64_t highest = 0;
-
     std::vector<DocInfo*> docInfos;
     std::vector<Doc*> docs;
     size_t size = 0;
@@ -591,9 +589,6 @@ struct Context {
 
 int couchstore_changes_callback(Db* db, DocInfo* docinfo, void* context) {
     auto* ctx = reinterpret_cast<Context*>(context);
-    if (docinfo->db_seq > ctx->highest) {
-        ctx->highest = docinfo->db_seq;
-    }
 
     auto st = ctx->preCopyHook(*db, *ctx->target, docinfo, nullptr);
     if (st != COUCHSTORE_SUCCESS) {
@@ -794,7 +789,7 @@ couchstore_error_t replay(Db& source,
         ctx.preCopyHook = std::move(preCopyHook);
     }
     auto header = cb::couchstore::getHeader(source);
-    auto lastUpdateSeqno = ctx.highest = header.updateSeqNum;
+    auto lastUpdateSeqno = header.updateSeqNum;
     ctx.target = &target;
     couchstore_error_t status;
 
@@ -812,17 +807,17 @@ couchstore_error_t replay(Db& source,
                     couchstore_strerror(status));
         }
 
-        if (header.updateSeqNum != lastUpdateSeqno) {
-            ++ctx.highest;
-            lastUpdateSeqno = header.updateSeqNum;
-            status = couchstore_changes_since(
-                    &source, ctx.highest, 0, couchstore_changes_callback, &ctx);
-            if (status != COUCHSTORE_SUCCESS) {
-                throw std::runtime_error(
-                        std::string{"couchstore_changes_since() Failed: "} +
-                        couchstore_strerror(status));
-            }
+        status = couchstore_changes_since(&source,
+                                          lastUpdateSeqno + 1,
+                                          0,
+                                          couchstore_changes_callback,
+                                          &ctx);
+        if (status != COUCHSTORE_SUCCESS) {
+            throw std::runtime_error(
+                    std::string{"couchstore_changes_since() Failed: "} +
+                    couchstore_strerror(status));
         }
+        lastUpdateSeqno = header.updateSeqNum;
 
         ctx.flush();
 
