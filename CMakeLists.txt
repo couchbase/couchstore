@@ -125,6 +125,7 @@ GENERATE_EXPORT_HEADER(couchstore
 
 ADD_LIBRARY(couchstore_static STATIC $<TARGET_OBJECTS:couchstore_objs>)
 TARGET_LINK_LIBRARIES(couchstore_static ${COUCHSTORE_LIBS})
+target_compile_definitions(couchstore_static PUBLIC LIBCOUCHSTORE_NO_VISIBILITY)
 
 TARGET_INCLUDE_DIRECTORIES(couchstore_objs PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_INCLUDE_DIRECTORIES(couchstore_view_objs PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
