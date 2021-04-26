@@ -296,17 +296,15 @@ static couchstore_error_t add_doc_to_update_list(Db *db,
                                                  sized_buf *idterm,
                                                  sized_buf *seqval,
                                                  sized_buf *idval,
-                                                 uint64_t seq,
                                                  couchstore_save_options options)
 {
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
     DocInfo updated = *info;
-    updated.db_seq = seq;
 
     seqterm->buf = (char *) fatbuf_get(fb, RAW_SEQ_SIZE);
     seqterm->size = RAW_SEQ_SIZE;
     error_unless(seqterm->buf, COUCHSTORE_ERROR_ALLOC_FAIL);
-    encode_raw48(seq, (raw_48*)seqterm->buf);
+    encode_raw48(updated.db_seq, (raw_48*)seqterm->buf);
 
     if (doc) {
         size_t disk_size;
@@ -388,9 +386,9 @@ couchstore_error_t couchstore_save_documents_and_callback(
         const Doc* curdoc;
 
         if(options & COUCHSTORE_SEQUENCE_AS_IS) {
-            seq = infos[ii]->db_seq;
+            seq = std::max(seq, infos[ii]->db_seq);
         } else {
-            seq++;
+            infos[ii]->db_seq = ++seq;
         }
 
         if (docs) {
@@ -407,7 +405,6 @@ couchstore_error_t couchstore_save_documents_and_callback(
                                                     &idklist[ii],
                                                     &seqvlist[ii],
                                                     &idvlist[ii],
-                                                    seq,
                                                     options);
         if (errcode != COUCHSTORE_SUCCESS) {
             return errcode;
@@ -428,23 +425,7 @@ couchstore_error_t couchstore_save_documents_and_callback(
         return errcode;
     }
 
-    if (options & COUCHSTORE_SEQUENCE_AS_IS) {
-        // Sequences are passed as-is, make sure update_seq is >= the highest.
-        seq = db->header.update_seq;
-        for (unsigned ii = 0; ii < numdocs; ii++) {
-            if (infos[ii]->db_seq >= seq) {
-                seq = infos[ii]->db_seq;
-            }
-        }
-        db->header.update_seq = seq;
-    } else {
-        // Fill in the assigned sequence numbers for caller's later use:
-        seq = db->header.update_seq;
-        for (unsigned ii = 0; ii < numdocs; ii++) {
-            infos[ii]->db_seq = ++seq;
-        }
-        db->header.update_seq = seq;
-    }
+    db->header.update_seq = seq;
 
     return COUCHSTORE_SUCCESS;
 }
