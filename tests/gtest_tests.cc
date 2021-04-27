@@ -1003,7 +1003,7 @@ TEST_F(CouchstoreTest, MB40415_precommit_hook) {
                       nullptr,
                       nullptr,
                       couchstore_get_default_file_ops(),
-                      [](Db& mdb) -> couchstore_error_t {
+                      [](Db&, Db& mdb) -> couchstore_error_t {
                           LocalDoc ldoc;
                           ldoc.id.buf = const_cast<char*>("_local/mb-40415");
                           ldoc.id.size = 15;

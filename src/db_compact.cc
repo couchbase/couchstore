@@ -202,7 +202,7 @@ couchstore_error_t cb::couchstore::compact(
     }
 
     if (precommitHook) {
-        error_pass(precommitHook(*target));
+        error_pass(precommitHook(source, *target));
     }
 
     error_pass(couchstore_commit_ex(target, source.header.timestamp));
@@ -823,7 +823,7 @@ couchstore_error_t replay(Db& source,
 
         couchstore_set_purge_seq(ctx.target, source.header.purge_seq);
         if (precommitHook) {
-            status = precommitHook(*ctx.target);
+            status = precommitHook(source, *ctx.target);
             if (status != COUCHSTORE_SUCCESS) {
                 throw std::runtime_error(
                         std::string{"cb::couchstore::replay() - precommit hook "
