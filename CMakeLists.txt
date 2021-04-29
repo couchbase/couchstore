@@ -191,7 +191,7 @@ ADD_EXECUTABLE(couch_view_group_compactor src/views/bin/couch_view_group_compact
 TARGET_LINK_LIBRARIES(couch_view_group_compactor couchstore_views platform)
 TARGET_INCLUDE_DIRECTORIES(couch_view_group_compactor PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
-ADD_EXECUTABLE(couch_create src/couch_create.cc src/crc32.cc)
+cb_add_test_executable(couch_create src/couch_create.cc src/crc32.cc)
 TARGET_LINK_LIBRARIES(couch_create couchstore platform)
 TARGET_INCLUDE_DIRECTORIES(couch_create PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
@@ -234,7 +234,7 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake.h.in
 # Tests:
 if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
     IF (LUA_FOUND)
-        ADD_EXECUTABLE(couchscript src/couchscript.cc)
+        cb_add_test_executable(couchscript src/couchscript.cc)
         SET_TARGET_PROPERTIES(couchscript PROPERTIES COMPILE_FLAGS
                               -I${LUA_INCLUDE_DIR})
         TARGET_LINK_LIBRARIES(couchscript couchstore ${LUA_LIBRARIES})
@@ -269,7 +269,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
     M_ADD_PYTHON_TEST(couchstore-changecount ${CMAKE_CURRENT_SOURCE_DIR}/tests/changecount.py)
 
     MACRO(M_MAKE_LEGACY_TEST name)
-        ADD_EXECUTABLE(${name} ${ARGN})
+        cb_add_test_executable(${name} ${ARGN})
         SET_TARGET_PROPERTIES(${name} PROPERTIES
                               COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
         TARGET_LINK_LIBRARIES(${name} couchstore_views platform)
@@ -306,7 +306,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                        ${MAP_REDUCE_SOURCES}
                        tests/mapreduce/reduce.cc)
 
-    ADD_EXECUTABLE(couchstore_testapp
+    cb_add_test_executable(couchstore_testapp
                    tests/testapp.cc
                    tests/views/tests.cc
                    tests/views/collate_json_test.cc
@@ -333,7 +333,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
     cb_enable_unity_build(couchstore_testapp)
     SET(COUCHSTORE_GTEST_LIBRARIES gtest gtest_main gmock phosphor)
     SET(COUCHSTORE_GTEST_INCLUDES ${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
-    ADD_EXECUTABLE(couchstore_gtest
+    cb_add_test_executable(couchstore_gtest
                    tests/couchstoretest.cc
                    tests/documents.cc
                    tests/gtest_tests.cc
@@ -350,7 +350,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
     TARGET_LINK_LIBRARIES(couchstore_gtest couchstore platform ${COUCHSTORE_GTEST_LIBRARIES})
     cb_enable_unity_build(couchstore_gtest)
 
-    ADD_EXECUTABLE(couchstore_internal_gtest
+    cb_add_test_executable(couchstore_internal_gtest
                    tests/couchstoretest.cc
                    tests/documents.cc
                    tests/gtest_internal_tests.cc
@@ -382,7 +382,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                                ${CMAKE_CURRENT_BINARY_DIR}/include)
     TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test_framework platform)
 
-    ADD_EXECUTABLE(couchstore_wrapped_fileops_test
+    cb_add_test_executable(couchstore_wrapped_fileops_test
                    src/iobuffer.cc
                    src/crc32.cc
                    tests/wrapped_fileops_test.cc
