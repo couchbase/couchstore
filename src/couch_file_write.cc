@@ -17,6 +17,7 @@
 
 #include "crc32.h"
 #include "internal.h"
+#include "log_last_internal_error.h"
 #include "util.h"
 
 #include <libcouchstore/couch_db.h>

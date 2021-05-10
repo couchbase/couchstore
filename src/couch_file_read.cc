@@ -9,10 +9,11 @@
 #include <string.h>
 #include <platform/compress.h>
 
-#include "internal.h"
-#include "iobuffer.h"
 #include "bitfield.h"
 #include "crc32.h"
+#include "internal.h"
+#include "iobuffer.h"
+#include "log_last_internal_error.h"
 #include "util.h"
 
 #include <gsl/gsl>

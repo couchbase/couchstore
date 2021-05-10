@@ -5,7 +5,6 @@
 #include "arena.h"
 
 #include <libcouchstore/couch_db.h>
-#include <platform/dynamic.h>
 #include <csignal>
 #include <cstring>
 
@@ -80,6 +79,4 @@ int strncpy_safe(char* d, const char* s, size_t n);
     do { \
         if((C) != 0) { error_pass(E); } \
     } while (0)
-
-    couchstore_error_t log_last_internal_error(const char *format, ...) CB_FORMAT_PRINTF(1, 2);
 
