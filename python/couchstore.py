@@ -357,7 +357,7 @@ class CouchStore(object):
         id = _toString(id)
         docptr = ctypes.pointer(DocStruct())
         err = _lib.couchstore_open_document(self,
-                                            id,
+                                            ctypes.c_char_p(id.encode()),
                                             ctypes.c_size_t(len(id)),
                                             ctypes.byref(docptr),
                                             options)
@@ -395,7 +395,7 @@ class CouchStore(object):
         id = _toString(id)
         infoptr = ctypes.pointer(DocInfoStruct())
         err = _lib.couchstore_docinfo_by_id(self,
-                                            id,
+                                            ctypes.c_char_p(id.encode()),
                                             ctypes.c_size_t(len(id)),
                                             ctypes.byref(infoptr))
         return self._infoPtrToDoc(id, infoptr, err)
