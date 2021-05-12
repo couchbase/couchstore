@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from couchstore import CouchStore, DocumentInfo
 from tempfile import mkdtemp
 import os

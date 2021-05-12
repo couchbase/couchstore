@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from couchstore import CouchStore, DocumentInfo
 from tempfile import mkdtemp
 import os
@@ -10,9 +12,9 @@ REV_META_PACK = ">QII"
 def deleteAt(db, key, time):
     info = db.getInfo(key)
     # cas, exp, flags
-    info.revMeta = str(struct.pack(REV_META_PACK, 0, time, 0))
+    info.revMeta = struct.pack(REV_META_PACK, 0, time, 0)
     info.deleted = True
-    return db.save(info, "")
+    return db.save(info, None)
 
 class PurgeTest(unittest.TestCase):
     def setUp(self):

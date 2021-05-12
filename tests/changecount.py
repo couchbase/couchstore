@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from couchstore import CouchStore, DocumentInfo
 from tempfile import mkdtemp
 import os
@@ -27,8 +29,8 @@ class ChangeCountTest(unittest.TestCase):
             pass
 
     def bulkSet(self, prefix, n):
-        ids = [prefix + str(x) for x in xrange(n)]
-        datas = ["val" + str(x) for x in xrange(n)]
+        ids = [prefix + str(x) for x in range(n)]
+        datas = ["val" + str(x) for x in range(n)]
         self.db.saveMultiple(ids, datas)
 
     def testRewind(self):

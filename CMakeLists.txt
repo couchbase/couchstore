@@ -255,7 +255,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
     ENDIF (LUA_FOUND)
 
     MACRO(M_ADD_PYTHON_TEST name pyfile)
-        ADD_TEST(${name} python ${pyfile})
+        ADD_TEST(${name} python3 ${pyfile})
         SET_PROPERTY(TEST ${name} PROPERTY ENVIRONMENT
                      "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/python"
                      "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}")
