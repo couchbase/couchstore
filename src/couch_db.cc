@@ -866,6 +866,9 @@ static couchstore_error_t lookup_callback(couchfile_lookup_request *rq,
         (context->options & COUCHSTORE_TOLERATE_CORRUPTION)) {
         // Invoke callback even if doc info is corrupted/unreadable, if magic flag is set
         docinfo = static_cast<DocInfo*>(cb_calloc(sizeof(DocInfo), 1));
+        if (!docinfo) {
+            return COUCHSTORE_ERROR_ALLOC_FAIL;
+        }
         docinfo->id = *k;
         docinfo->rev_meta = *v;
     } else if (errcode) {
