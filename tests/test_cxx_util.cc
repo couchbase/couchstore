@@ -108,6 +108,10 @@ protected:
     std::vector<cs_off_t> headers;
 };
 
+class CouchstoreCxxTestWithParam
+    : public CouchstoreCxxTest,
+      public ::testing::WithParamInterface<size_t> {};
+
 /**
  * Test that we can seek in both directions of the file (to an older version
  * of the database by locating the previous header, but also that we
@@ -288,7 +292,7 @@ TEST_F(CouchstoreCxxTest, GetHeaderJson) {
     EXPECT_EQ(10, json["update_seq"]);
 }
 
-TEST_F(CouchstoreCxxTest, ReplayOfDeletedDocuments) {
+TEST_P(CouchstoreCxxTestWithParam, ReplayOfDeletedDocuments) {
     auto source = openDb();
     auto start = cb::couchstore::getHeader(*source);
 
@@ -315,7 +319,8 @@ TEST_F(CouchstoreCxxTest, ReplayOfDeletedDocuments) {
                                      uint64_t(-1),
                                      end.headerPosition,
                                      {},
-                                     {}));
+                                     {},
+                                     GetParam()));
 
     // verify that I can read out the 3 documents
     {
@@ -344,7 +349,8 @@ TEST_F(CouchstoreCxxTest, ReplayOfDeletedDocuments) {
 }
 
 // Validate the pre-copy hook copies local documents before regular ones
-TEST_F(CouchstoreCxxTest, ReplayOfLocalDocumentsBeforeRegularDocuments) {
+TEST_P(CouchstoreCxxTestWithParam,
+       ReplayOfLocalDocumentsBeforeRegularDocuments) {
     auto source = openDb();
     auto start = cb::couchstore::getHeader(*source);
 
@@ -386,7 +392,8 @@ TEST_F(CouchstoreCxxTest, ReplayOfLocalDocumentsBeforeRegularDocuments) {
                           regular++;
                           return COUCHSTORE_SUCCESS;
                       },
-                      {}));
+                      {},
+                      GetParam()));
     EXPECT_EQ(2, regular);
     EXPECT_EQ(2, local);
 }
@@ -466,3 +473,8 @@ TEST_F(CouchstoreCxxTest, SyncHeaderFailure_CallbackRetry) {
     EXPECT_EQ(COUCHSTORE_ERROR_WRITE, couchstore_commit(db.get(), callback));
     EXPECT_EQ(10, numRetries);
 }
+
+INSTANTIATE_TEST_SUITE_P(CouchstoreCxxTestWithParams,
+                         CouchstoreCxxTestWithParam,
+                         ::testing::Values(0, 1, 2, 100 * 1024 * 1024),
+                         ::testing::PrintToStringParamName());

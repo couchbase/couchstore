@@ -519,17 +519,22 @@ static void locateStartHeader(Db& db, uint64_t timestamp) {
 }
 
 struct Context {
-    Db* target;
+    Context(size_t flushThreshold) : flushThreshold(flushThreshold) {
+    }
+
+    Db* target{nullptr};
 
     PreCopyHook preCopyHook = [](Db&, Db&, const DocInfo*, const DocInfo*) {
         return COUCHSTORE_SUCCESS;
     };
 
+    /// Vector of DocInfo* that are owned and freed by this class
     std::vector<DocInfo*> docInfos;
+    /// Vector of Doc* that are owned and freed by this class
     std::vector<Doc*> docs;
-    size_t size = 0;
 
-    const size_t flushThreshold = 100 * 1024 * 1024;
+    size_t size = 0;
+    const size_t flushThreshold{0};
 
     /**
      * Spool the document document so that we may flush documents to disk
@@ -544,8 +549,7 @@ struct Context {
      *
      * @param info the document info object for the document
      * @param d the documents value
-     * @return 0 if the document info may be released by the caller
-     *         1 if the ownership of the document info was taken by us
+     * @return 1 so the caller knows the info* was taken over by this
      */
     int spool(DocInfo* info, cb::couchstore::UniqueDocPtr d) {
         docInfos.emplace_back(info);
@@ -554,9 +558,10 @@ struct Context {
         if (size > flushThreshold) {
             // flush to avoid eating up too much resources
             flush();
-            return 0; // we may release the doc info structure as it was nuked
         }
-        return 1; // keep the doc info structure
+        // This object always takes ownership. Return value of 1 informs the
+        // caller to skip freeing of the info*
+        return 1;
     }
 
     void flush() {
@@ -575,9 +580,11 @@ struct Context {
         for (auto& d : docInfos) {
             couchstore_free_docinfo(d);
         }
+
         docs.clear();
         docInfos.clear();
         size = 0;
+
         if (error != COUCHSTORE_SUCCESS) {
             throw std::runtime_error(
                     std::string{"cb::couchstore::Context::flush() Failed to "
@@ -783,8 +790,9 @@ couchstore_error_t replay(Db& source,
                           uint64_t delta,
                           uint64_t sourceHeaderEndOffset,
                           PreCopyHook preCopyHook,
-                          PrecommitHook precommitHook) {
-    Context ctx;
+                          PrecommitHook precommitHook,
+                          size_t flushThreshold) {
+    Context ctx{flushThreshold};
     if (preCopyHook) {
         ctx.preCopyHook = std::move(preCopyHook);
     }

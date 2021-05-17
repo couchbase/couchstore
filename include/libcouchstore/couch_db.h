@@ -1407,6 +1407,7 @@ couchstore_error_t compact(Db& source,
  * @param preCopyHook The hook to be called before each document is copied over
  *        replay will copy localdocs before 'normal' documents
  * @param precommitHook The hook to call before each commit
+ * @param flushThreshold how much data can be buffered by replay
  */
 LIBCOUCHSTORE_API
 couchstore_error_t replay(Db& source,
@@ -1414,7 +1415,8 @@ couchstore_error_t replay(Db& source,
                           uint64_t delta,
                           uint64_t sourceHeaderEndOffset,
                           PreCopyHook preCopyHook,
-                          PrecommitHook precommitHook);
+                          PrecommitHook precommitHook,
+                          size_t flushThreshold = 100 * 1024 * 1024);
 
 /**
  * Save multiple local docs to the db. see couchstore_save_local_document. The
