@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
         goto out;
     }
 
-    fprintf(stdout, "Header Len : %lu\n", header_outbuf.size);
+    fprintf(stdout, "Header Len : %zu\n", header_outbuf.size);
     fwrite(header_outbuf.buf, header_outbuf.size, 1, stdout);
     fprintf(stdout, "\n");
 

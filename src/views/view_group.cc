@@ -1419,7 +1419,7 @@ couchstore_error_t couchstore_update_view_group(view_group_info_t *info,
 {
     couchstore_error_t ret;
     tree_file index_file = {
-            0, nullptr, nullptr, nullptr, {-1}, CRC32, tree_file_options{}};
+            0, nullptr, nullptr, nullptr, {}, CRC32, tree_file_options{}};
     index_header_t* header = nullptr;
     node_pointer* id_root = nullptr;
     node_pointer** view_roots = nullptr;

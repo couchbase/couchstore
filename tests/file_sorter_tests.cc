@@ -325,7 +325,7 @@ int main(void) {
     }
 
     fprintf(stderr,
-            "Testing file sort callback (%lu records) with buffer size of %lu "
+            "Testing file sort callback (%lu records) with buffer size of %zu "
             "bytes"
             " and %u temporary files\n",
             nrecords,
@@ -334,7 +334,7 @@ int main(void) {
     test_file_sort(sizeof(int) * 501, 3, check_sorted_callback, 0);
 
     fprintf(stderr,
-            "Testing file sort callback (%lu records) with buffer size of %lu "
+            "Testing file sort callback (%lu records) with buffer size of %zu "
             "bytes"
             " and %u temporary files\n",
             nrecords,
@@ -344,7 +344,7 @@ int main(void) {
 
     fprintf(stderr,
             "Testing file sort callback with skip writeback (%lu records)"
-            "with buffer size of %lu bytes and %u temporary files\n",
+            "with buffer size of %zu bytes and %u temporary files\n",
             nrecords,
             sizeof(int) * 501,
             3);
@@ -352,7 +352,7 @@ int main(void) {
 
     fprintf(stderr,
             "Testing file sort callback with skip writeback (%lu records)"
-            "with buffer size of %lu bytes and %u temporary files\n",
+            "with buffer size of %zu bytes and %u temporary files\n",
             nrecords,
             sizeof(int) * 50,
             10);
