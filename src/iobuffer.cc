@@ -25,7 +25,7 @@
 #include <platform/string_hex.h>
 #include <cstdlib>
 #include <cstring>
-#include <gsl/gsl>
+#include <gsl/gsl-lite.hpp>
 #include <memory>
 #include <new>
 #include <unordered_map>

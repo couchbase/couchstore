@@ -16,7 +16,7 @@
 #include "log_last_internal_error.h"
 #include "util.h"
 
-#include <gsl/gsl>
+#include <gsl/gsl-lite.hpp>
 
 void stop_trace() {
     PHOSPHOR_INSTANCE.stop();
