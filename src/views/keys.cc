@@ -2,14 +2,13 @@
 
 #include "keys.h"
 #include "../bitfield.h"
+#include "encoding.h"
 
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
 #include <cstring>
 
 #define dec_uint16(b) (decode_raw16(*((raw_16 *) b)))
-
-static void enc_uint16(uint16_t u, char **buf);
 
 couchstore_error_t decode_view_btree_json_key(const char* bytes,
                                               size_t len,
@@ -214,12 +213,5 @@ void free_view_id_btree_key(view_id_btree_key_t *key)
 
     cb_free(key->doc_id.buf);
     cb_free(key);
-}
-
-static void enc_uint16(uint16_t u, char **buf)
-{
-    raw_16 k = encode_raw16(u);
-    memcpy(*buf, &k, 2);
-    *buf += 2;
 }
 

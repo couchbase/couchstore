@@ -3,6 +3,7 @@
 #include "values.h"
 
 #include "../bitfield.h"
+#include "encoding.h"
 
 #include <platform/cb_malloc.h>
 #include <stdlib.h>
@@ -10,10 +11,9 @@
 #include <string.h>
 #include <platform/cbassert.h>
 
-#define dec_uint16(b) (decode_raw16(*((raw_16 *) b)))
+#define dec_uint16(b) (decode_raw16(*((raw_16*)b)))
 #define dec_raw24(b) (decode_raw24(*((raw_24 *) b)))
 
-static void enc_uint16(uint16_t u, char **buf);
 static void enc_raw24(uint32_t u, char **buf);
 
 couchstore_error_t decode_view_btree_value(const char* bytes,
@@ -351,13 +351,6 @@ void free_view_id_btree_value(view_id_btree_value_t *value)
     }
 
     cb_free(value);
-}
-
-static void enc_uint16(uint16_t u, char **buf)
-{
-    raw_16 v = encode_raw16(u);
-    memcpy(*buf, &v, 2);
-    *buf += 2;
 }
 
 static void enc_raw24(uint32_t u, char **buf)

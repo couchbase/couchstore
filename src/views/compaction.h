@@ -18,6 +18,8 @@
  * the License.
  **/
 
+#pragma once
+
 #include "../couch_btree.h"
 #include "../internal.h"
 #include "bitmap.h"

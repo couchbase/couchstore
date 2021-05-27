@@ -91,6 +91,7 @@ SET_PROPERTY(TARGET couchstore_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 ADD_LIBRARY(couchstore_view_objs OBJECT
         src/views/bitmap.cc
         src/views/collate_json.cc
+        src/views/encoding.cc
         src/views/file_merger.cc
         src/views/file_sorter.cc
         src/views/index_header.cc

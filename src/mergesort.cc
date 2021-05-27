@@ -17,7 +17,7 @@ struct record_in_memory {
     char *record;
 };
 
-struct compare_info {
+struct mergesort_compare_info {
     mergesort_compare_records_t compare;
     void *pointer;
 };
@@ -43,7 +43,7 @@ static int compare_records(void *p, void *q, void *pointer)
 {
 #define pp ((struct record_in_memory *) p)
 #define qq ((struct record_in_memory *) q)
-#define point ((struct compare_info *) pointer)
+#define point ((struct mergesort_compare_info*)pointer)
     return (*point->compare)(pp->record, qq->record, point->pointer);
 }
 
@@ -144,7 +144,7 @@ int merge_sort(FILE *unsorted_file, FILE *sorted_file,
         struct record_in_memory* first = nullptr;
         unsigned long block_count = 0;
         unsigned destination = 0;
-        struct compare_info comp;
+        struct mergesort_compare_info comp;
         comp.compare = compare;
         comp.pointer = pointer;
         while (1) {

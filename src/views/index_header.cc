@@ -21,6 +21,7 @@
 #include "index_header.h"
 
 #include "../bitfield.h"
+#include "encoding.h"
 
 #include <platform/cb_malloc.h>
 #include <stdlib.h>
@@ -37,7 +38,6 @@
 static size_t size_of_partition_versions(part_version_t *part_versions);
 static void free_part_versions(part_version_t *part_versions);
 
-static void enc_uint16(uint16_t u, char **buf);
 static void enc_uint48(uint64_t u, char **buf);
 
 static void enc_seq_list(const void *list, char **buf);
@@ -486,15 +486,6 @@ static void free_part_versions(part_version_t *part_versions) {
     sorted_list_free_iterator(it);
     sorted_list_free(part_versions);
 }
-
-
-static void enc_uint16(uint16_t u, char **buf)
-{
-    raw_16 r = encode_raw16(u);
-    memcpy(*buf, &r, 2);
-    *buf += 2;
-}
-
 
 static void enc_uint48(uint64_t u, char **buf)
 {

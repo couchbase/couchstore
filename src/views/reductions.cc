@@ -4,6 +4,7 @@
 
 #include "../bitfield.h"
 #include "../couch_btree.h"
+#include "encoding.h"
 
 #include <platform/cb_malloc.h>
 #include <stdlib.h>
@@ -15,8 +16,6 @@
 #define dec_uint16(b) (decode_raw16(*((raw_16 *) b)))
 #define dec_uint48(b) (decode_raw48(*((raw_48 *) b)))
 #define dec_uint40(b) (decode_raw40(*((raw_40 *) b)))
-
-static void enc_uint16(uint16_t u, char **buf);
 
 static void enc_raw40(uint64_t u, char **buf);
 
@@ -224,14 +223,6 @@ void free_view_id_btree_reduction(view_id_btree_reduction_t *reduction)
 
     cb_free(reduction);
 }
-
-static void enc_uint16(uint16_t u, char **buf)
-{
-    raw_16 r = encode_raw16(u);
-    memcpy(*buf, &r, 2);
-    *buf += 2;
-}
-
 
 static void enc_raw40(uint64_t u, char **buf)
 {
