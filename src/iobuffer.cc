@@ -326,14 +326,15 @@ static size_t write_to_buffer(FileBuffer* buf,
     size_t buffer_nbyte = std::min(buf->capacity - offset_in_buffer, nbyte);
 
     if (buf->tracing_enabled) {
-        uint32_t crc32 = get_checksum(
-                static_cast<const uint8_t*>(bytes), buffer_nbyte, CRC32C);
         TRACE_INSTANT2("couchstore_write",
                        "write_to_buffer",
                        "offset",
                        offset,
                        "nbytes&CRC",
-                       buffer_nbyte << 32 | crc32);
+                       buffer_nbyte << 32 |
+                               get_checksum(static_cast<const uint8_t*>(bytes),
+                                            buffer_nbyte,
+                                            CRC32C));
     }
 
     {
@@ -371,14 +372,15 @@ static couchstore_error_t flush_buffer(couchstore_error_info_t* errinfo,
                     raw_written);
 #endif
             if (buf->tracing_enabled) {
-                uint32_t crc32 =
-                        get_checksum(buf->getRawPtr(), buf->length, CRC32);
-                TRACE_INSTANT2("couchstore_write",
-                               "flush_buffer",
-                               "offset",
-                               buf->offset,
-                               "nbytes&CRC",
-                               raw_written << 32 | crc32);
+                TRACE_INSTANT2(
+                        "couchstore_write",
+                        "flush_buffer",
+                        "offset",
+                        buf->offset,
+                        "nbytes&CRC",
+                        raw_written << 32 | get_checksum(buf->getRawPtr(),
+                                                         buf->length,
+                                                         CRC32));
             }
         }
 

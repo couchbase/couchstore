@@ -33,13 +33,16 @@ static ssize_t write_entire_buffer(tree_file *file, const void* buf,
 
     /* calculate CRC for the piece written and trace it. */
     if (file->options.tracing_enabled) {
-        uint32_t crc32 = get_checksum(reinterpret_cast<const uint8_t*>(buf), nbytes, CRC32C);
-        TRACE_INSTANT2("couchstore_write",
-                       "write_entire_buffer",
-                       "offset",
-                       offset,
-                       "nbytes&CRC",
-                       nbytes << 32 | crc32);
+        TRACE_INSTANT2(
+                "couchstore_write",
+                "write_entire_buffer",
+                "offset",
+                offset,
+                "nbytes&CRC",
+                nbytes << 32 |
+                        get_checksum(reinterpret_cast<const uint8_t*>(buf),
+                                     nbytes,
+                                     CRC32C));
     }
 
     while (left_to_write) {
