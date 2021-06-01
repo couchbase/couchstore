@@ -86,6 +86,7 @@ ADD_LIBRARY(couchstore_objs OBJECT
 TARGET_COMPILE_DEFINITIONS(couchstore_objs PUBLIC -Dcouchstore_EXPORTS)
 TARGET_LINK_LIBRARIES(couchstore_objs PUBLIC Folly::headers)
 SET_PROPERTY(TARGET couchstore_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
+cb_enable_unity_build(couchstore_objs)
 
 # second object library is for the view specific code
 ADD_LIBRARY(couchstore_view_objs OBJECT
@@ -112,6 +113,7 @@ ADD_LIBRARY(couchstore_view_objs OBJECT
 TARGET_COMPILE_DEFINITIONS(couchstore_view_objs PUBLIC -Dcouchstore_EXPORTS)
 TARGET_LINK_LIBRARIES(couchstore_view_objs PUBLIC Folly::headers)
 SET_PROPERTY(TARGET couchstore_view_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
+cb_enable_unity_build(couchstore_view_objs)
 
 # libcouchstore, core couchstore library
 ADD_LIBRARY(couchstore SHARED $<TARGET_OBJECTS:couchstore_objs>)
@@ -328,6 +330,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                                PRIVATE
                                ${CMAKE_CURRENT_BINARY_DIR}/include)
     TARGET_LINK_LIBRARIES(couchstore_testapp ${COUCHSTORE_VIEW_LIBS})
+    cb_enable_unity_build(couchstore_testapp)
     SET(COUCHSTORE_GTEST_LIBRARIES gtest gtest_main gmock phosphor)
     SET(COUCHSTORE_GTEST_INCLUDES ${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
     ADD_EXECUTABLE(couchstore_gtest
@@ -345,6 +348,7 @@ if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
                           COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
     TARGET_INCLUDE_DIRECTORIES(couchstore_gtest PRIVATE ${COUCHSTORE_GTEST_INCLUDES})
     TARGET_LINK_LIBRARIES(couchstore_gtest couchstore platform ${COUCHSTORE_GTEST_LIBRARIES})
+    cb_enable_unity_build(couchstore_gtest)
 
     ADD_EXECUTABLE(couchstore_internal_gtest
                    tests/couchstoretest.cc
