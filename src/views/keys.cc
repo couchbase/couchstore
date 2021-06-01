@@ -8,8 +8,6 @@
 #include <platform/cbassert.h>
 #include <cstring>
 
-#define dec_uint16(b) (decode_raw16(*((raw_16 *) b)))
-
 couchstore_error_t decode_view_btree_json_key(const char* bytes,
                                               size_t len,
                                               sized_buf& key) {

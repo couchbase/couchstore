@@ -13,10 +13,6 @@
 
 #define BITMASK_BYTE_SIZE      (1024 / CHAR_BIT)
 
-#define dec_uint16(b) (decode_raw16(*((raw_16 *) b)))
-#define dec_uint48(b) (decode_raw48(*((raw_48 *) b)))
-#define dec_uint40(b) (decode_raw40(*((raw_40 *) b)))
-
 static void enc_raw40(uint64_t u, char **buf);
 
 uint64_t decode_view_btree_reduction_partitions_bitmap(

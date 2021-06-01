@@ -11,7 +11,6 @@
 #include <string.h>
 #include <platform/cbassert.h>
 
-#define dec_uint16(b) (decode_raw16(*((raw_16*)b)))
 #define dec_raw24(b) (decode_raw24(*((raw_24 *) b)))
 
 static void enc_raw24(uint32_t u, char **buf);

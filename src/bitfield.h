@@ -54,6 +54,11 @@ struct raw_64 {
 #define decode_raw48(a) couchstore_decode_raw48p(&(a))
 #define decode_raw64(a) couchstore_decode_raw64(a)
 
+#define dec_uint16(b) (decode_raw16(*((raw_16*)b)))
+#define dec_uint40(b) (decode_raw40(*((raw_40*)b)))
+#define dec_uint48(b) (decode_raw48(*((raw_48*)b)))
+#define dec_uint64(b) (decode_raw64(*((raw_64*)b)))
+
 LIBCOUCHSTORE_API
 uint8_t couchstore_decode_raw08(raw_08 raw);
 LIBCOUCHSTORE_API

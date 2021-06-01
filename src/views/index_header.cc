@@ -31,10 +31,6 @@
 
 #define BITMASK_BYTE_SIZE      (1024 / CHAR_BIT)
 
-#define dec_uint16(b) (decode_raw16(*((raw_16 *) b)))
-#define dec_uint48(b) (decode_raw48(*((raw_48 *) b)))
-#define dec_uint64(b) (decode_raw64(*((raw_64 *) b)))
-
 static size_t size_of_partition_versions(part_version_t *part_versions);
 static void free_part_versions(part_version_t *part_versions);
 
