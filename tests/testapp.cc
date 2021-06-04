@@ -15,10 +15,9 @@
  *   limitations under the License.
  */
 
-extern void mapreduce_init(const char*);
-extern void mapreduce_deinit();
-extern void view_tests();
-extern void purge_tests();
+#include "views/mapreduce/mapreduce.h"
+#include "btree_purge/purge_tests.h"
+#include "views/view_tests.h"
 
 int main(int argc, char* argv[]) {
     mapreduce_init(argv[1]);
