@@ -13,6 +13,7 @@
 #include "views/view_group.h"
 #include <collections/kvstore_generated.h>
 #include <libcouchstore/couch_db.h>
+#include <libcouchstore/json_utils.h>
 #include <mcbp/protocol/unsigned_leb128.h>
 #include <memcached/protocol_binary.h>
 #include <nlohmann/json.hpp>
@@ -970,8 +971,8 @@ static int process_vbucket_file(const char *file, int *total)
 next_header:
     if (dumpHeaders) {
         try {
-            const auto header = cb::couchstore::getHeader(*db).to_json().dump();
-            printf("File header: %s\n", header.c_str());
+            const auto header = cb::couchstore::getHeader(*db);
+            printf("File header: %s\n", to_json(header).dump().c_str());
         } catch (const std::exception& ex) {
             fprintf(stderr, "Failed to fetch database header information: %s\n",
                    ex.what());

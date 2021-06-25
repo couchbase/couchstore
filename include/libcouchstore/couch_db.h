@@ -21,8 +21,8 @@
 #include <libcouchstore/error.h>
 #include <libcouchstore/file_ops.h>
 
-#include <nlohmann/json_fwd.hpp>
 #include <functional>
+#include <memory>
 #include <optional>
 
 #include <system_error>
@@ -1236,8 +1236,6 @@ struct LIBCOUCHSTORE_API Header {
     uint64_t spaceUsed;
     /// Total disk space used by database
     uint64_t fileSize;
-
-    nlohmann::json to_json() const;
 };
 
 /**

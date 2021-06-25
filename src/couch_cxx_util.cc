@@ -17,6 +17,7 @@
 #include "internal.h"
 #include <nlohmann/json.hpp>
 #include <platform/string_hex.h>
+#include <libcouchstore/json_utils.h>
 
 namespace cb {
 namespace couchstore {
@@ -116,18 +117,18 @@ size_t getDiskBlockSize(Db&) {
     return COUCH_BLOCK_SIZE;
 }
 
-nlohmann::json Header::to_json() const {
+nlohmann::json to_json(const Header& header) {
     nlohmann::json ret;
-    ret["version"] = uint64_t(version);
-    ret["update_seq"] = updateSeqNum;
-    ret["purge_seq"] = purgeSeqNum;
-    ret["header_position"] = cb::to_hex(headerPosition);
-    ret["timestamp"] = timestamp;
-    ret["filename"] = filename;
-    ret["doc_count"] = docCount;
-    ret["deleted_count"] = deletedCount;
-    ret["space_used"] = spaceUsed;
-    ret["file_size"] = fileSize;
+    ret["version"] = uint64_t(header.version);
+    ret["update_seq"] = header.updateSeqNum;
+    ret["purge_seq"] = header.purgeSeqNum;
+    ret["header_position"] = cb::to_hex(header.headerPosition);
+    ret["timestamp"] = header.timestamp;
+    ret["filename"] = header.filename;
+    ret["doc_count"] = header.docCount;
+    ret["deleted_count"] = header.deletedCount;
+    ret["space_used"] = header.spaceUsed;
+    ret["file_size"] = header.fileSize;
     return ret;
 }
 

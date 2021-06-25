@@ -28,6 +28,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <vector>
 
 static void usage() {
     printf("USAGE: couch_dbck [options] "

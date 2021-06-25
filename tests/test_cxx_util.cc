@@ -22,6 +22,7 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 #include <libcouchstore/couch_db.h>
+#include <libcouchstore/json_utils.h>
 #include <nlohmann/json.hpp>
 #include <platform/dirutils.h>
 
@@ -279,7 +280,7 @@ TEST_F(CouchstoreCxxTest, GetHeaderJson) {
     couchstore_commit_ex(db.get(), 0xdeadbeef);
     auto header = cb::couchstore::getHeader(*db);
     ASSERT_EQ(Header::Version::V13, header.version);
-    auto json = header.to_json();
+    auto json = to_json(header);
     EXPECT_EQ(13, json["version"]);
     EXPECT_EQ("0x0000000000015000", json["header_position"]);
     EXPECT_EQ(3735928559, json["timestamp"]);
