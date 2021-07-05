@@ -9,9 +9,6 @@ INCLUDE(CheckSymbolExists)
 INCLUDE(CheckTypeSize)
 INCLUDE(CTest)
 INCLUDE(GenerateExportHeader)
-include(check_unit_test_enabled)
-
-check_unit_test_enabled(couchstore COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
 
 INCLUDE_DIRECTORIES(BEFORE ${CMAKE_INSTALL_PREFIX}/include
                            ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -24,9 +21,9 @@ INCLUDE_DIRECTORIES(BEFORE ${CMAKE_INSTALL_PREFIX}/include
 
 INCLUDE_DIRECTORIES(AFTER ${gsl_lite_SOURCE_DIR}/include)
 
-IF (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS AND LUA_FOUND)
-   INCLUDE_DIRECTORIES(AFTER SYSTEM {LUA_INCLUDE_DIR})
-ENDIF (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS AND LUA_FOUND)
+if (LUA_FOUND)
+   include_directories(AFTER SYSTEM {LUA_INCLUDE_DIR})
+endif (LUA_FOUND)
 
 INCLUDE_DIRECTORIES(AFTER
                     ${KVEngineAPI_SOURCE_DIR}
@@ -232,187 +229,185 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake.h.in
                ${CMAKE_CURRENT_BINARY_DIR}/couchstore_config.h)
 
 # Tests:
-if (COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
-    IF (LUA_FOUND)
-        cb_add_test_executable(couchscript src/couchscript.cc)
-        SET_TARGET_PROPERTIES(couchscript PROPERTIES COMPILE_FLAGS
-                              -I${LUA_INCLUDE_DIR})
-        TARGET_LINK_LIBRARIES(couchscript couchstore ${LUA_LIBRARIES})
+IF (LUA_FOUND)
+    cb_add_test_executable(couchscript src/couchscript.cc)
+    SET_TARGET_PROPERTIES(couchscript PROPERTIES COMPILE_FLAGS
+                          -I${LUA_INCLUDE_DIR})
+    TARGET_LINK_LIBRARIES(couchscript couchstore ${LUA_LIBRARIES})
 
-        ADD_TEST(couchstore-localdoc
-                 couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/localdoc.lua)
-        ADD_TEST(couchstore-corrupt
-                 couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/corrupt.lua)
-        ADD_TEST(couchstore-bulk
-                 couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/bulk.lua)
-        ADD_TEST(couchstore-changes-since-filter
-                 couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/changessincefilter.lua)
-        ADD_TEST(couchstore-compact
-                 couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/compact.lua)
-        ADD_TEST(couchstore-dropdel
-                 couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/dropdel.lua)
-        ADD_TEST(couchstore-largefile
-                 couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/largefile.lua)
-        ADD_TEST(couchstore-large
-                 couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/large.lua)
-    ENDIF (LUA_FOUND)
+    ADD_TEST(couchstore-localdoc
+             couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/localdoc.lua)
+    ADD_TEST(couchstore-corrupt
+             couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/corrupt.lua)
+    ADD_TEST(couchstore-bulk
+             couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/bulk.lua)
+    ADD_TEST(couchstore-changes-since-filter
+             couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/changessincefilter.lua)
+    ADD_TEST(couchstore-compact
+             couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/compact.lua)
+    ADD_TEST(couchstore-dropdel
+             couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/dropdel.lua)
+    ADD_TEST(couchstore-largefile
+             couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/largefile.lua)
+    ADD_TEST(couchstore-large
+             couchscript ${CMAKE_CURRENT_SOURCE_DIR}/tests/large.lua)
+ENDIF (LUA_FOUND)
 
-    MACRO(M_ADD_PYTHON_TEST name pyfile)
-        ADD_TEST(${name} python3 ${pyfile})
-        SET_PROPERTY(TEST ${name} PROPERTY ENVIRONMENT
-                     "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/python"
-                     "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}")
-    ENDMACRO()
+MACRO(M_ADD_PYTHON_TEST name pyfile)
+    ADD_TEST(${name} python3 ${pyfile})
+    SET_PROPERTY(TEST ${name} PROPERTY ENVIRONMENT
+                 "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/python"
+                 "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}")
+ENDMACRO()
 
-    M_ADD_PYTHON_TEST(couchstore-purge ${CMAKE_CURRENT_SOURCE_DIR}/tests/purge.py)
-    M_ADD_PYTHON_TEST(couchstore-rewind ${CMAKE_CURRENT_SOURCE_DIR}/tests/rewind.py)
-    M_ADD_PYTHON_TEST(couchstore-changecount ${CMAKE_CURRENT_SOURCE_DIR}/tests/changecount.py)
+M_ADD_PYTHON_TEST(couchstore-purge ${CMAKE_CURRENT_SOURCE_DIR}/tests/purge.py)
+M_ADD_PYTHON_TEST(couchstore-rewind ${CMAKE_CURRENT_SOURCE_DIR}/tests/rewind.py)
+M_ADD_PYTHON_TEST(couchstore-changecount ${CMAKE_CURRENT_SOURCE_DIR}/tests/changecount.py)
 
-    MACRO(M_MAKE_LEGACY_TEST name)
-        cb_add_test_executable(${name} ${ARGN})
-        SET_TARGET_PROPERTIES(${name} PROPERTIES
-                              COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
-        TARGET_LINK_LIBRARIES(${name} couchstore_views platform)
-        TARGET_INCLUDE_DIRECTORIES(${name} PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
-    ENDMACRO()
-
-    M_MAKE_LEGACY_TEST(couchstore_file-deduper-test
-                       src/file_merger.cc
-                       tests/file_deduper_tests.cc)
-
-    M_MAKE_LEGACY_TEST(couchstore_file-merger-test
-                       src/file_merger.cc
-                       tests/file_merger_tests.cc)
-
-    M_MAKE_LEGACY_TEST(couchstore_file-sorter-test
-                       src/file_merger.cc
-                       src/file_sorter.cc
-                       src/quicksort.c
-                       tests/file_sorter_tests.cc)
-
-    SET(MAP_REDUCE_SOURCES
-        src/views/mapreduce/mapreduce.cc
-        src/views/mapreduce/mapreduce_c.cc)
-
-    M_MAKE_LEGACY_TEST(couchstore_mapreduce-builtin-test
-                       ${MAP_REDUCE_SOURCES}
-                       tests/mapreduce/builtin.cc)
-
-    M_MAKE_LEGACY_TEST(couchstore_mapreduce-map-test
-                       ${MAP_REDUCE_SOURCES}
-                       tests/mapreduce/map.cc)
-
-    M_MAKE_LEGACY_TEST(couchstore_mapreduce-reduce-test
-                       ${MAP_REDUCE_SOURCES}
-                       tests/mapreduce/reduce.cc)
-
-    cb_add_test_executable(couchstore_testapp
-                   tests/testapp.cc
-                   tests/views/tests.cc
-                   tests/views/collate_json_test.cc
-                   tests/views/index_headers.cc
-                   tests/views/bitmaps.cc
-                   tests/views/sorted_lists.cc
-                   tests/views/reductions.cc
-                   tests/views/keys.cc
-                   tests/views/values.cc
-                   tests/views/reducers.cc
-                   tests/views/cleanup.cc
-                   tests/views/spatial.cc
-                   tests/btree_purge/purge_tests.h
-                   tests/btree_purge/tests.cc
-                   tests/btree_purge/purge.cc
-                   $<TARGET_OBJECTS:couchstore_objs>
-                   $<TARGET_OBJECTS:couchstore_view_objs>)
-    SET_TARGET_PROPERTIES(couchstore_testapp PROPERTIES
-                         COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
-    TARGET_INCLUDE_DIRECTORIES(couchstore_testapp
-                               PRIVATE
-                               ${CMAKE_CURRENT_BINARY_DIR}/include)
-    TARGET_LINK_LIBRARIES(couchstore_testapp ${COUCHSTORE_VIEW_LIBS})
-    cb_enable_unity_build(couchstore_testapp)
-    SET(COUCHSTORE_GTEST_LIBRARIES gtest gtest_main gmock phosphor)
-    SET(COUCHSTORE_GTEST_INCLUDES ${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
-    cb_add_test_executable(couchstore_gtest
-                   tests/couchstoretest.cc
-                   tests/documents.cc
-                   tests/gtest_tests.cc
-                   tests/test_compact.cc
-                   tests/test_cxx_util.cc
-                   tests/test_fileops.cc
-                   tests/test_seek.cc
-                   src/node_types.cc
-                   src/crc32.cc
-                   )
-    SET_TARGET_PROPERTIES(couchstore_gtest PROPERTIES
+MACRO(M_MAKE_LEGACY_TEST name)
+    cb_add_test_executable(${name} ${ARGN})
+    SET_TARGET_PROPERTIES(${name} PROPERTIES
                           COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
-    TARGET_INCLUDE_DIRECTORIES(couchstore_gtest PRIVATE ${COUCHSTORE_GTEST_INCLUDES})
-    TARGET_LINK_LIBRARIES(couchstore_gtest couchstore platform ${COUCHSTORE_GTEST_LIBRARIES})
-    cb_enable_unity_build(couchstore_gtest)
+    TARGET_LINK_LIBRARIES(${name} couchstore_views platform)
+    TARGET_INCLUDE_DIRECTORIES(${name} PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
+ENDMACRO()
 
-    cb_add_test_executable(couchstore_internal_gtest
-                   tests/couchstoretest.cc
-                   tests/documents.cc
-                   tests/gtest_internal_tests.cc
-                   tests/test_fileops.cc
-                   $<TARGET_OBJECTS:couchstore_objs>)
-    SET_TARGET_PROPERTIES(couchstore_internal_gtest PROPERTIES
-                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
-    TARGET_INCLUDE_DIRECTORIES(couchstore_internal_gtest
-                               PRIVATE
-                               ${CMAKE_CURRENT_BINARY_DIR}/include)
+M_MAKE_LEGACY_TEST(couchstore_file-deduper-test
+                   src/file_merger.cc
+                   tests/file_deduper_tests.cc)
 
-    TARGET_LINK_LIBRARIES(couchstore_internal_gtest
-                          ${COUCHSTORE_GTEST_LIBRARIES}
-                          ${COUCHSTORE_LIBS})
+M_MAKE_LEGACY_TEST(couchstore_file-merger-test
+                   src/file_merger.cc
+                   tests/file_merger_tests.cc)
 
-    # This is an object library and can be used for verifying
-    # FileOpsInterface implementations that wrap other FileOps
-    # propogate errors correctly.
-    #
-    # Example usage can be found in tests/wrapped_fileops_test.cc
-    ADD_LIBRARY(couchstore_wrapped_fileops_test_framework OBJECT
-                tests/test_fileops.cc
-                ${COUCHSTORE_FILE_OPS})
-    SET_TARGET_PROPERTIES(couchstore_wrapped_fileops_test_framework PROPERTIES
-                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
-    TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test_framework
-                               PRIVATE
-                               ${COUCHSTORE_GTEST_INCLUDES}
-                               ${CMAKE_CURRENT_BINARY_DIR}/include)
-    TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test_framework platform)
+M_MAKE_LEGACY_TEST(couchstore_file-sorter-test
+                   src/file_merger.cc
+                   src/file_sorter.cc
+                   src/quicksort.c
+                   tests/file_sorter_tests.cc)
 
-    cb_add_test_executable(couchstore_wrapped_fileops_test
-                   src/iobuffer.cc
-                   src/crc32.cc
-                   tests/wrapped_fileops_test.cc
-                   $<TARGET_OBJECTS:couchstore_wrapped_fileops_test_framework>)
-    SET_TARGET_PROPERTIES(couchstore_wrapped_fileops_test PROPERTIES
-                          COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
-    TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test
-                               PRIVATE
-                               ${CMAKE_CURRENT_BINARY_DIR}/include)
-    TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test ${COUCHSTORE_GTEST_LIBRARIES} platform)
+SET(MAP_REDUCE_SOURCES
+    src/views/mapreduce/mapreduce.cc
+    src/views/mapreduce/mapreduce_c.cc)
 
-    ADD_LIBRARY(couchstore_test_fileops OBJECT
-                tests/test_fileops.cc)
-    TARGET_INCLUDE_DIRECTORIES(couchstore_test_fileops
-                               PRIVATE
-                               ${COUCHSTORE_GTEST_INCLUDES}
-                               ${CMAKE_CURRENT_BINARY_DIR}/include)
-    TARGET_LINK_LIBRARIES(couchstore_test_fileops platform)
+M_MAKE_LEGACY_TEST(couchstore_mapreduce-builtin-test
+                   ${MAP_REDUCE_SOURCES}
+                   tests/mapreduce/builtin.cc)
 
-    ADD_TEST(couchstore-file-deduper-test couchstore_file-deduper-test)
-    ADD_TEST(couchstore-file-merge-test couchstore_file-merger-test)
-    ADD_TEST(couchstore-file-sorter-test couchstore_file-sorter-test)
-    ADD_TEST(couchstore-gtest couchstore_gtest)
-    ADD_TEST(couchstore-internal-gtest couchstore_internal_gtest)
-    ADD_TEST(NAME couchstore-mapreduce-builtin-test COMMAND couchstore_mapreduce-builtin-test ${CMAKE_INSTALL_PREFIX}/bin/)
-    ADD_TEST(NAME couchstore-mapreduce-map-test COMMAND couchstore_mapreduce-map-test ${CMAKE_INSTALL_PREFIX}/bin/)
-    ADD_TEST(NAME couchstore-mapreduce-reduce-test COMMAND couchstore_mapreduce-reduce-test ${CMAKE_INSTALL_PREFIX}/bin/)
-    ADD_TEST(NAME couchstore-testapp COMMAND couchstore_testapp ${CMAKE_INSTALL_PREFIX}/bin/)
-    ADD_TEST(couchstore-wrapped_fileops-test couchstore_wrapped_fileops_test)
-endif(COUCHBASE_COUCHSTORE_BUILD_UNIT_TESTS)
+M_MAKE_LEGACY_TEST(couchstore_mapreduce-map-test
+                   ${MAP_REDUCE_SOURCES}
+                   tests/mapreduce/map.cc)
+
+M_MAKE_LEGACY_TEST(couchstore_mapreduce-reduce-test
+                   ${MAP_REDUCE_SOURCES}
+                   tests/mapreduce/reduce.cc)
+
+cb_add_test_executable(couchstore_testapp
+               tests/testapp.cc
+               tests/views/tests.cc
+               tests/views/collate_json_test.cc
+               tests/views/index_headers.cc
+               tests/views/bitmaps.cc
+               tests/views/sorted_lists.cc
+               tests/views/reductions.cc
+               tests/views/keys.cc
+               tests/views/values.cc
+               tests/views/reducers.cc
+               tests/views/cleanup.cc
+               tests/views/spatial.cc
+               tests/btree_purge/purge_tests.h
+               tests/btree_purge/tests.cc
+               tests/btree_purge/purge.cc
+               $<TARGET_OBJECTS:couchstore_objs>
+               $<TARGET_OBJECTS:couchstore_view_objs>)
+SET_TARGET_PROPERTIES(couchstore_testapp PROPERTIES
+                     COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
+TARGET_INCLUDE_DIRECTORIES(couchstore_testapp
+                           PRIVATE
+                           ${CMAKE_CURRENT_BINARY_DIR}/include)
+TARGET_LINK_LIBRARIES(couchstore_testapp ${COUCHSTORE_VIEW_LIBS})
+cb_enable_unity_build(couchstore_testapp)
+SET(COUCHSTORE_GTEST_LIBRARIES gtest gtest_main gmock phosphor)
+SET(COUCHSTORE_GTEST_INCLUDES ${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
+cb_add_test_executable(couchstore_gtest
+               tests/couchstoretest.cc
+               tests/documents.cc
+               tests/gtest_tests.cc
+               tests/test_compact.cc
+               tests/test_cxx_util.cc
+               tests/test_fileops.cc
+               tests/test_seek.cc
+               src/node_types.cc
+               src/crc32.cc
+               )
+SET_TARGET_PROPERTIES(couchstore_gtest PROPERTIES
+                      COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
+TARGET_INCLUDE_DIRECTORIES(couchstore_gtest PRIVATE ${COUCHSTORE_GTEST_INCLUDES})
+TARGET_LINK_LIBRARIES(couchstore_gtest couchstore platform ${COUCHSTORE_GTEST_LIBRARIES})
+cb_enable_unity_build(couchstore_gtest)
+
+cb_add_test_executable(couchstore_internal_gtest
+               tests/couchstoretest.cc
+               tests/documents.cc
+               tests/gtest_internal_tests.cc
+               tests/test_fileops.cc
+               $<TARGET_OBJECTS:couchstore_objs>)
+SET_TARGET_PROPERTIES(couchstore_internal_gtest PROPERTIES
+                      COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
+TARGET_INCLUDE_DIRECTORIES(couchstore_internal_gtest
+                           PRIVATE
+                           ${CMAKE_CURRENT_BINARY_DIR}/include)
+
+TARGET_LINK_LIBRARIES(couchstore_internal_gtest
+                      ${COUCHSTORE_GTEST_LIBRARIES}
+                      ${COUCHSTORE_LIBS})
+
+# This is an object library and can be used for verifying
+# FileOpsInterface implementations that wrap other FileOps
+# propogate errors correctly.
+#
+# Example usage can be found in tests/wrapped_fileops_test.cc
+ADD_LIBRARY(couchstore_wrapped_fileops_test_framework OBJECT
+            tests/test_fileops.cc
+            ${COUCHSTORE_FILE_OPS})
+SET_TARGET_PROPERTIES(couchstore_wrapped_fileops_test_framework PROPERTIES
+                      COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
+TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test_framework
+                           PRIVATE
+                           ${COUCHSTORE_GTEST_INCLUDES}
+                           ${CMAKE_CURRENT_BINARY_DIR}/include)
+TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test_framework platform)
+
+cb_add_test_executable(couchstore_wrapped_fileops_test
+               src/iobuffer.cc
+               src/crc32.cc
+               tests/wrapped_fileops_test.cc
+               $<TARGET_OBJECTS:couchstore_wrapped_fileops_test_framework>)
+SET_TARGET_PROPERTIES(couchstore_wrapped_fileops_test PROPERTIES
+                      COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
+TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test
+                           PRIVATE
+                           ${CMAKE_CURRENT_BINARY_DIR}/include)
+TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test ${COUCHSTORE_GTEST_LIBRARIES} platform)
+
+ADD_LIBRARY(couchstore_test_fileops OBJECT
+            tests/test_fileops.cc)
+TARGET_INCLUDE_DIRECTORIES(couchstore_test_fileops
+                           PRIVATE
+                           ${COUCHSTORE_GTEST_INCLUDES}
+                           ${CMAKE_CURRENT_BINARY_DIR}/include)
+TARGET_LINK_LIBRARIES(couchstore_test_fileops platform)
+
+ADD_TEST(couchstore-file-deduper-test couchstore_file-deduper-test)
+ADD_TEST(couchstore-file-merge-test couchstore_file-merger-test)
+ADD_TEST(couchstore-file-sorter-test couchstore_file-sorter-test)
+ADD_TEST(couchstore-gtest couchstore_gtest)
+ADD_TEST(couchstore-internal-gtest couchstore_internal_gtest)
+ADD_TEST(NAME couchstore-mapreduce-builtin-test COMMAND couchstore_mapreduce-builtin-test ${CMAKE_INSTALL_PREFIX}/bin/)
+ADD_TEST(NAME couchstore-mapreduce-map-test COMMAND couchstore_mapreduce-map-test ${CMAKE_INSTALL_PREFIX}/bin/)
+ADD_TEST(NAME couchstore-mapreduce-reduce-test COMMAND couchstore_mapreduce-reduce-test ${CMAKE_INSTALL_PREFIX}/bin/)
+ADD_TEST(NAME couchstore-testapp COMMAND couchstore_testapp ${CMAKE_INSTALL_PREFIX}/bin/)
+ADD_TEST(couchstore-wrapped_fileops-test couchstore_wrapped_fileops_test)
 
 ADD_SUBDIRECTORY(programs)
 
