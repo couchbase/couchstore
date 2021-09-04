@@ -81,7 +81,7 @@ ADD_LIBRARY(couchstore_objs OBJECT
         src/util.cc
         ${COUCHSTORE_FILE_OPS})
 TARGET_COMPILE_DEFINITIONS(couchstore_objs PUBLIC -Dcouchstore_EXPORTS)
-TARGET_LINK_LIBRARIES(couchstore_objs PUBLIC Folly::headers)
+TARGET_LINK_LIBRARIES(couchstore_objs PUBLIC Folly::headers nlohmann_json::nlohmann_json)
 SET_PROPERTY(TARGET couchstore_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 cb_enable_unity_build(couchstore_objs)
 
