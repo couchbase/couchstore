@@ -122,6 +122,18 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
 
     header_len = pread_header(&db->file, pos, &header_buf.buf, MAX_DB_HEADER_SIZE);
     if (header_len < 0) {
+        // MB-38788:
+        // Prior to the fix for MB-38788, compaction would leave the first
+        // byte of the file (pos:0) with DiskBlockType::Header; which would
+        // result in this function incorrectly attempting to try to parse
+        // as a header; this results in pread_header() failing with
+        // COUCHSTORE_ERROR_CHECKSUM_FAIL.
+        // To handle this more gracefully than simply returning CHECKSUM_FAIL
+        // when in fact there's no header; treat this case as-if the block
+        // was Data all along.
+        if (pos == 0) {
+            return COUCHSTORE_ERROR_NO_HEADER;
+        }
         error_pass(static_cast<couchstore_error_t>(header_len));
     }
 
