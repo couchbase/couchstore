@@ -731,11 +731,11 @@ static couchstore_error_t local_doc_print(couchfile_lookup_request *rq,
     printf("Key: ");
     printsb(id);
 
-    std::string decodedData;
-    auto rv = maybe_decode_local_doc(k, v, decodedData);
-
-    if (rv != COUCHSTORE_SUCCESS) {
-        return rv;
+    auto [status, decodedData] =
+            maybe_decode_local_doc(std::string_view{k->buf, k->size},
+                                   std::string_view{v->buf, v->size});
+    if (!status) {
+        return COUCHSTORE_ERROR_CORRUPT;
     }
 
     if (!decodedData.empty()) {
@@ -762,11 +762,11 @@ static couchstore_error_t local_doc_print_json(couchfile_lookup_request* rq,
     (*count)++;
     sized_buf value = {v->buf, v->size};
 
-    std::string decodedData;
-    auto rv = maybe_decode_local_doc(k, v, decodedData);
-
-    if (rv != COUCHSTORE_SUCCESS) {
-        return rv;
+    auto [status, decodedData] =
+            maybe_decode_local_doc(std::string_view{k->buf, k->size},
+                                   std::string_view{v->buf, v->size});
+    if (!status) {
+        return COUCHSTORE_ERROR_CORRUPT;
     }
 
     if (!decodedData.empty()) {
