@@ -156,8 +156,8 @@ TARGET_INCLUDE_DIRECTORIES(couch_dbdump
 TARGET_LINK_LIBRARIES(couch_dbdump
                       mcbp
                       xattr
-                      ${FLATBUFFERS_LIBRARIES}
                       ep-engine_collections
+        ep-engine_storage_common
                       ${COUCHSTORE_VIEW_LIBS})
 
 ADD_EXECUTABLE(couch_dbck src/dbck.cc)
