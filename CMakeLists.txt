@@ -327,8 +327,7 @@ TARGET_INCLUDE_DIRECTORIES(couchstore_testapp
                            ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_LINK_LIBRARIES(couchstore_testapp ${COUCHSTORE_VIEW_LIBS})
 cb_enable_unity_build(couchstore_testapp)
-SET(COUCHSTORE_GTEST_LIBRARIES gtest gtest_main gmock phosphor)
-SET(COUCHSTORE_GTEST_INCLUDES ${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
+SET(COUCHSTORE_GTEST_LIBRARIES GTest::gtest GTest::gtest_main GTest::gmock phosphor)
 cb_add_test_executable(couchstore_gtest
                tests/couchstoretest.cc
                tests/documents.cc
@@ -342,7 +341,6 @@ cb_add_test_executable(couchstore_gtest
                )
 SET_TARGET_PROPERTIES(couchstore_gtest PROPERTIES
                       COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
-TARGET_INCLUDE_DIRECTORIES(couchstore_gtest PRIVATE ${COUCHSTORE_GTEST_INCLUDES})
 TARGET_LINK_LIBRARIES(couchstore_gtest couchstore platform ${COUCHSTORE_GTEST_LIBRARIES})
 cb_enable_unity_build(couchstore_gtest)
 
@@ -374,9 +372,8 @@ SET_TARGET_PROPERTIES(couchstore_wrapped_fileops_test_framework PROPERTIES
                       COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
 TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test_framework
                            PRIVATE
-                           ${COUCHSTORE_GTEST_INCLUDES}
                            ${CMAKE_CURRENT_BINARY_DIR}/include)
-TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test_framework platform)
+TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test_framework GTest::gmock platform)
 
 cb_add_test_executable(couchstore_wrapped_fileops_test
                src/iobuffer.cc
@@ -394,9 +391,8 @@ ADD_LIBRARY(couchstore_test_fileops OBJECT
             tests/test_fileops.cc)
 TARGET_INCLUDE_DIRECTORIES(couchstore_test_fileops
                            PRIVATE
-                           ${COUCHSTORE_GTEST_INCLUDES}
                            ${CMAKE_CURRENT_BINARY_DIR}/include)
-TARGET_LINK_LIBRARIES(couchstore_test_fileops platform)
+TARGET_LINK_LIBRARIES(couchstore_test_fileops GTest::gmock platform)
 
 ADD_TEST(couchstore-file-deduper-test couchstore_file-deduper-test)
 ADD_TEST(couchstore-file-merge-test couchstore_file-merger-test)
