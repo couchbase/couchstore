@@ -19,8 +19,6 @@ INCLUDE_DIRECTORIES(BEFORE ${CMAKE_INSTALL_PREFIX}/include
                            ${Platform_SOURCE_DIR}/include
                            ${phosphor_SOURCE_DIR}/include)
 
-INCLUDE_DIRECTORIES(AFTER ${gsl_lite_SOURCE_DIR}/include)
-
 if (LUA_FOUND)
    include_directories(AFTER SYSTEM {LUA_INCLUDE_DIR})
 endif (LUA_FOUND)
@@ -81,7 +79,7 @@ ADD_LIBRARY(couchstore_objs OBJECT
         src/util.cc
         ${COUCHSTORE_FILE_OPS})
 TARGET_COMPILE_DEFINITIONS(couchstore_objs PUBLIC -Dcouchstore_EXPORTS)
-TARGET_LINK_LIBRARIES(couchstore_objs PUBLIC Folly::headers nlohmann_json::nlohmann_json)
+TARGET_LINK_LIBRARIES(couchstore_objs PUBLIC Folly::headers nlohmann_json::nlohmann_json gsl::gsl-lite)
 SET_PROPERTY(TARGET couchstore_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 cb_enable_unity_build(couchstore_objs)
 
@@ -157,8 +155,8 @@ TARGET_LINK_LIBRARIES(couch_dbdump
                       mcbp
                       xattr
                       ep-engine_collections
-        ep-engine_storage_common
-                      ${COUCHSTORE_VIEW_LIBS})
+                      ep-engine_storage_common
+                      ${COUCHSTORE_VIEW_LIBS} gsl::gsl-lite)
 
 ADD_EXECUTABLE(couch_dbck src/dbck.cc)
 TARGET_LINK_LIBRARIES(couch_dbck couchstore platform)
@@ -189,7 +187,7 @@ TARGET_LINK_LIBRARIES(couch_view_group_compactor couchstore_views platform)
 TARGET_INCLUDE_DIRECTORIES(couch_view_group_compactor PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 cb_add_test_executable(couch_create src/couch_create.cc src/crc32.cc)
-TARGET_LINK_LIBRARIES(couch_create couchstore platform)
+TARGET_LINK_LIBRARIES(couch_create couchstore platform gsl::gsl-lite)
 TARGET_INCLUDE_DIRECTORIES(couch_create PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 IF (INSTALL_HEADER_FILES)
@@ -385,7 +383,7 @@ SET_TARGET_PROPERTIES(couchstore_wrapped_fileops_test PROPERTIES
 TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test
                            PRIVATE
                            ${CMAKE_CURRENT_BINARY_DIR}/include)
-TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test ${COUCHSTORE_GTEST_LIBRARIES} platform)
+TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test gsl::gsl-lite ${COUCHSTORE_GTEST_LIBRARIES} platform)
 
 ADD_LIBRARY(couchstore_test_fileops OBJECT
             tests/test_fileops.cc)
