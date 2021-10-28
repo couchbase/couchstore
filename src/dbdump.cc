@@ -53,7 +53,11 @@ static bool decodeNamespace = true;
 static bool iterateHeaders = false;
 static bool dumpHeaders = false;
 static std::optional<cs_off_t> headerOffset;
-static sized_buf dumpKey;
+
+// Key decoding things
+static std::string dumpKey;
+static std::string dumpCollection;
+static bool dumpPrepare = false;
 
 typedef struct {
     raw_64 cas;
@@ -833,7 +837,8 @@ static couchstore_error_t couchstore_print_local_docs(
 
     if (oneKey) {
         rq.fold = 0;
-        key = dumpKey;
+        key.buf = dumpKey.data();
+        key.size = dumpKey.size();
     }
 
     errcode = btree_lookup(&rq, db->header.local_docs_root->pointer);
@@ -912,7 +917,8 @@ next_header:
                                               &count);
         } else if (oneKey) {
             DocInfo* info;
-            errcode = couchstore_docinfo_by_id(db, dumpKey.buf, dumpKey.size, &info);
+            errcode = couchstore_docinfo_by_id(
+                    db, dumpKey.data(), dumpKey.size(), &info);
             if (errcode == COUCHSTORE_SUCCESS) {
                 foldprint(db, info, &count);
                 couchstore_free_docinfo(info);
@@ -1152,6 +1158,9 @@ static void usage(void) {
     printf("    --vbucket <vb_file> decode vbucket file\n");
     printf("    --view <view_file> decode view index file\n");
     printf("    --key <key>  dump only the specified document\n");
+    printf("    --collection <id> dump key belonging to specific collection "
+           "(defaults to default collection)\n");
+    printf("    --prepare    dump key belonging to prepare namespace\n");
     printf("    --hex-body   convert document body data to hex (for binary data)\n");
     printf("    --no-body    don't retrieve document bodies (metadata only, faster)\n");
     printf("    --byid       sort output by document ID\n");
@@ -1166,6 +1175,27 @@ static void usage(void) {
     printf("    --local      dump local documents. Can be used in conjunction with --tree\n");
     printf("    --map        dump block map \n");
     exit(EXIT_FAILURE);
+}
+
+std::string encodeDocKey(std::string_view key,
+                         std::string_view collection,
+                         bool prepare) {
+    std::string ret;
+
+    if (prepare) {
+        auto leb128 = cb::mcbp::unsigned_leb128<uint64_t>(2);
+        ret.append(leb128.begin(), leb128.end());
+    }
+
+    auto cid = 0;
+    if (collection != "") {
+        cid = stoull(dumpCollection);
+    }
+    auto leb128 = cb::mcbp::unsigned_leb128<uint64_t>(cid);
+    ret.append(leb128.begin(), leb128.end());
+    ret.append(key);
+
+    return ret;
 }
 
 int main(int argc, char **argv)
@@ -1203,12 +1233,21 @@ int main(int argc, char **argv)
                 usage();
             }
             oneKey = true;
-            dumpKey.buf = argv[ii+1];
-            dumpKey.size = strlen(argv[ii+1]);
+            dumpKey = argv[ii + 1];
             if (mode == DumpBySequence) {
                 mode = DumpByID;
             }
             ii++;
+        } else if (command == "--collection") {
+            // Append collection namespace prefix to key
+            if (argc < (ii + 1)) {
+                usage();
+            }
+            dumpCollection = argv[ii + 1];
+            ii++;
+        } else if (command == "--prepare") {
+            // Apend prepare namespace prefix to key
+            dumpPrepare = true;
         } else if (command == "--local") {
             mode = DumpLocals;
         } else if (command == "--map") {
@@ -1237,6 +1276,11 @@ int main(int argc, char **argv)
 
     if (ii >= argc) {
         usage();
+    }
+
+    // Local doc index doesn't prefix keys with cid or prepare namespace
+    if (oneKey && mode != DumpLocals) {
+        dumpKey = encodeDocKey(dumpKey, dumpCollection, dumpPrepare);
     }
 
     for (; ii < argc; ++ii) {
