@@ -21,6 +21,7 @@
 #include <platform/cbassert.h>
 #include <platform/string_hex.h>
 #include <snappy-c.h>
+#include <storage_common/doc_key_encoder.h>
 #include <storage_common/local_doc_parser.h>
 #include <xattr/blob.h>
 #include <xattr/utils.h>
@@ -1175,27 +1176,6 @@ static void usage(void) {
     printf("    --local      dump local documents. Can be used in conjunction with --tree\n");
     printf("    --map        dump block map \n");
     exit(EXIT_FAILURE);
-}
-
-std::string encodeDocKey(std::string_view key,
-                         std::string_view collection,
-                         bool prepare) {
-    std::string ret;
-
-    if (prepare) {
-        auto leb128 = cb::mcbp::unsigned_leb128<uint64_t>(2);
-        ret.append(leb128.begin(), leb128.end());
-    }
-
-    auto cid = 0;
-    if (collection != "") {
-        cid = stoull(dumpCollection);
-    }
-    auto leb128 = cb::mcbp::unsigned_leb128<uint64_t>(cid);
-    ret.append(leb128.begin(), leb128.end());
-    ret.append(key);
-
-    return ret;
 }
 
 int main(int argc, char **argv)
