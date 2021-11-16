@@ -58,7 +58,9 @@ static std::optional<cs_off_t> headerOffset;
 // Key decoding things
 static std::string dumpKey;
 static std::string dumpCollection;
-static bool dumpPrepare = false;
+static uint32_t dumpNamespace;
+static uint32_t systemNamespace = 1;
+static uint32_t prepareNamespace = 2;
 
 typedef struct {
     raw_64 cas;
@@ -1162,6 +1164,8 @@ static void usage(void) {
     printf("    --collection <id> dump key belonging to specific collection "
            "(defaults to default collection)\n");
     printf("    --prepare    dump key belonging to prepare namespace\n");
+    printf("    --system    dump key belonging to system namespace\n");
+    printf("    --namespace  dump key belonging to specified namespace\n");
     printf("    --hex-body   convert document body data to hex (for binary data)\n");
     printf("    --no-body    don't retrieve document bodies (metadata only, faster)\n");
     printf("    --byid       sort output by document ID\n");
@@ -1226,8 +1230,16 @@ int main(int argc, char **argv)
             dumpCollection = argv[ii + 1];
             ii++;
         } else if (command == "--prepare") {
-            // Apend prepare namespace prefix to key
-            dumpPrepare = true;
+            dumpNamespace = prepareNamespace;
+        } else if (command == "--system") {
+            dumpNamespace = systemNamespace;
+        } else if (command == "--namespace") {
+            // Append collection namespace prefix to key
+            if (argc < (ii + 1)) {
+                usage();
+            }
+            dumpNamespace = std::stoull(argv[ii + 1]);
+            ii++;
         } else if (command == "--local") {
             mode = DumpLocals;
         } else if (command == "--map") {
@@ -1260,7 +1272,7 @@ int main(int argc, char **argv)
 
     // Local doc index doesn't prefix keys with cid or prepare namespace
     if (oneKey && mode != DumpLocals) {
-        dumpKey = encodeDocKey(dumpKey, dumpCollection, dumpPrepare);
+        dumpKey = encodeDocKey(dumpKey, dumpCollection, dumpNamespace);
     }
 
     for (; ii < argc; ++ii) {
