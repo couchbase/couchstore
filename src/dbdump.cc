@@ -10,8 +10,6 @@
 #include "views/index_header.h"
 #include "views/util.h"
 #include "views/view_group.h"
-
-#include <collections/kvstore_generated.h>
 #include <libcouchstore/couch_db.h>
 #include <libcouchstore/json_utils.h>
 #include <mcbp/protocol/unsigned_leb128.h>
@@ -20,12 +18,9 @@
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
 #include <platform/string_hex.h>
-#include <snappy-c.h>
 #include <storage_common/doc_key_encoder.h>
 #include <storage_common/local_doc_parser.h>
 #include <xattr/blob.h>
-#include <xattr/utils.h>
-
 #include <cinttypes>
 #include <cstdio>
 #include <cstdlib>
@@ -35,12 +30,12 @@
 
 #define MAX_HEADER_SIZE (64 * 1024)
 
-typedef enum {
+enum DumpMode{
     DumpBySequence,
     DumpByID,
     DumpLocals,
     DumpFileMap,
-} DumpMode;
+};
 
 static DumpMode mode = DumpBySequence;
 static bool dumpTree = false;
@@ -62,11 +57,11 @@ static uint32_t dumpNamespace;
 static uint32_t systemNamespace = 1;
 static uint32_t prepareNamespace = 2;
 
-typedef struct {
+struct CouchbaseRevMeta{
     raw_64 cas;
     raw_32 expiry;
     raw_32 flags;
-} CouchbaseRevMeta;
+};
 
 // Additional Couchbase V1 metadata:
 struct CouchbaseRevMetaV1 {
@@ -393,7 +388,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
     Doc* doc = nullptr;
     uint64_t cas;
     uint32_t expiry, flags;
-    protocol_binary_datatype_t datatype = PROTOCOL_BINARY_RAW_BYTES;
+    auto datatype = PROTOCOL_BINARY_RAW_BYTES;
     bool ttl_delete = false;
     couchstore_error_t docerr;
     (*count)++;
@@ -402,7 +397,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         printf("{\"seq\":%" PRIu64 ",\"id\":\"", docinfo->db_seq);
         if (decodeNamespace && docinfo->id.size >= sizeof(uint32_t)) {
             auto expandedDocId = buildCollectionInfoId(&docinfo->id);
-            sized_buf expandedDoc = sized_buf{expandedDocId.data(), expandedDocId.size()};
+            sized_buf expandedDoc{expandedDocId.data(), expandedDocId.size()};
             printjquote(&expandedDoc);
         } else {
             printjquote(&docinfo->id);
@@ -437,7 +432,8 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
     }
 
     if (docinfo->rev_meta.size >= sizeof(CouchbaseRevMeta)) {
-        const CouchbaseRevMeta* meta = (const CouchbaseRevMeta*)docinfo->rev_meta.buf;
+        const auto* meta = reinterpret_cast<const CouchbaseRevMeta*>(
+                docinfo->rev_meta.buf);
         cas = decode_raw64(meta->cas);
         expiry = decode_raw32(meta->expiry);
         flags = decode_raw32(meta->flags);
@@ -518,9 +514,9 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         const auto metaV3 = CouchbaseRevMetaV3(docinfo->rev_meta);
 
         if (dumpJson) {
-            printf(",\"sync_write\":\"%s\"", metaV3.getOperationName());
+            printf(R"(,"sync_write":"%s")", metaV3.getOperationName());
             if (metaV3.operation == 0 /*Pending*/) {
-                printf(",\"level\":\"%s\"", metaV3.getLevelName());
+                printf(R"(,"level":"%s")", metaV3.getLevelName());
                 printf(",\"isDelete\":%s", metaV3.isDelete() ? "true" : "false");
             } else if (metaV3.operation == 1 /*Commit*/ ||
                        metaV3.operation == 2 /*Abort*/) {
@@ -547,7 +543,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
     if (docinfo->deleted) {
         const char* deleteSource = ttl_delete ? "TTL" : "explicit";
         if (dumpJson) {
-            printf(",\"deleted\":\"%s\"", deleteSource);
+            printf(R"(,"deleted":"%s")", deleteSource);
         } else {
             printf("     doc deleted (%s)\n", deleteSource);
         }
@@ -595,17 +591,17 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
             if (dumpJson) {
                 printf(",\"size\":%" PRIu64 ",", (uint64_t)doc->data.size);
                 if (docinfo->content_meta & COUCH_DOC_IS_COMPRESSED) {
-                    printf("\"snappy\":true,\"display\":\"inflated\",");
+                    printf(R"("snappy":true,"display":"inflated",)");
                 }
 
                 if (xattrs.size() > 0) {
                     sized_buf xa{const_cast<char*>(xattrs.data()), xattrs.size()};
-                    printf("\"xattr\":\"");
+                    printf(R"("xattr":")");
                     printjquote(&xa);
                     printf("\",");
                 }
 
-                printf("\"body\":\"");
+                printf(R"("body":")");
                 printjquote(&body);
                 printf("\"}\n");
             } else {
@@ -732,11 +728,10 @@ static couchstore_error_t local_doc_print(couchfile_lookup_request *rq,
         return COUCHSTORE_ERROR_DOC_NOT_FOUND;
     }
     (*count)++;
-    sized_buf* id = (sized_buf*)k;
     sized_buf value = {v->buf, v->size};
 
     printf("Key: ");
-    printsb(id);
+    printsb(k);
 
     auto [status, decodedData] =
             maybe_decode_local_doc(std::string_view{k->buf, k->size},
@@ -1013,9 +1008,9 @@ static couchstore_error_t lookup_callback(couchfile_lookup_request *rq,
     json_value.buf = v->buf + sizeof(raw_kv_length);
 
     if (dumpJson) {
-        printf("{\"id\":\"");
+        printf(R"({"id":")");
         printjquote(&json_key);
-        printf("\",\"data\":\"");
+        printf(R"(","data":")");
         printjquote(&json_value);
         printf("\"}\n");
     } else {
@@ -1155,7 +1150,7 @@ static int process_view_file(const char *file, int *total)
     return 0;
 }
 
-static void usage(void) {
+static void usage() {
     printf("USAGE: couch_dbdump [options] file.couch [main_xxxx.view.X ...]\n");
     printf("\nOptions:\n");
     printf("    --vbucket <vb_file> decode vbucket file\n");
