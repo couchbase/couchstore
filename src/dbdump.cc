@@ -20,6 +20,7 @@
 #include <platform/string_hex.h>
 #include <storage_common/doc_key_encoder.h>
 #include <storage_common/local_doc_parser.h>
+#include <boost/algorithm/string.hpp>
 #include <xattr/blob.h>
 #include <cinttypes>
 #include <cstdio>
@@ -277,30 +278,6 @@ static void printjquote(const sized_buf *sb)
     }
 }
 
-static void print_datatype_as_json(const std::string& datatype) {
-    printf("\"datatype_as_text\":[");
-
-    std::string::size_type start = 0;
-    std::string::size_type end;
-    bool need_comma = false;
-    while ((end = datatype.find(',', start)) != std::string::npos) {
-        auto token = datatype.substr(start, end - start);
-        if (need_comma) {
-            printf(",");
-        }
-        printf("\"%s\"", token.c_str());
-        start = end + 1;
-        need_comma = true;
-    }
-
-    if (need_comma) {
-        printf(",");
-    }
-    auto token = datatype.substr(start);
-    printf("\"%s\"", token.c_str());
-    printf("]");
-}
-
 static std::string getNamespaceString(uint32_t ns) {
     switch (ns) {
     case 0:
@@ -392,17 +369,15 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
     bool ttl_delete = false;
     couchstore_error_t docerr;
     (*count)++;
+    nlohmann::json json;
 
     if (dumpJson) {
-        printf("{\"seq\":%" PRIu64 ",\"id\":\"", docinfo->db_seq);
-        if (decodeNamespace) {
-            auto expandedDocId = buildCollectionInfoId(&docinfo->id);
-            sized_buf expandedDoc{expandedDocId.data(), expandedDocId.size()};
-            printjquote(&expandedDoc);
+        json["seq"] = docinfo->db_seq;
+        if (decodeNamespace && docinfo->id.size >= sizeof(uint32_t)) {
+            json["id"] = buildCollectionInfoId(&docinfo->id);
         } else {
-            printjquote(&docinfo->id);
+            json["id"] = std::string_view{docinfo->id.buf, docinfo->id.size};
         }
-        printf("\",");
     } else {
         if (mode == DumpBySequence) {
             printf("Doc seq: %" PRIu64 "\n", docinfo->db_seq);
@@ -421,10 +396,9 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         return 0;
     }
     if (dumpJson) {
-        printf("\"rev\":%" PRIu64 ",\"content_meta\":%#02x,",
-               docinfo->rev_seq,
-               docinfo->content_meta);
-        printf("\"physical_size\":%" PRIu64 ",", (uint64_t)docinfo->physical_size);
+        json["rev"] = docinfo->rev_seq;
+        json["content_meta"] = cb::to_hex(docinfo->content_meta);
+        json["physical_size"] = (uint64_t)docinfo->physical_size;
     } else {
         printf("     rev: %" PRIu64 "\n", docinfo->rev_seq);
         printf("     content_meta: %#02x\n", docinfo->content_meta);
@@ -438,11 +412,9 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         expiry = decode_raw32(meta->expiry);
         flags = decode_raw32(meta->flags);
         if (dumpJson) {
-            printf("\"cas\":\"%" PRIu64 "\",\"expiry\":%" PRIu32
-                   ",\"flags\":%" PRIu32,
-                   cas,
-                   expiry,
-                   flags);
+            json["cas"] = cas;
+            json["expiry"] = expiry;
+            json["flags"] = flags;
         } else {
             printf("     cas: %" PRIu64 ", expiry: %" PRIu32
                    ", flags: %" PRIu32,
@@ -476,8 +448,10 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         const auto datatype_string = mcbp::datatype::to_string(datatype);
 
         if (dumpJson) {
-            printf(",\"datatype\":%d,", datatype);
-            print_datatype_as_json(datatype_string);
+            json["datatype"] = datatype;
+            std::vector<std::string> dataTypesStr;
+            boost::split(dataTypesStr, datatype_string, boost::is_any_of(","));
+            json["datatype_as_text"] = dataTypesStr;
         } else {
             printf(", datatype: 0x%02x (%s)",
                    datatype,
@@ -500,7 +474,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         const auto conf_res_mode = metaV2->confResMode;
 
         if (dumpJson) {
-            printf(",\"conflict_resolution_mode\":%d", conf_res_mode);
+            json["conflict_resolution_mode"] = conf_res_mode;
         } else {
             printf(", conflict_resolution_mode: %d", conf_res_mode);
         }
@@ -514,14 +488,13 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         const auto metaV3 = CouchbaseRevMetaV3(docinfo->rev_meta);
 
         if (dumpJson) {
-            printf(R"(,"sync_write":"%s")", metaV3.getOperationName());
+            json["sync_write"] = metaV3.getOperationName();
             if (metaV3.operation == 0 /*Pending*/) {
-                printf(R"(,"level":"%s")", metaV3.getLevelName());
-                printf(",\"isDelete\":%s", metaV3.isDelete() ? "true" : "false");
+                json["level"] = metaV3.getLevelName();
+                json["isDelete"] = metaV3.isDelete();
             } else if (metaV3.operation == 1 /*Commit*/ ||
                        metaV3.operation == 2 /*Abort*/) {
-                printf(",\"prepareSeqno\":\"%" PRIu64 "\"",
-                       metaV3.getPrepareSeqno());
+                json["prepareSeqno"] = metaV3.getPrepareSeqno();
             }
         } else {
             printf(", sync_write: %s", metaV3.getOperationName());
@@ -543,7 +516,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
     if (docinfo->deleted) {
         const char* deleteSource = ttl_delete ? "TTL" : "explicit";
         if (dumpJson) {
-            printf(R"(,"deleted":"%s")", deleteSource);
+            json["deleted"] = deleteSource;
         } else {
             printf("     doc deleted (%s)\n", deleteSource);
         }
@@ -553,7 +526,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         docerr = couchstore_open_doc_with_docinfo(db, docinfo, &doc, DECOMPRESS_DOC_BODIES);
         if (docerr != COUCHSTORE_SUCCESS) {
             if (dumpJson) {
-                printf(",\"body\":null}\n");
+                json["body"] = nullptr;
             } else {
                 printf("     could not read document body: %s\n", couchstore_strerror(docerr));
             }
@@ -571,7 +544,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
                             {doc->data.buf, doc->data.size},
                             inflated)) {
                     if (dumpJson) {
-                        printf(",\"body\":null}\n");
+                        json["body"] = nullptr;
                     } else {
                         printf("     could not inflate document body\n");
                     }
@@ -589,21 +562,22 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
             }
 
             if (dumpJson) {
-                printf(",\"size\":%" PRIu64 ",", (uint64_t)doc->data.size);
+                json["size"] = (uint64_t)doc->data.size;
                 if (docinfo->content_meta & COUCH_DOC_IS_COMPRESSED) {
-                    printf(R"("snappy":true,"display":"inflated",)");
+                    json["snappy"] = true;
+                    json["display"] = "inflated";
                 }
 
-                if (xattrs.size() > 0) {
-                    sized_buf xa{const_cast<char*>(xattrs.data()), xattrs.size()};
-                    printf(R"("xattr":")");
-                    printjquote(&xa);
-                    printf("\",");
+                if (!xattrs.empty()) {
+                    json["xattr"] = xattrs;
                 }
 
-                printf(R"("body":")");
-                printjquote(&body);
-                printf("\"}\n");
+                std::string_view strBody{body.buf, body.size};
+                if(datatype & PROTOCOL_BINARY_DATATYPE_JSON) {
+                    json["body"] = nlohmann::json::parse(strBody);
+                } else {
+                    json["body"] = strBody;
+                }
             } else {
                 printf("     size: %" PRIu64 "\n", (uint64_t)doc->data.size);
                 if (xattrs.size() > 0) {
@@ -632,10 +606,14 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         }
     } else {
         if (dumpJson) {
-            printf(",\"body\":null}\n");
+            json["body"] = nullptr;
         } else {
             printf("\n");
         }
+    }
+
+    if(dumpJson) {
+        std::cout << json.dump() << std::endl;
     }
 
     couchstore_free_document(doc);
@@ -879,8 +857,9 @@ static int process_vbucket_file(const char *file, int *total)
             return -1;
         }
     }
-
-    printf("Dumping \"%s\":\n", file);
+    if(!dumpJson) {
+        printf("Dumping \"%s\":\n", file);
+    }
 
 next_header:
     if (dumpHeaders) {
