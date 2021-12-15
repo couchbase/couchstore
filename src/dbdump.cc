@@ -373,7 +373,7 @@ static std::string buildCollectionInfoId(const sized_buf* sb){
 }
 static void printDocId(const char* prefix, const sized_buf* sb) {
     printf("%s", prefix);
-    if (decodeNamespace && sb->size >= sizeof(uint32_t)) {
+    if (decodeNamespace) {
         auto expandedDocId = buildCollectionInfoId(sb);
         printbuf(expandedDocId.c_str(), expandedDocId.size());
     } else {
@@ -395,7 +395,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
 
     if (dumpJson) {
         printf("{\"seq\":%" PRIu64 ",\"id\":\"", docinfo->db_seq);
-        if (decodeNamespace && docinfo->id.size >= sizeof(uint32_t)) {
+        if (decodeNamespace) {
             auto expandedDocId = buildCollectionInfoId(&docinfo->id);
             sized_buf expandedDoc{expandedDocId.data(), expandedDocId.size()};
             printjquote(&expandedDoc);
