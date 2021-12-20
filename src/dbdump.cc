@@ -556,7 +556,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
 
             if (mcbp::datatype::is_xattr(datatype)) {
                 cb::xattr::Blob blob({body.buf, body.size}, false);
-                xattrs = blob.to_json().dump();
+                xattrs = blob.to_json().dump(-1, ' ', true);
                 body = sized_buf{body.buf + blob.size(),
                                  body.size - blob.size()};
             }
@@ -613,7 +613,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
     }
 
     if(dumpJson) {
-        std::cout << json.dump() << std::endl;
+        std::cout << json.dump(-1, ' ', true) << std::endl;
     }
 
     couchstore_free_document(doc);
@@ -768,7 +768,7 @@ static couchstore_error_t local_doc_print_json(couchfile_lookup_request* rq,
     }
 
 
-    std::cout << parsed.dump() << std::endl;
+    std::cout << parsed.dump(-1, ' ', true) << std::endl;
 
     return COUCHSTORE_SUCCESS;
 }
@@ -865,10 +865,12 @@ next_header:
     if (dumpHeaders) {
         try {
             const auto header = cb::couchstore::getHeader(*db);
-            printf("File header: %s\n", to_json(header).dump().c_str());
+            printf("File header: %s\n",
+                   to_json(header).dump(-1, ' ', true).c_str());
         } catch (const std::exception& ex) {
-            fprintf(stderr, "Failed to fetch database header information: %s\n",
-                   ex.what());
+            fprintf(stderr,
+                    "Failed to fetch database header information: %s\n",
+                    ex.what());
             return -1;
         }
     }
