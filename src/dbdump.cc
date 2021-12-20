@@ -373,7 +373,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
 
     if (dumpJson) {
         json["seq"] = docinfo->db_seq;
-        if (decodeNamespace && docinfo->id.size >= sizeof(uint32_t)) {
+        if (decodeNamespace) {
             json["id"] = buildCollectionInfoId(&docinfo->id);
         } else {
             json["id"] = std::string_view{docinfo->id.buf, docinfo->id.size};
