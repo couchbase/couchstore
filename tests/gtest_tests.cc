@@ -1584,6 +1584,75 @@ TEST_F(CouchstoreTest, RangeScanMulti) {
                                         &expected));
 }
 
+// Test demonstrating inclusive range
+TEST_F(CouchstoreTest, RangeScanIsInclusive) {
+    Documents documents(4);
+    documents.generateDocs();
+
+    // store all of the documents
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(
+                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_save_documents(db,
+                                        documents.getDocs(),
+                                        documents.getDocInfos(),
+                                        documents.getDocsCount(),
+                                        0));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+    db = nullptr;
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+
+    // expected result is inclusive of end - [doc0, doc2]
+    std::string start = "doc0";
+    std::string end = "doc2";
+    std::vector<sized_buf> ranges;
+    ranges.emplace_back(sized_buf{start.data(), start.size()});
+    ranges.emplace_back(sized_buf{end.data(), end.size()});
+
+    Documents expected0(3);
+    expected0.setDoc(0, "doc0", "0-data");
+    expected0.setDoc(1, "doc1", "1-data");
+    expected0.setDoc(2, "doc2", "2-data");
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        ranges.data(),
+                                        ranges.size(),
+                                        RANGES,
+                                        &Documents::checkCallback,
+                                        &expected0));
+
+    EXPECT_EQ(3, expected0.getCallbacks());
+
+    // Assuming start is a prefix, we can create and end key from start and
+    // get all doc prefixed documents
+    ranges.clear();
+    start = "doc";
+    end = start;
+    end.append("\xff");
+    ranges.emplace_back(sized_buf{start.data(), start.size()});
+    ranges.emplace_back(sized_buf{end.data(), end.size()});
+    Documents expected1(4);
+    expected1.setDoc(0, "doc0", "0-data");
+    expected1.setDoc(1, "doc1", "1-data");
+    expected1.setDoc(2, "doc2", "2-data");
+    expected1.setDoc(3, "doc3", "3-data");
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        ranges.data(),
+                                        ranges.size(),
+                                        RANGES,
+                                        &Documents::checkCallback,
+                                        &expected1));
+
+    EXPECT_EQ(4, expected1.getCallbacks());
+}
+
 // Test fixture for the add or replace callback exposed by save_docs
 class SaveCallbackTest : public CouchstoreTest {
 public:

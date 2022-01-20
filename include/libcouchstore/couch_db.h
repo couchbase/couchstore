@@ -665,13 +665,13 @@ extern "C" {
     /**
      * Iterate over the document infos of a set of ids.
      *
-     * The DocInfos will be presented to the callback in order of ascending document id,
-     * *not* in the order in which they appear in the ids[] array.
+     * The DocInfos will be presented to the callback in order of ascending
+     * document id, *not* in the order in which they appear in the ids[] array.
      *
-     * If the RANGES option flag is set, the ids array is interpreted as alternating
-     * begin/end points of ranges, and all DocInfos with IDs within those ranges
-     * are iterated over. (If there is an odd number of IDs, the iteration will
-     * stop at the last ID.)
+     * If the RANGES option flag is set, the ids array is expected to store
+     * begin/end keys describing inclusive ranges of documents. All DocInfos
+     * with IDs within those ranges are iterated over. (If there is an odd
+     * number of IDs, the iteration will stop at the last ID.)
      *
      * The callback will not be invoked for nonexistent ids.
      *
