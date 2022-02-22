@@ -38,6 +38,10 @@ const char *couchstore_strerror(couchstore_error_t errcode)
         return "error closing file";
     case COUCHSTORE_ERROR_CANCEL:
         return "error cancel";
+    case COUCHSTORE_ERROR_SCAN_YIELD:
+        return "scan yield";
+    case COUCHSTORE_ERROR_SCAN_ABORTED:
+        return "scan aborted";
     default:
         return "couchstore_strerror unknown errcode";
     }

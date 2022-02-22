@@ -40,4 +40,24 @@
         COUCHSTORE_ERROR_DB_NO_LONGER_VALID = -16,
         COUCHSTORE_ERROR_FILE_CLOSE = -17,
         COUCHSTORE_ERROR_NOT_SUPPORTED = -18,
+
+        /**
+         * A non success status code for the callback of
+         * couchstore_changes_since and couchstore_docinfos_by_id to signal that
+         * the outer function is to stop visiting the index and return this
+         * status code to the caller. The callback uses this status to indicate
+         * some temporary issue (e.g. a soft out of memory condition) and the
+         * caller should yield and resume the index scan later.
+         */
+        COUCHSTORE_ERROR_SCAN_YIELD = -19,
+
+        /**
+         * A non success status code for the callback of
+         * couchstore_changes_since and couchstore_docinfos_by_id to signal that
+         * the outer function is to stop visiting the index and return this
+         * status code to the caller. The callback uses this status to indicate
+         * some non temporary issue (e.g. a change of vbucket state) and the
+         * caller should abort the scan.
+         */
+        COUCHSTORE_ERROR_SCAN_ABORTED = -20,
     };
