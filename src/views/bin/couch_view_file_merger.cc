@@ -34,7 +34,7 @@
 #define LINE_BUF_SIZE (8 * 1024)
 #define MERGE_ERROR_CODE(Err) (100 + (Err))
 
-typedef enum {
+typedef enum : char {
     MERGE_FILE_TYPE_ID_BTREE = 'i',
     MERGE_FILE_TYPE_MAPREDUCE_VIEW = 'v',
     MERGE_FILE_TYPE_SPATIAL = 's'
