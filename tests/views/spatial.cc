@@ -274,6 +274,16 @@ void test_set_bit_sized()
     cb_free(bitmap2);
 }
 
+void reverse_spatial_key(unsigned char expected[], int n, int k)
+{
+        for (int i = 2; i < n; i += k)
+        {
+            int left = i;
+            int right = std::min(i + k - 1, n - 1);
+                while (left < right)
+                      std::swap(expected[left++], expected[right--]);
+        }
+}
 
 void test_encode_spatial_key()
 {
@@ -294,6 +304,14 @@ void test_encode_spatial_key()
         0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x1f, 0x40, 0x33, 0x33,
         0x33, 0x33, 0x33, 0x33, 0x1f, 0x40
     };
+
+    if (folly::kIsBigEndian) {
+        int k = 8;
+        int len = sizeof(expected) / sizeof(expected[0]);
+        int len2 = sizeof(expected2) / sizeof(expected2[0]);
+        reverse_spatial_key(expected, len, k);
+        reverse_spatial_key(expected2, len2, k);
+    }
 
     fprintf(stderr, "Running encode spatial key tests\n");
 
@@ -341,6 +359,14 @@ void test_decode_spatial_key()
     };
     double expected[] = {6.3, 18.7};
     double expected2[] = {1.0, 3.0, 30.33, 31.33, 15.4, 138.7, 7.8, 7.8};
+
+    if (folly::kIsBigEndian) {
+        int k = 8;
+        int len = sizeof(mbb) / sizeof(mbb[0]);
+        int len2 = sizeof(mbb2) / sizeof(mbb2[0]);
+        reverse_spatial_key(mbb, len, k);
+        reverse_spatial_key(mbb2, len2, k);
+    }
 
     fprintf(stderr, "Running decode spatial key tests\n");
 
