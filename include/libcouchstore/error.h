@@ -57,7 +57,7 @@
          * the outer function is to stop visiting the index and return this
          * status code to the caller. The callback uses this status to indicate
          * some non temporary issue (e.g. a change of vbucket state) and the
-         * caller should abort the scan.
+         * caller should cancel the scan.
          */
-        COUCHSTORE_ERROR_SCAN_ABORTED = -20,
+        COUCHSTORE_ERROR_SCAN_CANCELLED = -20,
     };

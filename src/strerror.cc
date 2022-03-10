@@ -40,8 +40,8 @@ const char *couchstore_strerror(couchstore_error_t errcode)
         return "error cancel";
     case COUCHSTORE_ERROR_SCAN_YIELD:
         return "scan yield";
-    case COUCHSTORE_ERROR_SCAN_ABORTED:
-        return "scan aborted";
+    case COUCHSTORE_ERROR_SCAN_CANCELLED:
+        return "scan cancelled";
     default:
         return "couchstore_strerror unknown errcode";
     }
