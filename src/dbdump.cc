@@ -442,7 +442,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
                    metaV1->flex_code);
             return 1;
         }
-        ttl_delete = ((metaV1->flex_code << 7) & 0x1) == 1;
+        ttl_delete = ((metaV1->flex_code >> 7) & 0x1) == 1;
 
         datatype = metaV1->datatype;
         const auto datatype_string = mcbp::datatype::to_string(datatype);
