@@ -570,6 +570,61 @@ TEST_F(CouchstoreCompactTest, PitrCompactionSquashHeaders) {
 }
 
 /**
+ * Differently from the first version of the same test, here:
+ * 1. We stress timestamps that aren't aligned to the granularity
+ * 2. We checkout the exact result (ie, not only the number of final headers but
+ *    also the exact sequence of headers kept in the compacted file)
+ */
+TEST_F(CouchstoreCompactTest, PitrCompactionSquashHeaders_2) {
+    auto sourceDb = openSourceDb();
+
+    const auto startTime = cb::couchstore::getHeader(*sourceDb).timestamp;
+    const auto value = std::string(128, 'v');
+    for (const uint64_t t : {2, 3, 6, 7, 9, 11, 12, 13, 18, 21, 27}) {
+        const auto timestamp = startTime + t;
+        storeDocument(*sourceDb, "key" + std::to_string(timestamp), value);
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_commit_ex(sourceDb.get(), timestamp));
+    }
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::compact(*sourceDb,
+                                      targetFilename.c_str(),
+                                      COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                      {},
+                                      {},
+                                      couchstore_get_default_file_ops(),
+                                      {},
+                                      0 /*oldestTimestamp*/,
+                                      10 /*granularity*/,
+                                      {},
+                                      {},
+                                      {},
+                                      {}));
+
+    auto targetDb = openTargetDb();
+    const auto expected = {0, 9, 18, 27};
+    for (auto it = expected.begin(); it != expected.end(); ++it) {
+        if (it == expected.begin()) {
+            ASSERT_EQ(COUCHSTORE_SUCCESS,
+                      cb::couchstore::seek(
+                              *targetDb,
+                              cb::couchstore::getDiskBlockSize(*targetDb)));
+        } else {
+            ASSERT_EQ(COUCHSTORE_SUCCESS,
+                      cb::couchstore::seek(*targetDb,
+                                           cb::couchstore::Direction::Forward));
+        }
+        EXPECT_EQ(startTime + *it,
+                  cb::couchstore::getHeader(*targetDb).timestamp);
+    }
+
+    EXPECT_EQ(COUCHSTORE_ERROR_NO_HEADER,
+              cb::couchstore::seek(*targetDb,
+                                   cb::couchstore::Direction::Forward));
+}
+
+/**
  * Generate a database with multiple headers and verify that we may
  * perform full compaction up to one point (and that the expected header
  * is provided in the preCompactionCallback), then incremental / compactions

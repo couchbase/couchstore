@@ -801,11 +801,16 @@ couchstore_error_t replay(Db& source,
     ctx.target = &target;
     couchstore_error_t status;
 
-    uint64_t next = header.timestamp - (header.timestamp % delta) + delta;
-    while ((status = findNextHeader(source, sourceHeaderEndOffset, next)) ==
+    // Align our timeline to the delta-boundary.
+    uint64_t boundary = header.timestamp - (header.timestamp % delta) + delta;
+
+    while ((status = findNextHeader(source, sourceHeaderEndOffset, boundary)) ==
            COUCHSTORE_SUCCESS) {
         header = cb::couchstore::getHeader(source);
-        next = header.timestamp - (header.timestamp % delta) + delta;
+
+        // Note: Timeline already initialized at the delta-boundary - Next point
+        // in the timeline is at +delta
+        boundary += delta;
 
         status = couchstore_walk_local_tree(
                 &source, nullptr, couchstore_walk_local_tree_callback, &ctx);
