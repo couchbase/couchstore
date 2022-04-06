@@ -1884,49 +1884,117 @@ couchstore_error_t seekFirstHeaderContaining(Db& db,
                                              uint64_t granularity) {
     if (granularity == 0) {
         throw std::invalid_argument(
-                "cb::couchstore::seekFirstHeaderContaining: granularity can't "
-                "be 0");
+                "seekFirstHeaderContaining: granularity can't be 0");
     }
 
-    auto header = getHeader(db);
-    const auto tipOffset = header.headerPosition;
+    // We can have readers and writers in the same file, and given the
+    // append-only format it is safe for readers to seek within the portion up
+    // to where they opened the file.
+    const auto tipOffset = getHeader(db).headerPosition;
 
-    // We need to roll back to find out where the startSeqno was introduced
-    // and give you data from there!
-    while (header.updateSeqNum > seqno) {
-        const auto prev = header.headerPosition;
-        auto status = seek(db, Direction::Backward);
-        if (status == COUCHSTORE_ERROR_NO_HEADER) {
-            // We've moved back to the first header we got so we got to
-            // give the user everything from this one going forward!
-            break;
+    // The following implements a binary-search on the datafile for finding the
+    // first header that contains the given seqno.
+    //
+    // [left, right] are offsets of file headers, and they represent the search
+    // range at each iteration.
+    // The procedure starts from [0, last-header-offset] and narrows down the
+    // range to a point where there's no further possibility to shrink the range
+    // down.
+    // Note that, compared to a vanilla binary-search on a domain that contains
+    // the search element, here we are in a case where the element might or
+    // might be not in the domain - ie, in most cases we will be looking for a
+    // seqno for which we don't have an exact header.updateSeqNum. Thus the
+    // extra complexity in the break-conditions of the procedure, see below for
+    // details.
+
+    const auto blockSize = getDiskBlockSize(db);
+    uint64_t left = 0;
+    uint64_t right = getHeader(db).headerPosition;
+    while (true) {
+        if (left > right) {
+            throw std::logic_error("seekFirstHeaderContaining: l (" +
+                                   std::to_string(left) + ") > r (" +
+                                   std::to_string(right) + ")");
         }
 
-        if (status != COUCHSTORE_SUCCESS) {
-            seek(db, tipOffset);
-            return status;
-        }
+        // Find the offset in the middle of the range
+        uint64_t middle = (left + right) / 2;
+        // Align it to the block boundary
+        middle = middle - (middle % blockSize);
 
-        header = getHeader(db);
-        if (header.updateSeqNum < seqno) {
-            // we went too far... jump back
-            status = seek(db, prev);
-            if (status != COUCHSTORE_SUCCESS) {
-                seek(db, tipOffset);
-                return status;
+        // middle here is at block boundary but it could point to header or
+        // data, so we need to find the first header.
+        couchstore_error_t ret;
+        while ((ret = seek(db, middle)) != COUCHSTORE_SUCCESS) {
+            if (ret != COUCHSTORE_ERROR_NO_HEADER) {
+                throw std::logic_error(
+                        "seekFirstHeaderContaining: looking for the "
+                        "middle-header, unexpected ret:" +
+                        std::to_string(ret));
             }
-            header = getHeader(db);
+            middle += blockSize;
+        }
+
+        // Finding middle has required some adjustments. Those ensure the
+        // following invariants, but let's be paranoid on correctness.
+        if (middle < left || middle > right) {
+            throw std::logic_error(
+                    "seekFirstHeaderContaining: l < m < r invariant broken: "
+                    "l(" +
+                    std::to_string(left) + "), m(" + std::to_string(middle) +
+                    "), r(" + std::to_string(right) + ")");
+        }
+
+        const auto headerSeqno = getHeader(db).updateSeqNum;
+        if (seqno < headerSeqno) {
+            // H  H  H  H  H  H  H  H  H
+            // l     s     m           r
+            if (right == middle) {
+                // H  H  H  H  H  H  H  H  H
+                // l        s m/r
+                // We have already set r (ie the upper bound of the range) to m.
+                // That means that the search-seqno is lower then the current
+                // header, but the current header is the closer that contains
+                // the search-seqno.
+                break;
+            }
+            right = middle;
+        } else if (seqno > headerSeqno) {
+            // H  H  H  H  H  H  H  H  H
+            // l           m     s     r
+            if (left == middle) {
+                // H  H  H  H  H  H  H  H  H
+                //         l/m s           r
+                // We have already set l (ie the lower bound of the range) to m.
+                // That means that the search-seqno is higher then the current
+                // header, but the header next to the current one is the closer
+                // that contains the search-seqno.
+                const auto ret = seek(db, Direction::Forward);
+                if (ret != COUCHSTORE_SUCCESS) {
+                    throw std::logic_error(
+                            "seekFirstHeaderContaining: header located, "
+                            "seeking forward, unexpected ret:" +
+                            std::to_string(ret));
+                }
+                break;
+            }
+            left = middle;
+        } else {
+            // Unlikely/lucky case, we have an header that is exactly at
+            // search-seqno, all done.
             break;
         }
     }
+
+    // We may have a finer granularity "on disk" than the user requested
+    // Try to "fast forward" to the requested boundary
+    auto header = getHeader(db);
 
     if (header.headerPosition == tipOffset || granularity == 1) {
         // This is the newest header so we can't fast forward
         return COUCHSTORE_SUCCESS;
     }
 
-    // We may have a finer granularity "on disk" than the user requested
-    // Try to "fast forward" to the requested boundary
     const auto next =
             header.timestamp - (header.timestamp % granularity) + granularity;
     if (header.timestamp < next) {
