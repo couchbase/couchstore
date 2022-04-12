@@ -659,11 +659,6 @@ TEST_F(CouchstoreCompactTest, PitrCompactionNotLastBlock) {
 }
 
 /**
- * Create a database where the first header in the database block is newer
- * than the oldest data we want to keep, so we don't get out of sync trying
- * to locate the next PiTR bar (align the current block, and set search for
- * the next barrier).
- *
  * Create a database with multiple commit headers (all fitting within the
  * same granularity bar, but there are plenty of "empty" slots from the time
  * of the oldest we want to keep and the oldest one present in the database
@@ -678,37 +673,38 @@ TEST_F(CouchstoreCompactTest, CheckMultipleMissingInBeginning) {
     using cb::couchstore::seek;
 
     auto db = openSourceDb();
+    ASSERT_EQ(0, cb::couchstore::getHeader(*db).timestamp);
 
-    auto now = cb::couchstore::getHeader(*db).timestamp;
     for (int ii = 0; ii < 10; ++ii) {
-        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), now + ii));
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit_ex(db.get(), ii));
     }
 
-    ASSERT_EQ(
-            COUCHSTORE_SUCCESS,
-            cb::couchstore::compact(
-                    *db,
-                    targetFilename.c_str(),
-                    COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
-                    {},
-                    {},
-                    couchstore_get_default_file_ops(),
-                    {},
-                    now - std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                  std::chrono::hours(1))
-                                    .count(),
-                    std::chrono::duration_cast<std::chrono::nanoseconds>(
-                            std::chrono::seconds(1))
-                            .count(),
-                    {},
-                    {},
-                    {},
-                    {}));
+    // Note: oldest=0 as we want don't want to discard the first header in the
+    // file
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::compact(
+                      *db,
+                      targetFilename.c_str(),
+                      COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                      {},
+                      {},
+                      couchstore_get_default_file_ops(),
+                      {},
+                      0 /*oldest*/,
+                      std::chrono::duration_cast<std::chrono::nanoseconds>(
+                              std::chrono::seconds(1))
+                              .count(),
+                      {},
+                      {},
+                      {},
+                      {}));
 
     db = openTargetDb();
-    ASSERT_EQ(now + 9, cb::couchstore::getHeader(*db).timestamp);
+    // All the headers in the middle are deduplicate and merged into the last
+    // single header
+    ASSERT_EQ(9, cb::couchstore::getHeader(*db).timestamp);
     ASSERT_EQ(COUCHSTORE_SUCCESS, seek(*db, Direction::Backward));
-    ASSERT_EQ(now, cb::couchstore::getHeader(*db).timestamp);
+    ASSERT_EQ(0, cb::couchstore::getHeader(*db).timestamp);
     ASSERT_EQ(COUCHSTORE_ERROR_NO_HEADER, seek(*db, Direction::Backward));
 }
 

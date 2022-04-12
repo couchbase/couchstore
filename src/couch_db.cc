@@ -315,10 +315,7 @@ static couchstore_error_t create_header(Db *db)
     db->header.purge_seq = 0;
     db->header.purge_ptr = 0;
     db->header.position = 0;
-    db->header.timestamp =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::system_clock::now().time_since_epoch())
-                    .count();
+    db->header.timestamp = 0;
     return db_write_header(db);
 }
 
