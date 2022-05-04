@@ -57,6 +57,16 @@ public:
     void generateDocs(std::string keyPrefix = "doc");
 
     /**
+     * Generate documents with a fixed length (8) and are 1 greater (memcmp)
+     * than the previous. E.g.
+     * "00000000"
+     * "10000000"
+     * "20000000"
+     * ...
+     * "a0000000"
+     */
+    void generateLexicographicalSequence();
+    /**
      * Generate docs with random keys
      */
     void generateRandomDocs(int seed,
@@ -72,6 +82,8 @@ public:
     void** getUserReqs();
 
     Doc* getDoc(int index);
+
+    std::string_view getKey(int index) const;
 
     DocInfo* getDocInfo(int index);
 
@@ -94,6 +106,11 @@ public:
     void updateDocumentMap(const std::string& key);
 
     void clearDocumentMap();
+
+    void setRange(std::string_view start, std::string_view end) {
+        this->start = start;
+        this->end = end;
+    }
 
     /**
         Couchstore callback method that checks the document against
@@ -118,6 +135,8 @@ public:
     **/
     static int docMapUpdateCallback(Db *db, DocInfo *info, void *ctx);
 
+    static int inRangeAndCountCallback(Db* db, DocInfo* info, void* ctx);
+
 private:
 
     void incrementCallbacks();
@@ -125,6 +144,14 @@ private:
     void incrementDeleted();
 
     void incrementPosition();
+
+    std::string_view getRangeStart() const {
+        return start;
+    }
+    std::string_view getRangeEnd() const {
+        return end;
+    }
+
     /**
         Inner class storing the data for one document.
     **/
@@ -169,6 +196,10 @@ private:
     int deleted;
     int callbacks;
     int position;
+
+    // data for inRangeAndCountCallback
+    std::string start;
+    std::string end;
 };
 
 /// Convenience function to convert a size_buf to std::string.

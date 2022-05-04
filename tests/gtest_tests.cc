@@ -1653,6 +1653,148 @@ TEST_F(CouchstoreTest, RangeScanIsInclusive) {
     EXPECT_EQ(4, expected1.getCallbacks());
 }
 
+// Minimal reproducer for MB-52010. Here 1 key exists in the kvstore and is
+// incorrectly returned by a range scan.
+TEST_F(CouchstoreTest, MB_52010) {
+    // Generate 1 document "d0"
+    Documents documents(1);
+    documents.generateDocs("d");
+
+    // store all of the documents
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(
+                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_save_documents(db,
+                                        documents.getDocs(),
+                                        documents.getDocInfos(),
+                                        documents.getDocsCount(),
+                                        0));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+    db = nullptr;
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+
+    // Scan for a to c, d0 is not in this range
+    std::string start = "a";
+    std::string end = "c";
+    EXPECT_GT(documents.getKey(0), start);
+    EXPECT_GT(documents.getKey(0), end);
+
+    std::vector<sized_buf> ranges;
+    ranges.emplace_back(sized_buf{start.data(), start.size()});
+    ranges.emplace_back(sized_buf{end.data(), end.size()});
+
+    Documents expected0(0);
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        ranges.data(),
+                                        ranges.size(),
+                                        RANGES,
+                                        &Documents::countCallback,
+                                        &expected0));
+
+    // Should be no callbacks, doc0 is not in our range
+    EXPECT_EQ(0, expected0.getCallbacks());
+}
+
+class RangeScanTest : public CouchstoreTest,
+                      public ::testing::WithParamInterface<int> {
+public:
+    void SetUp() override {
+        documents.generateLexicographicalSequence();
+        // store all of the documents
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_open_db(
+                          filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_save_documents(db,
+                                            documents.getDocs(),
+                                            documents.getDocInfos(),
+                                            documents.getDocsCount(),
+                                            0));
+
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    }
+    Documents documents{GetParam()};
+};
+
+TEST_P(RangeScanTest, scan_all) {
+    auto start = documents.getKey(0);
+    std::string end = "\xFF";
+
+    std::array<sized_buf, 2> ids;
+    ids[0] = sized_buf{
+            const_cast<char*>(reinterpret_cast<const char*>(start.data())),
+            start.size()};
+    ids[1] = sized_buf{
+            const_cast<char*>(reinterpret_cast<const char*>(end.data())),
+            end.size()};
+
+    documents.setRange(start, end);
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        ids.data(),
+                                        ids.size(),
+                                        RANGES,
+                                        &Documents::inRangeAndCountCallback,
+                                        &documents));
+    EXPECT_EQ(GetParam(), documents.getCallbacks());
+}
+
+TEST_P(RangeScanTest, scan_upper_half) {
+    // start from index 2 for size 4 etc... for odd inputs adjust by 1
+    size_t in = (GetParam() / 2) + (GetParam() & 1);
+    auto start = documents.getKey(in);
+    // end at max of all keys
+    std::string end = "\xFF";
+
+    std::array<sized_buf, 2> ids;
+    ids[0] = sized_buf{
+            const_cast<char*>(reinterpret_cast<const char*>(start.data())),
+            start.size()};
+    ids[1] = sized_buf{
+            const_cast<char*>(reinterpret_cast<const char*>(end.data())),
+            end.size()};
+
+    documents.setRange(start, end);
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        ids.data(),
+                                        ids.size(),
+                                        RANGES,
+                                        &Documents::inRangeAndCountCallback,
+                                        &documents));
+
+    EXPECT_EQ(GetParam() / 2, documents.getCallbacks());
+}
+
+TEST_P(RangeScanTest, scan_lower_half) {
+    auto end = documents.getKey((GetParam() / 2) - 1);
+    auto start = documents.getKey(0);
+
+    std::array<sized_buf, 2> ids;
+    ids[0] = sized_buf{
+            const_cast<char*>(reinterpret_cast<const char*>(start.data())),
+            start.size()};
+    ids[1] = sized_buf{
+            const_cast<char*>(reinterpret_cast<const char*>(end.data())),
+            end.size()};
+
+    documents.setRange(start, end);
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        ids.data(),
+                                        ids.size(),
+                                        RANGES,
+                                        &Documents::inRangeAndCountCallback,
+                                        &documents));
+    EXPECT_EQ(GetParam() / 2, documents.getCallbacks());
+}
+
 // Test fixture for the add or replace callback exposed by save_docs
 class SaveCallbackTest : public CouchstoreTest {
 public:
@@ -1994,7 +2136,14 @@ INSTANTIATE_TEST_SUITE_P(DocTest,
                             return fmt.str();
                         });
 
-
+INSTANTIATE_TEST_SUITE_P(RangeScanTest,
+                         RangeScanTest,
+                         ::testing::Values(4, 69, 666),
+                         [](const ::testing::TestParamInfo<int>& info) {
+                             std::stringstream fmt;
+                             fmt << "x" << info.param;
+                             return fmt.str();
+                         });
 
 INSTANTIATE_TEST_SUITE_P(
         MTLatencyCollectTest,

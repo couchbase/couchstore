@@ -59,6 +59,25 @@ void Documents::generateDocs(std::string keyPrefix) {
     }
 }
 
+void Documents::generateLexicographicalSequence() {
+    // fill with the smallest printable char
+    std::string key(8, '!');
+    size_t ii = 0;
+    do {
+        setDoc(ii, key, "data-" + key);
+        ii++;
+        for (auto itr = key.begin(); itr != key.end(); itr++) {
+            // stop incrementing if this char has reached our max (keeping
+            // everything printable)
+            if (*itr == '~') {
+                continue;
+            }
+            (*itr)++;
+            break;
+        }
+    } while (ii < documents.size());
+}
+
 void Documents::generateRandomDocs(int seed,
                                    std::string keyPrefix,
                                    std::string keySuffix) {
@@ -95,6 +114,10 @@ void** Documents::getUserReqs() {
 
 Doc* Documents::getDoc(int index) {
     return docs[index];
+}
+
+std::string_view Documents::getKey(int index) const {
+    return std::string_view(docs.at(index)->id.buf, docs.at(index)->id.size);
 }
 
 DocInfo* Documents::getDocInfo(int index) {
@@ -228,6 +251,15 @@ int Documents::docMapUpdateCallback(Db *db, DocInfo *info, void *ctx) {
     Documents* ds = reinterpret_cast<Documents*>(ctx);
     std::string key(info->id.buf, info->id.size);
     ds->updateDocumentMap(key);
+    return 0;
+}
+
+int Documents::inRangeAndCountCallback(Db* db, DocInfo* info, void* ctx) {
+    Documents* ds = reinterpret_cast<Documents*>(ctx);
+    ds->incrementCallbacks();
+    std::string_view key{info->id.buf, info->id.size};
+    EXPECT_GE(key, ds->getRangeStart());
+    EXPECT_LE(key, ds->getRangeEnd());
     return 0;
 }
 
