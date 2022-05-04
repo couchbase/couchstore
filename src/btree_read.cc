@@ -105,8 +105,11 @@ static couchstore_error_t btree_lookup_inner(couchfile_lookup_request *rq,
             int cmp_val = lookup_compare(rq, &cmp_key, rq->keys[current]);
             if (cmp_val >= 0 && rq->fold && !rq->in_fold) {
                 rq->in_fold = 1;
-            } else if (rq->in_fold && (current + 1) < end &&
-                       (lookup_compare(rq, &cmp_key, rq->keys[current + 1])) > 0) {
+            }
+
+            // in_fold (>= start), requires a compare against end
+            if (rq->in_fold && (current + 1) < end &&
+                (lookup_compare(rq, &cmp_key, rq->keys[current + 1])) > 0) {
                 //We've hit a key past the end of our range.
                 rq->in_fold = 0;
                 rq->fold = 0;
