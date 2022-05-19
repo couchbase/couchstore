@@ -998,29 +998,6 @@ extern "C" {
     LIBCOUCHSTORE_API
     const char *couchstore_strerror(couchstore_error_t errcode);
 
-    /**
-     * Prints a description of the last OS-level errors that Couchstore
-     * encountered on this thread into buf.
-     *
-     * @param buf The buffer to store the message in
-     * @param size The size of the buffer.
-     */
-    LIBCOUCHSTORE_API
-    couchstore_error_t couchstore_last_os_error(const Db *db,
-                                                 char* buf,
-                                                 size_t size);
-    /**
-     * Prints a description of the last internal error that Couchstore
-     * encountered on this thread into buf.
-     *
-     * @param buf The buffer to store the message in
-     * @param size The size of the buffer.
-     */
-    LIBCOUCHSTORE_API
-    couchstore_error_t couchstore_last_internal_error(const Db *db,
-                                                 char* buf,
-                                                 size_t size);
-
      /**
       * Counts the number of changes between two sequence numbers, inclusive.
       *
@@ -1428,6 +1405,26 @@ couchstore_error_t replay(Db& source,
 LIBCOUCHSTORE_API
 couchstore_error_t saveLocalDocuments(
         Db& db, std::vector<std::reference_wrapper<LocalDoc>>& documents);
+
+/**
+ * Get a description of the last OS-level errors that Couchstore
+ * encountered on this database instance.
+ *
+ * @throws std::bad_alloc
+ */
+LIBCOUCHSTORE_API
+std::string getLastOsError(const Db& db);
+
+/**
+ * Get a description of the last internal error that Couchstore
+ * encountered on this thread.
+ *
+ * @throws std::bad_alloc
+ */
+LIBCOUCHSTORE_API
+std::string getLastInternalError();
+
+
 
 } // namespace couchstore
 } // namespace cb

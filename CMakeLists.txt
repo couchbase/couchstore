@@ -79,7 +79,7 @@ ADD_LIBRARY(couchstore_objs OBJECT
         src/util.cc
         ${COUCHSTORE_FILE_OPS})
 TARGET_COMPILE_DEFINITIONS(couchstore_objs PUBLIC -Dcouchstore_EXPORTS)
-TARGET_LINK_LIBRARIES(couchstore_objs PUBLIC Folly::headers nlohmann_json::nlohmann_json gsl::gsl-lite)
+TARGET_LINK_LIBRARIES(couchstore_objs PUBLIC Folly::headers nlohmann_json::nlohmann_json gsl::gsl-lite fmt::fmt)
 SET_PROPERTY(TARGET couchstore_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 cb_enable_unity_build(couchstore_objs)
 
@@ -112,7 +112,7 @@ cb_enable_unity_build(couchstore_view_objs)
 
 # libcouchstore, core couchstore library
 ADD_LIBRARY(couchstore SHARED $<TARGET_OBJECTS:couchstore_objs>)
-SET(COUCHSTORE_LIBS cbcompress platform phosphor)
+SET(COUCHSTORE_LIBS cbcompress platform phosphor fmt::fmt)
 TARGET_LINK_LIBRARIES(couchstore ${COUCHSTORE_LIBS})
 
 GENERATE_EXPORT_HEADER(couchstore

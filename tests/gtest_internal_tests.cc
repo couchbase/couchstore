@@ -758,7 +758,6 @@ TEST_F(CouchstoreInternalTest, corrupted_btree_node2)
     uint32_t size = htonl(0 | 0x80000000);
     uint32_t crc32 = htonl(0);
     char info[4 + 4];
-    char errbuf[250];
 
     // Write the header's block header
     memcpy(&info[0], &size, 4);
@@ -834,12 +833,11 @@ TEST_F(CouchstoreInternalTest, corrupted_btree_node2)
     ASSERT_LT(static_cast<size_t>(0), param.num_called);
     ASSERT_GT(docsInTest, param.num_called);
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_last_internal_error(db, errbuf, 250));
     ASSERT_EQ(
             "'Couchstore::pread_compressed() Invalid compressed buffer "
             "length:0 pos:" +
                     std::to_string(param.last_doc_bp + 24) + "'",
-            errbuf);
+            cb::couchstore::getLastInternalError());
 
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));

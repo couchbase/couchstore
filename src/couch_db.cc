@@ -22,6 +22,7 @@
 #include "couch_latency_internal.h"
 #include "internal.h"
 #include "node_types.h"
+#include "platform/strerror.h"
 #include "reduces.h"
 #include "util.h"
 
@@ -34,6 +35,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <fmt/core.h>
 
 #define ROOT_BASE_SIZE 12
 #define HEADER_BASE_SIZE 25
@@ -1643,57 +1645,13 @@ void couchstore_free_local_document(LocalDoc *lDoc)
     }
 }
 
-couchstore_error_t couchstore_last_os_error(const Db *db,
-                                            char* buf,
-                                            size_t size) {
-    if (db == nullptr || buf == nullptr || size == 0) {
-        return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
-    }
-    const couchstore_error_info_t *err = &db->file.lastError;
-
-    int nw;
-
-#ifdef WIN32
-    char* win_msg = nullptr;
-    FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-                           FORMAT_MESSAGE_IGNORE_INSERTS,
-                   nullptr,
-                   err->error,
-                   MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                   (LPTSTR)&win_msg,
-                   0,
-                   nullptr);
-    nw = _snprintf(buf, size, "WINAPI error = %d: '%s'", err->error, win_msg);
-    LocalFree(win_msg);
-#else
-    nw = snprintf(buf, size, "errno = %d: '%s'",
-                      err->error, strerror(err->error));
-#endif
-
-    if (nw < 0) {
-        return COUCHSTORE_ERROR_ALLOC_FAIL;
-    } if (size_t(nw) >= size) {
-        /* Truncate the error message */
-        buf[size - 1] = '\0';
-    }
-
-    return COUCHSTORE_SUCCESS;
+std::string cb::couchstore::getLastOsError(const Db& db) {
+    const auto err = db.file.lastError.error;
+    return fmt::format("errno = {}: '{}'", err, cb_strerror(err));
 }
 
-couchstore_error_t couchstore_last_internal_error(const Db *db,
-                                                  char* buf,
-                                                  size_t size) {
-    if (db == nullptr || buf == nullptr || size == 0) {
-        return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
-    }
-
-    int nw;
-
-    nw = snprintf(buf, size, "'%s'", internal_error_string);
-    if (nw < 0) {
-        return COUCHSTORE_ERROR_ALLOC_FAIL;
-    }
-    return COUCHSTORE_SUCCESS;
+std::string cb::couchstore::getLastInternalError() {
+    return fmt::format("'{}'", internal_error_string);
 }
 
 static couchstore_error_t btree_eval_seq_reduce(Db *db,
