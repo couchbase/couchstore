@@ -51,7 +51,6 @@ int main(int argc, char *argv[])
     char tmp_dir[LINE_BUF_SIZE];
     char dest_file[LINE_BUF_SIZE];
     file_merger_error_t error;
-    cb_thread_t exit_thread;
     int status = 0;
 
     (void) argc;
@@ -131,7 +130,7 @@ int main(int argc, char *argv[])
         goto finished;
     }
 
-    status = start_exit_listener(&exit_thread, 0 /*uses_v8*/);
+    status = start_exit_listener(0 /*uses_v8*/);
     if (status) {
         fprintf(stderr, "Error starting stdin exit listener thread\n");
         goto finished;

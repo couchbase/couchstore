@@ -43,7 +43,6 @@ int main(int argc, char *argv[])
     int ret = 2;
     uint64_t header_pos;
     view_error_t error_info = {nullptr, nullptr, "GENERIC"};
-    cb_thread_t exit_thread;
 
     (void) argc;
     (void) argv;
@@ -119,7 +118,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    ret = start_exit_listener(&exit_thread, 1 /*uses_v8*/);
+    ret = start_exit_listener(1 /*uses_v8*/);
     if (ret) {
         fprintf(stderr, "Error starting stdin exit listener thread\n");
         goto out;

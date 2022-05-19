@@ -28,6 +28,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <system_error>
+#include <thread>
 
 static void do_exit(int ret, int uses_v8)
 {
@@ -39,12 +40,9 @@ static void do_exit(int ret, int uses_v8)
     _exit(ret);
 }
 
-static void exit_thread_helper(void *args)
-{
+static void exit_thread_helper(int uses_v8) {
     char buf[4];
     int len = fread(buf, 1, 4, stdin);
-
-    int uses_v8 = *reinterpret_cast<int*>(args);
 
     /* If the other end closed the pipe */
     if (len == 0) {
@@ -58,16 +56,10 @@ static void exit_thread_helper(void *args)
 }
 
 /* Start a watcher thread to gracefully die on exit message */
-int start_exit_listener(cb_thread_t *id, int uses_v8)
-{
-    void *args = reinterpret_cast<void*>(&uses_v8);
-    int ret = cb_create_thread(id, exit_thread_helper, args, 1);
-    if (ret < 0) {
-        /* For differentiating from couchstore_error_t */
-        return -ret;
-    }
-
-    return ret;
+int start_exit_listener(int uses_v8) {
+    auto listener = std::thread{[uses_v8]() { exit_thread_helper(uses_v8); }};
+    listener.detach();
+    return 0;
 }
 
 int set_binary_mode()

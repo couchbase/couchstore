@@ -26,7 +26,7 @@
 #include <platform/platform_thread.h>
 
 /* Start a thread to handle exit message*/
-int start_exit_listener(cb_thread_t *id, int uses_v8);
+int start_exit_listener(int uses_v8);
 int set_binary_mode(void);
 
 #endif

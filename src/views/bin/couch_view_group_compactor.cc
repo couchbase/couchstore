@@ -50,7 +50,6 @@ int main(int argc, char *argv[])
     uint64_t total_changes = 0;
     uint64_t header_size = 0;
     view_error_t error_info = {nullptr, nullptr, "GENERIC"};
-    cb_thread_t exit_thread;
     compactor_stats_t stats;
 
     (void) argc;
@@ -131,7 +130,7 @@ int main(int argc, char *argv[])
     stats.update_fun = stats_updater;
     stats.freq = MAX(total_changes / 100, 1);
 
-    ret = (couchstore_error_t)start_exit_listener(&exit_thread, 1 /*uses_v8*/);
+    ret = (couchstore_error_t)start_exit_listener(1 /*uses_v8*/);
     if (ret) {
         fprintf(stderr, "Error starting stdin exit listener thread\n");
         goto out;
