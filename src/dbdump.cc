@@ -445,7 +445,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         ttl_delete = ((metaV1->flex_code >> 7) & 0x1) == 1;
 
         datatype = metaV1->datatype;
-        const auto datatype_string = mcbp::datatype::to_string(datatype);
+        const auto datatype_string = cb::mcbp::datatype::to_string(datatype);
 
         if (dumpJson) {
             json["datatype"] = datatype;
@@ -536,7 +536,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
 
             // If datatype is snappy (and not marked compressed) we must inflate
             cb::compression::Buffer inflated;
-            if (mcbp::datatype::is_snappy(datatype) &&
+            if (cb::mcbp::datatype::is_snappy(datatype) &&
                 !(docinfo->content_meta & COUCH_DOC_IS_COMPRESSED)) {
                 // Inflate the entire document so we can work with it
                 if (!cb::compression::inflate(
@@ -554,7 +554,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
                 body = sized_buf{inflated.data(), inflated.size()};
             }
 
-            if (mcbp::datatype::is_xattr(datatype)) {
+            if (cb::mcbp::datatype::is_xattr(datatype)) {
                 cb::xattr::Blob blob({body.buf, body.size}, false);
                 xattrs = blob.to_json().dump(-1, ' ', true);
                 body = sized_buf{body.buf + blob.size(),
