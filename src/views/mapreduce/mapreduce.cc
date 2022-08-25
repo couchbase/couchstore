@@ -124,7 +124,7 @@ void initV8(const char* executable_img)
 void deinitV8()
 {
     V8::Dispose();
-    V8::ShutdownPlatform();
+    V8::DisposePlatform();
 }
 
 void initContext(mapreduce_ctx_t *ctx,
