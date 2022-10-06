@@ -104,8 +104,8 @@ static void test_runtime_error(void) {
 
     cb_assert(result->list[0].error == MAPREDUCE_RUNTIME_ERROR);
     cb_assert(result->list[0].result.error_msg != nullptr);
-    cb_assert(strcmp("TypeError: Cannot read property 'bar' of undefined (line "
-                     "1:36)",
+    cb_assert(strcmp("TypeError: Cannot read properties of undefined "
+                     "(reading 'bar') (line 1:36)",
                      result->list[0].result.error_msg) == 0);
 
     mapreduce_free_map_result_list(result);
@@ -436,8 +436,8 @@ static void test_map_multiple_emits(void) {
     /* function 3 */
     cb_assert(result->list[2].error == MAPREDUCE_RUNTIME_ERROR);
     cb_assert(result->list[2].result.error_msg != nullptr);
-    cb_assert(strcmp("TypeError: Cannot read property 'z' of undefined (line "
-                     "2:79)",
+    cb_assert(strcmp("TypeError: Cannot read properties of undefined "
+                     "(reading 'z') (line 2:79)",
                      result->list[2].result.error_msg) == 0);
 
     mapreduce_free_map_result_list(result);
