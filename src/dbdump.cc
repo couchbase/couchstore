@@ -17,10 +17,10 @@
 #include <nlohmann/json.hpp>
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
+#include <platform/split_string.h>
 #include <platform/string_hex.h>
 #include <storage_common/doc_key_encoder.h>
 #include <storage_common/local_doc_parser.h>
-#include <boost/algorithm/string.hpp>
 #include <xattr/blob.h>
 #include <cinttypes>
 #include <cstdio>
@@ -449,9 +449,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
 
         if (dumpJson) {
             json["datatype"] = datatype;
-            std::vector<std::string> dataTypesStr;
-            boost::split(dataTypesStr, datatype_string, boost::is_any_of(","));
-            json["datatype_as_text"] = dataTypesStr;
+            json["datatype_as_text"] = cb::string::split(datatype_string, ',');
         } else {
             printf(", datatype: 0x%02x (%s)",
                    datatype,
