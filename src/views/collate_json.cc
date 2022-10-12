@@ -254,7 +254,7 @@ static int convertUTF8toUChar(const char *src, UChar *dst, int len)
 
 icu_conv:
     status = U_ZERO_ERROR;
-    ucnv_toUnicode(cnv.get(), &p, p + len, &s, s + len, nullptr, TRUE, &status);
+    ucnv_toUnicode(cnv.get(), &p, p + len, &s, s + len, nullptr, 1, &status);
 
     if (U_FAILURE(status)) {
         return -1;
