@@ -412,7 +412,11 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
         expiry = decode_raw32(meta->expiry);
         flags = decode_raw32(meta->flags);
         if (dumpJson) {
-            json["cas"] = cas;
+            // While nhlohmann::json handles numbers greater than 2^53
+            // correctly, other JSON tools / libraries (e.g. 'jq') do not, so
+            // serialise CAS as a string instead of number to avoid it getting
+            // mangled downstream...
+            json["cas"] = std::to_string(cas);
             json["expiry"] = expiry;
             json["flags"] = flags;
         } else {
