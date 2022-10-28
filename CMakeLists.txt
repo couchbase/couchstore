@@ -112,7 +112,10 @@ cb_enable_unity_build(couchstore_view_objs)
 
 # libcouchstore, core couchstore library
 ADD_LIBRARY(couchstore SHARED $<TARGET_OBJECTS:couchstore_objs>)
-SET(COUCHSTORE_LIBS cbcompress platform phosphor fmt::fmt)
+SET(COUCHSTORE_LIBS cbcompress
+                    platform_without_global_new_replacement
+                    phosphor
+                    fmt::fmt)
 TARGET_LINK_LIBRARIES(couchstore ${COUCHSTORE_LIBS})
 
 GENERATE_EXPORT_HEADER(couchstore
@@ -262,7 +265,7 @@ FUNCTION(M_ADD_PYTHON_TEST name pyfile)
         RETURN()
     ENDIF()
 
-    ADD_TEST(${name} python3 ${pyfile})
+    ADD_TEST(${name} ${PYTHON_EXE} ${pyfile})
     SET_PROPERTY(TEST ${name} PROPERTY ENVIRONMENT
                  "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/python"
                  "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:${CMAKE_INSTALL_PREFIX}/lib")
@@ -285,6 +288,8 @@ ENDFUNCTION()
 M_ADD_PYTHON_TEST(couchstore-purge ${CMAKE_CURRENT_SOURCE_DIR}/tests/purge.py)
 M_ADD_PYTHON_TEST(couchstore-rewind ${CMAKE_CURRENT_SOURCE_DIR}/tests/rewind.py)
 M_ADD_PYTHON_TEST(couchstore-changecount ${CMAKE_CURRENT_SOURCE_DIR}/tests/changecount.py)
+M_ADD_PYTHON_TEST(couchstore-new_delete_replacement
+                  ${CMAKE_CURRENT_SOURCE_DIR}/tests/new_delete_replacement.py)
 
 MACRO(M_MAKE_LEGACY_TEST name)
     cb_add_test_executable(${name} ${ARGN})
@@ -363,7 +368,7 @@ cb_add_test_executable(couchstore_gtest
                )
 SET_TARGET_PROPERTIES(couchstore_gtest PROPERTIES
                       COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
-TARGET_LINK_LIBRARIES(couchstore_gtest couchstore platform ${COUCHSTORE_GTEST_LIBRARIES})
+TARGET_LINK_LIBRARIES(couchstore_gtest couchstore ${COUCHSTORE_GTEST_LIBRARIES})
 cb_enable_unity_build(couchstore_gtest)
 
 cb_add_test_executable(couchstore_internal_gtest
