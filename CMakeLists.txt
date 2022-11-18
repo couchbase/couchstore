@@ -113,7 +113,7 @@ cb_enable_unity_build(couchstore_view_objs)
 # libcouchstore, core couchstore library
 ADD_LIBRARY(couchstore SHARED $<TARGET_OBJECTS:couchstore_objs>)
 SET(COUCHSTORE_LIBS cbcompress
-                    platform_without_global_new_replacement
+                    platform
                     phosphor
                     fmt::fmt)
 TARGET_LINK_LIBRARIES(couchstore ${COUCHSTORE_LIBS})
@@ -140,7 +140,7 @@ ADD_LIBRARY(couchstore_views SHARED
             $<TARGET_OBJECTS:couchstore_view_objs>)
 SET(COUCHSTORE_VIEW_LIBS ${COUCHSTORE_LIBS} ${V8_LIBRARIES} ${ICU_LIBRARIES})
 SET(COUCHSTORE_VIEW_LIBS_WITHOUT_GLOBAL_NEW_REPLACEMENT ${V8_LIBRARIES} ${ICU_LIBRARIES}
-    cbcompress platform_without_global_new_replacement phosphor)
+    cbcompress platform phosphor)
 TARGET_LINK_LIBRARIES(couchstore_views ${COUCHSTORE_VIEW_LIBS_WITHOUT_GLOBAL_NEW_REPLACEMENT})
 TARGET_INCLUDE_DIRECTORIES(couchstore_views PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
