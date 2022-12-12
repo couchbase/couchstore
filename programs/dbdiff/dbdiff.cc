@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <cinttypes>
 
 static int quiet = 0;
 struct compare_context {

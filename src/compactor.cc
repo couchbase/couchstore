@@ -20,6 +20,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <cinttypes>
 
 static void exit_error(couchstore_error_t errcode) {
     fprintf(stderr, "Couchstore error: %s\n", couchstore_strerror(errcode));
