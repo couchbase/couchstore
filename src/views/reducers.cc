@@ -78,10 +78,6 @@ typedef struct {
         sscanf(buf, "{\"sum\":%lg,\"count\":%" SCNu64 ",\"min\":%lg,\"max\":%lg,\"sumsqr\":%lg}",\
                &sum, &count, &min, &max, &sumsqr)
 
-#define sprint_stats(buf, sum, count, min, max, sumsqr) \
-        sprintf(buf, "{\"sum\":%g,\"count\":%" PRIu64 ",\"min\":%g,\"max\":%g,\"sumsqr\":%g}",\
-                sum, count, min, max, sumsqr)
-
 static void free_json_key_list(mapreduce_json_list_t& list);
 
 static int json_to_str(const mapreduce_json_t *buf, char str[32])
@@ -207,7 +203,7 @@ static couchstore_error_t builtin_sum_reducer(const mapreduce_json_list_t *keys,
         }
     }
 
-    size = sprintf(red, DOUBLE_FMT, sum);
+    size = snprintf(red, sizeof(red), DOUBLE_FMT, sum);
     cb_assert(size > 0);
     buf->buf = (char *) cb_malloc(size);
     if (buf->buf == nullptr) {
@@ -247,7 +243,7 @@ static couchstore_error_t builtin_count_reducer(const mapreduce_json_list_t *key
         }
     }
 
-    size = sprintf(red, "%" PRIu64, count);
+    size = snprintf(red, sizeof(red), "%" PRIu64, count);
     cb_assert(size > 0);
     buf->buf = (char *) cb_malloc(size);
     if (buf->buf == nullptr) {
@@ -341,7 +337,15 @@ static couchstore_error_t builtin_stats_reducer(const mapreduce_json_list_t *key
         }
     }
 
-    size = sprint_stats(red, s.sum, s.count, s.min, s.max, s.sumsqr);
+    size = snprintf(red,
+                    sizeof(red),
+                    "{\"sum\":%g,\"count\":%" PRIu64
+                    ",\"min\":%g,\"max\":%g,\"sumsqr\":%g}",
+                    s.sum,
+                    s.count,
+                    s.min,
+                    s.max,
+                    s.sumsqr);
     cb_assert(size > 0);
     buf->buf = (char *) cb_malloc(size);
     if (buf->buf == nullptr) {
@@ -537,9 +541,14 @@ static void add_error_message(view_reducer_ctx_t *red_ctx, int rereduce)
 
        cb_assert(priv->mapreduce_error == MAPREDUCE_SUCCESS);
        if (!rereduce && (priv->error_key != nullptr)) {
-           error_msg = (char *) cb_malloc(strlen(base_msg) + 12 + strlen(priv->error_key));
-           cb_assert(error_msg != nullptr);
-           sprintf(error_msg, "%s (key %s)", base_msg, priv->error_key);
+            auto nbytes = strlen(base_msg) + 12 + strlen(priv->error_key);
+            error_msg = (char*)cb_malloc(nbytes);
+            cb_assert(error_msg != nullptr);
+            snprintf(error_msg,
+                     nbytes,
+                     "%s (key %s)",
+                     base_msg,
+                     priv->error_key);
        } else {
            error_msg = cb_strdup(base_msg);
            cb_assert(error_msg != nullptr);
@@ -559,7 +568,10 @@ static void add_error_message(view_reducer_ctx_t *red_ctx, int rereduce)
            } else {
                error_msg = (char*)cb_malloc(64);
                cb_assert(error_msg != nullptr);
-               sprintf(error_msg, "mapreduce error: %d", priv->mapreduce_error);
+               snprintf(error_msg,
+                        64,
+                        "mapreduce error: %d",
+                        priv->mapreduce_error);
            }
        }
    }
