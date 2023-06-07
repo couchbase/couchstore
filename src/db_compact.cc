@@ -50,24 +50,32 @@ couchstore_error_t couchstore_compact_db_ex(Db* source,
                                             void* hook_ctx,
                                             FileOpsInterface* ops,
                                             PrecommitHook precommitHook) {
-    return cb::couchstore::compact(
-            *source,
-            target_filename,
-            flags,
-            [hook, hook_ctx](Db& db, DocInfo* info, sized_buf body) -> int {
-                if (hook == nullptr) {
-                    return COUCHSTORE_COMPACT_KEEP_ITEM;
-                }
-                return hook(&db, info, body, hook_ctx);
-            },
-            [dhook](DocInfo*& docInfo, sized_buf body) -> int {
-                if (dhook == nullptr) {
-                    return COUCHSTORE_SUCCESS;
-                }
-                return dhook(&docInfo, &body);
-            },
-            ops,
-            precommitHook);
+    // Concert C-style hooks into C++ std::function. Note that
+    // COUCHSTORE_COMPACT_FLAG_DROP_DELETES drops deletes iff compaction hook is
+    // nullptr - i.e. we need to map a null value for the C function pointer
+    // to an empty std::function.
+    cb::couchstore::CompactFilterCallback filterCallback;
+    if (hook) {
+        filterCallback = [hook, hook_ctx](
+                                 Db& db, DocInfo* info, sized_buf body) {
+            return hook(&db, info, body, hook_ctx);
+        };
+    }
+    // Similary for rewriteCallback; this is only expected to be non-empty
+    // if the (C-style) user specified one.
+    cb::couchstore::CompactRewriteDocInfoCallback rewriteCallback;
+    if (dhook) {
+        rewriteCallback = [dhook](DocInfo*& docInfo, sized_buf body) {
+            return dhook(&docInfo, &body);
+        };
+    }
+    return cb::couchstore::compact(*source,
+                                   target_filename,
+                                   flags,
+                                   filterCallback,
+                                   rewriteCallback,
+                                   ops,
+                                   precommitHook);
 }
 
 couchstore_error_t couchstore_compact_db(Db* source,
