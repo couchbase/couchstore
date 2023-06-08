@@ -19,7 +19,7 @@ except OSError as err:
 
 if _lib is None:
     try:
-        _lib = ctypes.CDLL("couchstore.dll")
+        _lib = ctypes.CDLL("couchstore.dll", winmode=0)
     except OSError as err:
         pass
 
