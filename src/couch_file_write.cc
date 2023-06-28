@@ -188,10 +188,7 @@ couchstore_error_t db_write_buf_compressed(tree_file *file,
 {
     cb::compression::Buffer buffer;
     try {
-        using cb::compression::Algorithm;
-        if (!cb::compression::deflate(Algorithm::Snappy,
-                                      {buf->buf, buf->size},
-                                      buffer)) {
+        if (!cb::compression::deflateSnappy({buf->buf, buf->size}, buffer)) {
             log_last_internal_error("Couchstore::db_write_buf_compressed() "
                                     "Compression failed buffer size:%zu", buf->size);
             return COUCHSTORE_ERROR_CORRUPT;

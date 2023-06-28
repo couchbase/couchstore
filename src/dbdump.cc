@@ -541,10 +541,8 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
             if (cb::mcbp::datatype::is_snappy(datatype) &&
                 !(docinfo->content_meta & COUCH_DOC_IS_COMPRESSED)) {
                 // Inflate the entire document so we can work with it
-                if (!cb::compression::inflate(
-                            cb::compression::Algorithm::Snappy,
-                            {doc->data.buf, doc->data.size},
-                            inflated)) {
+                if (!cb::compression::inflateSnappy(
+                            {doc->data.buf, doc->data.size}, inflated)) {
                     if (dumpJson) {
                         json["body"] = nullptr;
                     } else {
