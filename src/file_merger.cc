@@ -162,9 +162,7 @@ file_merger_error_t merge_files(const char *source_files[],
 
 static file_merger_error_t do_merge_files(file_merger_ctx_t *ctx)
 {
-    unsigned i;
-
-    for (i = 0; i < ctx->num_files; ++i) {
+    for (size_t i = 0; i < ctx->num_files; ++i) {
         FILE *f = ctx->files[i];
         int record_len;
         void *record_data;
@@ -196,7 +194,6 @@ static file_merger_error_t do_merge_files(file_merger_ctx_t *ctx)
     while (ctx->sorted_vector.count != 0) {
         record_t **records;
         size_t n;
-        size_t i;
         void *record_data;
         int record_len;
         file_merger_error_t ret;
@@ -229,7 +226,7 @@ static file_merger_error_t do_merge_files(file_merger_ctx_t *ctx)
             }
         }
 
-        for (i = 0; i < n; i++) {
+        for (size_t i = 0; i < n; i++) {
             record_len = (*ctx->read_record)(ctx->files[records[i]->file],
                                              &record_data,
                                              ctx->user_ctx);

@@ -189,8 +189,8 @@ public:
         // Now are we managing all vbuckets, or a list?
         if (optind < argc) {
             while (optind < argc) {
-                int i = atoi(argv[optind]);
-                if (i < vbc) {
+                int vbid = atoi(argv[optind]);
+                if (vbid < vbc) {
                     // a or r present?
                     VBucketState s = VB_ACTIVE;
                     for (size_t i = 0; i < strlen(argv[optind]); i++) {
@@ -200,10 +200,10 @@ public:
                             s = VB_REPLICA;
                         }
                     }
-                    vbuckets[i] = s;
+                    vbuckets[vbid] = s;
                     vbuckets_managed++; // keep track of how many we are
                     // managing
-                    std::cout << "Managing VB " << i;
+                    std::cout << "Managing VB " << vbid;
                     if (s == VB_ACTIVE) {
                         std::cout << " active" << std::endl;
                     } else {
@@ -675,7 +675,7 @@ public:
             } else {
                 // VB exists and is valid, close and open in write mode.
                 destroy();
-                couchstore_error_t err = couchstore_open_db(
+                err = couchstore_open_db(
                         filename, COUCHSTORE_OPEN_FLAG_CREATE, &handle);
                 if (err != COUCHSTORE_SUCCESS) {
                     throw exception3;

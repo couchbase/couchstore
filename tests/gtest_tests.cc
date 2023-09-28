@@ -2126,22 +2126,24 @@ TEST_F(CouchstoreTest, mprotect) {
 }
 #endif /* WIN32 */
 
-INSTANTIATE_TEST_SUITE_P(DocTest,
-                        CouchstoreDoctest,
-                        ::testing::Combine(::testing::Bool(), ::testing::Values(4, 69, 666, 4090)),
-                        [] (const ::testing::TestParamInfo<std::tuple<bool, int>>& info) {
-                            std::stringstream fmt;
-                            fmt << ((std::get<0>(info.param))?"Small":"Large")
-                                << "x" << std::get<1>(info.param);
-                            return fmt.str();
-                        });
+INSTANTIATE_TEST_SUITE_P(
+        DocTest,
+        CouchstoreDoctest,
+        ::testing::Combine(::testing::Bool(),
+                           ::testing::Values(4, 69, 666, 4090)),
+        [](const ::testing::TestParamInfo<std::tuple<bool, int>>& testInfo) {
+            std::stringstream fmt;
+            fmt << ((std::get<0>(testInfo.param)) ? "Small" : "Large") << "x"
+                << std::get<1>(testInfo.param);
+            return fmt.str();
+        });
 
 INSTANTIATE_TEST_SUITE_P(RangeScanTest,
                          RangeScanTest,
                          ::testing::Values(4, 69, 666),
-                         [](const ::testing::TestParamInfo<int>& info) {
+                         [](const ::testing::TestParamInfo<int>& testInfo) {
                              std::stringstream fmt;
-                             fmt << "x" << info.param;
+                             fmt << "x" << testInfo.param;
                              return fmt.str();
                          });
 
@@ -2150,14 +2152,13 @@ INSTANTIATE_TEST_SUITE_P(
         CouchstoreMTTest,
         ::testing::Combine(::testing::Values(true, false),
                            ::testing::Values(8)),
-        [] (const ::testing::TestParamInfo<std::tuple<bool, size_t>>& info) {
+        [](const ::testing::TestParamInfo<std::tuple<bool, size_t>>& testInfo) {
             std::stringstream fmt;
             fmt << "collector_"
-                << ((std::get<0>(info.param))?"enabled":"disabled")
-                << "_" << std::get<1>(info.param);
+                << ((std::get<0>(testInfo.param)) ? "enabled" : "disabled")
+                << "_" << std::get<1>(testInfo.param);
             return fmt.str();
         });
-
 
 int main(int argc, char ** argv)
 {
