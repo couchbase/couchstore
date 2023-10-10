@@ -17,6 +17,7 @@
 #include <nlohmann/json.hpp>
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
+#include <platform/compress.h>
 #include <platform/split_string.h>
 #include <platform/string_hex.h>
 #include <storage_common/doc_key_encoder.h>
