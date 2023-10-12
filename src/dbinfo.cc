@@ -17,9 +17,9 @@
 #include <getopt.h>
 #include <inttypes.h>
 #include <libcouchstore/couch_db.h>
-#include <memcached/isotime.h>
 #include <platform/cbassert.h>
 #include <platform/string_hex.h>
+#include <platform/timeutils.h>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -94,8 +94,7 @@ next_header:
             auto seconds = std::chrono::duration_cast<std::chrono::seconds>(ns);
             auto usec = std::chrono::duration_cast<std::chrono::microseconds>(
                     ns - seconds);
-            auto dest =
-                    ISOTime::generatetimestamp(seconds.count(), usec.count());
+            auto dest = cb::time::timestamp(seconds.count(), usec.count());
             printf("   timestamp: %s\n", dest.c_str());
         } else {
             printf("   timestamp: %" PRIu64 "\n", db->header.timestamp);

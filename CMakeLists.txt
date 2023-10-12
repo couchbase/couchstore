@@ -167,7 +167,7 @@ ADD_EXECUTABLE(couch_dbck src/dbck.cc)
 TARGET_LINK_LIBRARIES(couch_dbck couchstore platform)
 
 ADD_EXECUTABLE(couch_dbinfo src/dbinfo.cc)
-TARGET_LINK_LIBRARIES(couch_dbinfo couchstore mcd_time platform)
+TARGET_LINK_LIBRARIES(couch_dbinfo couchstore platform)
 
 ADD_EXECUTABLE(couch_compact src/compactor.cc)
 TARGET_LINK_LIBRARIES(couch_compact couchstore platform)
