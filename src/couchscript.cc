@@ -11,6 +11,7 @@
 #include <string>
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
+#include <platform/socket.h>
 #include <libcouchstore/couch_db.h>
 #include "internal.h"
 
