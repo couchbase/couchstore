@@ -379,8 +379,6 @@ extern "C" {
                 DocInfo *docinfo(bs.infos[offset]);
                 cb_assert(docinfo);
                 ++offset;
-                revbuf_t revbuf;
-                memset(&revbuf, 0, sizeof(revbuf));
 
                 lua_rawgeti(ls, -1, 1);
                 doc->id.buf = const_cast<char *>(luaL_checklstring(ls, -1, &doc->id.size));
@@ -400,31 +398,6 @@ extern "C" {
                     docinfo->rev_seq = (uint64_t) luaL_checknumber(ls, -1);
                     lua_pop(ls, 1);
                 }
-
-                if (n > 4) {
-                    lua_rawgeti(ls, -1, 5);
-                    revbuf.fields.cas = (uint64_t) luaL_checknumber(ls, -1);
-                    revbuf.fields.cas = ntohll(revbuf.fields.cas);
-                    lua_pop(ls, 1);
-                }
-
-                if (n > 5) {
-                    lua_rawgeti(ls, -1, 6);
-                    revbuf.fields.exp = static_cast<uint32_t>(luaL_checklong(ls, -1));
-                    revbuf.fields.exp = ntohl(revbuf.fields.exp);
-                    lua_pop(ls, 1);
-                }
-
-                if (n > 6) {
-                    lua_rawgeti(ls, -1, 7);
-                    revbuf.fields.flags = static_cast<uint32_t>(luaL_checklong(ls, 8));
-                    revbuf.fields.flags = ntohl(revbuf.fields.flags);
-                    lua_pop(ls, 1);
-                }
-
-                docinfo->rev_meta.size = sizeof(revbuf);
-                docinfo->rev_meta.buf = revbuf.bytes;
-
             }
         }
 
