@@ -325,7 +325,7 @@ static std::string buildCollectionInfoId(const sized_buf* sb){
                          rawKey.size()});
 
         // System event namespace
-        if (systemType == 0 &&
+        if ((systemType == 0 || systemType == 2) &&
             key.find(collectionsPrefix) != std::string::npos) {
             auto [affectedCid, keyRemainder] =
                     cb::mcbp::unsigned_leb128<uint32_t>::decode(systemKey);
@@ -333,7 +333,11 @@ static std::string buildCollectionInfoId(const sized_buf* sb){
                     reinterpret_cast<const char*>(keyRemainder.data()),
                     keyRemainder.size()};
             std::stringstream ss;
-            ss << collectionInfo << "collection:0x" << std::hex << affectedCid;
+            ss << collectionInfo;
+            if (systemType == 2) {
+                ss << "modify-";
+            }
+            ss << "collection:0x" << std::hex << affectedCid;
             collectionInfo = ss.str();
         } else if (systemType == 1 &&
                    key.find(scopePrefix) != std::string::npos) {
