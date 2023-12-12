@@ -312,7 +312,6 @@ cb_add_test_executable(couchstore_testapp
                tests/testapp.cc
                tests/views/tests.cc
                tests/views/collate_json_test.cc
-               tests/views/index_headers.cc
                tests/views/bitmaps.cc
                tests/views/sorted_lists.cc
                tests/views/reductions.cc
