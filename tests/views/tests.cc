@@ -29,8 +29,6 @@ void view_tests()
     test_bitmaps();
     test_sorted_lists();
     test_collate_json();
-    // test_index_headers_v1(); @todo MB-59041
-    // test_index_headers_v2(); @todo MB-59041
     test_reductions();
     test_keys();
     test_values();
