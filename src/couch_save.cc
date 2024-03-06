@@ -146,7 +146,6 @@ static void idfetch_update_cb(couchfile_modify_request*,
             fatbuf_get(&ctx->deltermbuf, sizeof(sized_buf)));
     delbuf->buf = static_cast<char*>(fatbuf_get(&ctx->deltermbuf, 6));
     delbuf->size = 6;
-    memset(delbuf->buf, 0, 6);
     encode_raw48(oldseq, (raw_48*)delbuf->buf);
 
     ctx->seqacts[ctx->actpos].setType(ACTION_REMOVE);
