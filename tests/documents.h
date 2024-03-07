@@ -43,6 +43,8 @@ public:
     **/
     void setDoc(int index, const std::string& id, const std::string& data);
 
+    void delDoc(int index);
+
     /**
         shuffle the documents so they're no longer in the order setDoc indicated.
     **/

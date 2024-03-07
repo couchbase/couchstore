@@ -302,6 +302,50 @@ TEST_F(CouchstoreTest, save_doc)
     EXPECT_EQ(4096ll, info.header_position);
 }
 
+TEST_F(CouchstoreTest, save_del_docs_in_a_batch) {
+    const uint32_t numDocs = 2;
+    Documents documents(numDocs);
+    documents.setDoc(0, "doc1", "{\"foo\":1}");
+    documents.setDoc(1, "doc2", "{\"bar\":2}");
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(
+                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_save_documents(
+                      db, documents.getDocs(), documents.getDocInfos(), 2, 0));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    documents.setDoc(0, "doc1", "{\"foo\":2}");
+    documents.delDoc(1);
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_save_documents(
+                      db, documents.getDocs(), documents.getDocInfos(), 2, 0));
+
+    // Retrieve "doc1" & check if the val is updated.
+    Doc* doc1 = nullptr;
+    std::string doc1Key = "doc1";
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_document(
+                      db, doc1Key.data(), doc1Key.size(), &doc1, 0));
+    auto val = to_string(doc1->data);
+    ASSERT_EQ("{\"foo\":2}", val);
+
+    if (doc1) {
+        couchstore_free_document(doc1);
+    }
+
+    Doc* doc2 = nullptr;
+    std::string doc2Key = "doc2";
+    ASSERT_EQ(COUCHSTORE_ERROR_DOC_NOT_FOUND,
+              couchstore_open_document(
+                      db, doc2Key.data(), doc2Key.size(), &doc2, 0));
+    // The doc shouldn't be found!
+    ASSERT_EQ(nullptr, doc2);
+}
+
 TEST_F(CouchstoreTest, compressed_doc_body)
 {
     Documents documents(2);

@@ -43,6 +43,12 @@ void Documents::setDoc(int index, const std::string& id, const std::string& data
     docInfos[index] = documents[index].getDocInfoPointer();
 }
 
+void Documents::delDoc(int index) {
+    // delete docs[index];
+    docs[index] = nullptr;
+    docInfos[index]->deleted = 1;
+}
+
 // shuffle the doc*/docinfo*
 void Documents::shuffle() {
     // shuffle both arrays using same psudeo-rand input
