@@ -55,7 +55,7 @@ protected:
     T ops;
     couchstore_error_info_t errinfo;
     couchstore_error_t error;
-    couch_file_handle handle;
+    couch_file_handle handle = nullptr;
     char buf[4096];
 
     std::string file_path;
@@ -71,7 +71,6 @@ WrappedOpsTest<T>::WrappedOpsTest()
     // error injection.
     : mock_ops(new testing::NiceMock<MockOps>(create_default_file_ops())),
       ops(mock_ops),
-      handle(0),
       file_path("wrapped_ops_test.couch") {
     this->handle = this->ops.constructor(&this->errinfo);
 }

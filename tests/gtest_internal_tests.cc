@@ -384,18 +384,14 @@ TEST_F(CouchstoreInternalTest, custom_btree_node_size)
     }
 }
 
-
 struct corrupted_btree_node_cb_param {
-    corrupted_btree_node_cb_param() : last_doc_bp(0), num_called(0) {
-    }
-
     void reset() {
         last_doc_bp = 0;
         num_called = 0;
     }
 
-    uint64_t last_doc_bp;
-    size_t num_called;
+    uint64_t last_doc_bp{0};
+    size_t num_called{0};
 };
 
 int corrupted_btree_node_cb(Db *db, DocInfo *info, void *ctx) {

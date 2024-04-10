@@ -83,12 +83,10 @@ struct FileBuffer : public boost::intrusive::list_base_hook<> {
                bool _mprotect_enabled)
         : owner(_owner),
           capacity(_capacity),
-          length(0),
           // Setting initial offset to 0 may cause problem
           // as there can be an actual buffer corresponding
           // to offset 0.
           offset(static_cast<cs_off_t>(-1)),
-          dirty(0),
           tracing_enabled(_tracing_enabled),
           write_validation_enabled(_write_validation_enabled),
           mprotect_enabled(_mprotect_enabled),
@@ -157,11 +155,11 @@ struct FileBuffer : public boost::intrusive::list_base_hook<> {
     // Buffer capacity.
     size_t capacity;
     // Length of data written.
-    size_t length;
+    size_t length = 0;
     // Starting offset of buffer.
     cs_off_t offset;
     // Flag indicating whether or not this buffer contains dirty data.
-    uint8_t dirty;
+    uint8_t dirty = 0;
     // Trace and verify flags
     bool tracing_enabled;
     bool write_validation_enabled;
@@ -222,8 +220,7 @@ struct BufferedFileHandle {
  */
 class ReadBufferManager {
 public:
-    ReadBufferManager() : nBuffers(0) {
-    }
+    ReadBufferManager() = default;
 
     ~ReadBufferManager() {
         // Note: all elements in intrusive list MUST be unlinked
@@ -303,7 +300,7 @@ private:
     // Map from offset to buffer instance.
     FileBufferMap readMap;
     // Number of buffers allocated.
-    size_t nBuffers;
+    size_t nBuffers = 0;
 };
 
 

@@ -24,50 +24,37 @@
 
     typedef struct compare_info {
         /* Compare function */
-        compare_callback compare;
+        compare_callback compare = nullptr;
     } compare_info;
 
 
     /* Lookup */
 
     struct couchfile_lookup_request {
-        couchfile_lookup_request()
-            : cmp({nullptr}),
-              file(nullptr),
-              num_keys(0),
-              fold(0),
-              in_fold(0),
-              tolerate_corruption(0),
-              keys(nullptr),
-              callback_ctx(nullptr),
-              fetch_callback(nullptr),
-              node_callback(nullptr) {
-        }
-
-        compare_info cmp;
-        tree_file *file;
-        int num_keys;
+        compare_info cmp = {};
+        tree_file* file = nullptr;
+        int num_keys = 0;
         /**
          * If nonzero, calls fetch_callback for all keys between and
          * including key 0 and key 1 in the keys array, or all keys after
          * key 0 if it contains only one key.
          * GIVE KEYS SORTED.
          */
-        int fold;
+        int fold = 0;
         //  v-- Flag used during lookup, do not set.
-        int in_fold;
+        int in_fold = 0;
         // If nonzero, continue to traverse tree skipping corrupted node.
-        int tolerate_corruption;
-        sized_buf **keys;
-        void *callback_ctx;
-        couchstore_error_t (*fetch_callback) (
-                struct couchfile_lookup_request *rq,
-                const sized_buf *k,
-                const sized_buf *v);
-        couchstore_error_t (*node_callback) (
-                struct couchfile_lookup_request *rq,
-                uint64_t subtreeSize,
-                const sized_buf *reduce_value);
+        int tolerate_corruption = 0;
+        sized_buf** keys = nullptr;
+        void* callback_ctx = nullptr;
+        couchstore_error_t (*fetch_callback)(
+                struct couchfile_lookup_request* rq,
+                const sized_buf* k,
+                const sized_buf* v) = nullptr;
+        couchstore_error_t (*node_callback)(struct couchfile_lookup_request* rq,
+                                            uint64_t subtreeSize,
+                                            const sized_buf* reduce_value) =
+                nullptr;
     } ;
 
     couchstore_error_t btree_lookup(couchfile_lookup_request *rq,
@@ -134,46 +121,30 @@
     typedef int (*purge_kv_fn)(const sized_buf *key, const sized_buf *val, void *ctx);
 
     typedef struct couchfile_modify_request {
-        couchfile_modify_request()
-            : file(nullptr),
-              num_actions(0),
-              actions(nullptr),
-              fetch_callback(nullptr),
-              reduce(nullptr),
-              rereduce(nullptr),
-              user_reduce_ctx(nullptr),
-              purge_kp(nullptr),
-              purge_kv(nullptr),
-              enable_purging(0),
-              guided_purge_ctx(nullptr),
-              compacting(0),
-              kv_chunk_threshold(0),
-              kp_chunk_threshold(0),
-              save_callback(nullptr),
-              save_callback_ctx(nullptr),
-              docinfo_callback(nullptr) {
-        }
-        compare_info cmp;
-        tree_file *file;
-        int num_actions;
-        couchfile_modify_action *actions;
-        void (*fetch_callback) (struct couchfile_modify_request *rq, sized_buf *k, sized_buf *v, void *arg);
+        compare_info cmp = {};
+        tree_file* file = nullptr;
+        int num_actions = 0;
+        couchfile_modify_action* actions = nullptr;
+        void (*fetch_callback)(struct couchfile_modify_request* rq,
+                               sized_buf* k,
+                               sized_buf* v,
+                               void* arg) = nullptr;
         void* fetch_callback_ctx;
-        reduce_fn reduce;
-        reduce_fn rereduce;
-        void *user_reduce_ctx;
+        reduce_fn reduce = nullptr;
+        reduce_fn rereduce = nullptr;
+        void* user_reduce_ctx = nullptr;
         /* For guided btree purge */
-        purge_kp_fn purge_kp;
-        purge_kv_fn purge_kv;
-        int enable_purging;
-        void *guided_purge_ctx;
+        purge_kp_fn purge_kp = nullptr;
+        purge_kv_fn purge_kv = nullptr;
+        int enable_purging = 0;
+        void* guided_purge_ctx = nullptr;
         /*  We're in the compactor */
-        int compacting;
-        int kv_chunk_threshold;
-        int kp_chunk_threshold;
-        save_callback_fn save_callback;
-        void* save_callback_ctx;
-        make_docinfo_callback docinfo_callback;
+        int compacting = 0;
+        int kv_chunk_threshold = 0;
+        int kp_chunk_threshold = 0;
+        save_callback_fn save_callback = nullptr;
+        void* save_callback_ctx = nullptr;
+        make_docinfo_callback docinfo_callback = nullptr;
     } couchfile_modify_request;
 
 #define KP_NODE 0

@@ -80,19 +80,7 @@ public:
     //
     // Construct a program parameters, all parameters assigned default settings
     //
-    ProgramParameters()
-        : reuse_couch_files(reuse_couch_files_default),
-          vbc(vbc_default),
-          key_count(key_count_default),
-          keys_per_vbucket(keys_per_vbucket_default),
-          keys_per_flush(keys_per_flush_default),
-          doc_len(doc_len_default),
-          doc_type(doc_type_default),
-          vbuckets(vbc_default),
-          vbuckets_managed(0),
-          start_key(start_key_default),
-          low_compression(low_compression_default),
-          flusher_count(flusher_count_default) {
+    ProgramParameters() {
         fill(vbuckets.begin(), vbuckets.end(), VB_UNMANAGED);
     }
 
@@ -450,18 +438,18 @@ public:
     }
 
 private:
-    bool reuse_couch_files;
-    int16_t vbc;
-    uint64_t key_count;
-    bool keys_per_vbucket;
-    int keys_per_flush;
-    int doc_len;
-    DocType doc_type;
-    std::vector<VBucketState> vbuckets;
-    int vbuckets_managed;
-    uint64_t start_key;
-    bool low_compression;
-    int flusher_count;
+    bool reuse_couch_files = reuse_couch_files_default;
+    int16_t vbc = vbc_default;
+    uint64_t key_count = key_count_default;
+    bool keys_per_vbucket = keys_per_vbucket_default;
+    int keys_per_flush = keys_per_flush_default;
+    int doc_len = doc_len_default;
+    DocType doc_type = doc_type_default;
+    std::vector<VBucketState> vbuckets{vbc_default};
+    int vbuckets_managed = 0;
+    uint64_t start_key = start_key_default;
+    bool low_compression = low_compression_default;
+    int flusher_count = flusher_count_default;
     bool namespaced{true};
     uint32_t collection_id{collection_id_default};
 };
@@ -480,9 +468,7 @@ class Document {
                                          .time_since_epoch())
                                  .count())),
               exptime(htonl(e)),
-              flags(f),
-              flex_meta_code(0x01),
-              flex_value(0x0) {
+              flags(f) {
         }
 
         void set_exptime(uint32_t exptime) {
@@ -503,19 +489,13 @@ class Document {
         uint64_t cas;
         uint32_t exptime;
         uint32_t flags;
-        uint8_t flex_meta_code;
-        uint8_t flex_value;
+        uint8_t flex_meta_code = 0x01;
+        uint8_t flex_value = 0x0;
     };
 
 public:
     Document(const char* k, int klen, ProgramParameters& params, int dlen)
-        : meta(0, 0),
-          key_len(klen),
-          key(nullptr),
-          data_len(dlen),
-          data(nullptr),
-          parameters(params),
-          doc_created(0) {
+        : meta(0, 0), key_len(klen), data_len(dlen), parameters(params) {
         key = new char[klen];
         data = new char[dlen];
         set_doc(k, klen, dlen);
@@ -600,11 +580,11 @@ private:
     Meta meta;
 
     int key_len;
-    char* key;
+    char* key = nullptr;
     int data_len;
-    char* data;
+    char* data = nullptr;
     ProgramParameters& parameters;
-    int doc_created;
+    int doc_created = 0;
     static uint64_t db_seq;
 };
 
@@ -645,18 +625,11 @@ public:
             int vb,
             uint64_t& saved_counter,
             ProgramParameters& params_ref)
-        : handle(nullptr),
-          next_free_doc(0),
-          flush_threshold(params_ref.get_keys_per_flush()),
+        : flush_threshold(params_ref.get_keys_per_flush()),
           docs(params_ref.get_keys_per_flush()),
-          pending_documents(0),
           documents_saved(saved_counter),
           params(params_ref),
-          vbid(vb),
-          doc_count(0),
-          got_vbstate(false),
-          vb_seq(0),
-          ok_to_set_vbstate(true) {
+          vbid(vb) {
         int flags = params.get_reuse_couch_files()
                             ? COUCHSTORE_OPEN_FLAG_RDONLY
                             : COUCHSTORE_OPEN_FLAG_CREATE;
@@ -833,26 +806,25 @@ private:
         couchstore_free_db(handle);
     }
 
-    Db* handle;
-    int next_free_doc;
+    Db* handle = nullptr;
+    int next_free_doc = 0;
     int flush_threshold;
     std::vector<std::unique_ptr<Document>> docs;
-    int pending_documents;
+    int pending_documents = 0;
     uint64_t& documents_saved;
     ProgramParameters& params;
     int vbid;
-    uint64_t doc_count;
+    uint64_t doc_count = 0;
     std::string vbstate_data;
-    bool got_vbstate;
-    uint64_t vb_seq;
-    bool ok_to_set_vbstate;
+    bool got_vbstate = false;
+    uint64_t vb_seq = 0;
+    bool ok_to_set_vbstate = true;
 };
 
 class VBucketFlusher {
 public:
     VBucketFlusher(ProgramParameters& params)
         : started(false),
-          documents_saved(0),
           parameters(params),
           task_thread(&VBucketFlusher::run, this) {
     }
@@ -969,7 +941,7 @@ private:
     }
 
     std::atomic<bool> started;
-    uint64_t documents_saved;
+    uint64_t documents_saved = 0;
     ProgramParameters& parameters;
     std::set<uint16_t> my_vbuckets;
     std::deque<VBucket*> work_queue;
