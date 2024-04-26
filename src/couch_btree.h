@@ -125,10 +125,11 @@
         tree_file* file = nullptr;
         int num_actions = 0;
         couchfile_modify_action* actions = nullptr;
-        void (*fetch_callback)(struct couchfile_modify_request* rq,
-                               sized_buf* k,
-                               sized_buf* v,
-                               void* arg) = nullptr;
+        couchstore_error_t (*fetch_callback)(
+                struct couchfile_modify_request* rq,
+                sized_buf* k,
+                sized_buf* v,
+                void* arg) = nullptr;
         void* fetch_callback_ctx;
         reduce_fn reduce = nullptr;
         reduce_fn rereduce = nullptr;

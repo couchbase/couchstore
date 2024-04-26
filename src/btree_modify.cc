@@ -482,10 +482,14 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                     case ACTION_FETCH_INSERT:
                         if (rq->fetch_callback) {
                             // not found
-                            (*rq->fetch_callback)(rq,
-                                                  rq->actions[start].getKey(),
-                                                  nullptr,
-                                                  rq->fetch_callback_ctx);
+                            errcode = (*rq->fetch_callback)(
+                                    rq,
+                                    rq->actions[start].getKey(),
+                                    nullptr,
+                                    rq->fetch_callback_ctx);
+                            if (errcode != COUCHSTORE_SUCCESS) {
+                                goto cleanup;
+                            }
                         }
                         if (rq->actions[start].getType() == ACTION_FETCH) {
                             break;
@@ -518,10 +522,14 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                     case ACTION_FETCH:
                     case ACTION_FETCH_INSERT:
                         if (rq->fetch_callback) {
-                            (*rq->fetch_callback)(rq,
-                                                  rq->actions[start].getKey(),
-                                                  &val_buf,
-                                                  rq->fetch_callback_ctx);
+                            errcode = (*rq->fetch_callback)(
+                                    rq,
+                                    rq->actions[start].getKey(),
+                                    &val_buf,
+                                    rq->fetch_callback_ctx);
+                            if (errcode != COUCHSTORE_SUCCESS) {
+                                goto cleanup;
+                            }
                         }
                         if (rq->actions[start].getType() == ACTION_FETCH) {
                             // Do next action on same item in the node, as our

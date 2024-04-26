@@ -129,12 +129,12 @@ struct index_update_ctx {
     fatbuf& deltermbuf;
 };
 
-static void idfetch_update_cb(couchfile_modify_request*,
-                              sized_buf*,
-                              sized_buf* v,
-                              void* arg) {
+static couchstore_error_t idfetch_update_cb(couchfile_modify_request*,
+                                            sized_buf*,
+                                            sized_buf* v,
+                                            void* arg) {
     if (v == nullptr) { // Doc not found
-        return;
+        return COUCHSTORE_SUCCESS;
     }
 
     // v contains a seq we need to remove ( {Seq,_,_,_,_} )
@@ -144,6 +144,11 @@ static void idfetch_update_cb(couchfile_modify_request*,
 
     auto* delbuf = static_cast<sized_buf*>(
             fatbuf_get(&ctx->deltermbuf, sizeof(sized_buf)));
+
+    if (!delbuf) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
+
     delbuf->buf = static_cast<char*>(fatbuf_get(&ctx->deltermbuf, 6));
     delbuf->size = 6;
     encode_raw48(oldseq, (raw_48*)delbuf->buf);
@@ -153,6 +158,7 @@ static void idfetch_update_cb(couchfile_modify_request*,
     ctx->seqacts[ctx->actpos].setKey(delbuf);
 
     ctx->actpos++;
+    return COUCHSTORE_SUCCESS;
 }
 
 static couchstore_error_t update_indexes(Db* db,
