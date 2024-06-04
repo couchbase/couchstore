@@ -837,7 +837,7 @@ static int process_vbucket_file(const char *file, int *total)
     if (mode == DumpFileMap) {
         flags |= COUCHSTORE_OPEN_FLAG_UNBUFFERED;
         trackingFileOps = new TrackingFileOps();
-        errcode = couchstore_open_db_ex(file, flags, trackingFileOps, &db);
+        errcode = couchstore_open_db_ex(file, flags, {}, trackingFileOps, &db);
     } else {
         errcode = couchstore_open_db(file, flags, &db);
     }

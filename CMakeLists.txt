@@ -106,13 +106,14 @@ ADD_LIBRARY(couchstore_view_objs OBJECT
         src/views/compaction.cc
         $<TARGET_OBJECTS:couchstore_objs>)
 TARGET_COMPILE_DEFINITIONS(couchstore_view_objs PUBLIC -Dcouchstore_EXPORTS)
-TARGET_LINK_LIBRARIES(couchstore_view_objs PUBLIC Folly::headers)
+TARGET_LINK_LIBRARIES(couchstore_view_objs PUBLIC Folly::headers cbcrypto)
 SET_PROPERTY(TARGET couchstore_view_objs PROPERTY POSITION_INDEPENDENT_CODE 1)
 cb_enable_unity_build(couchstore_view_objs)
 
 # libcouchstore, core couchstore library
 ADD_LIBRARY(couchstore SHARED $<TARGET_OBJECTS:couchstore_objs>)
 SET(COUCHSTORE_LIBS cbcompress
+                    cbcrypto
                     platform
                     phosphor
                     fmt::fmt)
@@ -140,7 +141,7 @@ ADD_LIBRARY(couchstore_views SHARED
             $<TARGET_OBJECTS:couchstore_view_objs>)
 SET(COUCHSTORE_VIEW_LIBS ${COUCHSTORE_LIBS} ${V8_LIBRARIES} ${ICU_LIBRARIES})
 SET(COUCHSTORE_VIEW_LIBS_WITHOUT_GLOBAL_NEW_REPLACEMENT ${V8_LIBRARIES} ${ICU_LIBRARIES}
-    cbcompress platform phosphor)
+    cbcompress cbcrypto platform phosphor)
 TARGET_LINK_LIBRARIES(couchstore_views ${COUCHSTORE_VIEW_LIBS_WITHOUT_GLOBAL_NEW_REPLACEMENT})
 TARGET_INCLUDE_DIRECTORIES(couchstore_views PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
@@ -399,7 +400,8 @@ SET_TARGET_PROPERTIES(couchstore_wrapped_fileops_test_framework PROPERTIES
 TARGET_INCLUDE_DIRECTORIES(couchstore_wrapped_fileops_test_framework
                            PRIVATE
                            ${CMAKE_CURRENT_BINARY_DIR}/include)
-TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test_framework GTest::gmock platform)
+TARGET_LINK_LIBRARIES(couchstore_wrapped_fileops_test_framework
+        GTest::gmock cbcrypto platform)
 
 cb_add_test_executable(couchstore_wrapped_fileops_test
                src/iobuffer.cc
@@ -418,7 +420,7 @@ ADD_LIBRARY(couchstore_test_fileops OBJECT
 TARGET_INCLUDE_DIRECTORIES(couchstore_test_fileops
                            PRIVATE
                            ${CMAKE_CURRENT_BINARY_DIR}/include)
-TARGET_LINK_LIBRARIES(couchstore_test_fileops GTest::gmock platform)
+TARGET_LINK_LIBRARIES(couchstore_test_fileops GTest::gmock cbcrypto platform)
 
 ADD_TEST(couchstore-file-deduper-test couchstore_file-deduper-test)
 ADD_TEST(couchstore-file-merge-test couchstore_file-merger-test)

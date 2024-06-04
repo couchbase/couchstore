@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
     }
 
     auto [status, source] = cb::couchstore::openDatabase(
-            argv[optind], COUCHSTORE_OPEN_FLAG_RDONLY, {}, header_offset);
+            argv[optind], COUCHSTORE_OPEN_FLAG_RDONLY, {}, {}, header_offset);
     if (status != COUCHSTORE_SUCCESS) {
         std::cerr << "Failed to open " << argv[optind] << ": "
                   << couchstore_strerror(status) << std::endl;
@@ -90,6 +90,7 @@ int main(int argc, char** argv) {
         status = cb::couchstore::compact(*source,
                                          argv[optind + 1],
                                          COUCHSTORE_OPEN_FLAG_UNBUFFERED,
+                                         {},
                                          {},
                                          {},
                                          {},

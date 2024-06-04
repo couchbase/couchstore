@@ -94,13 +94,15 @@ std::pair<couchstore_error_t, UniqueDocInfoPtr> openDocInfo(
 std::pair<couchstore_error_t, UniqueDbPtr> openDatabase(
         const std::string& filename,
         couchstore_open_flags flags,
+        cb::couchstore::EncryptionKeyGetter encryptionKeyCB,
         FileOpsInterface* fileops,
         std::optional<cs_off_t> offset) {
     Db* db = nullptr;
     if (!fileops) {
         fileops = couchstore_get_default_file_ops();
     }
-    auto error = couchstore_open_db_ex(filename.c_str(), flags, fileops, &db);
+    auto error = couchstore_open_db_ex(
+            filename.c_str(), flags, std::move(encryptionKeyCB), fileops, &db);
     if (error == COUCHSTORE_SUCCESS) {
         if (offset) {
             UniqueDbPtr uniqueDbPtr{db};
@@ -147,6 +149,14 @@ Header getHeader(Db& db) {
     ret.spaceUsed = info.space_used;
     ret.fileSize = info.file_size;
     return ret;
+}
+
+bool isEncrypted(const Db& db) {
+    return false;
+}
+
+std::string_view getEncryptionKeyId(const Db& db) {
+    return {};
 }
 
 } // namespace couchstore

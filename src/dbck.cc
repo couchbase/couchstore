@@ -237,6 +237,7 @@ static void rewind_and_get_stale_data(rewind_request& rq) {
 
     errcode = couchstore_open_db_ex(rq.options->src_filename.c_str(),
                                     COUCHSTORE_OPEN_FLAG_RDONLY,
+                                    {},
                                     couchstore_get_default_file_ops(),
                                     &db);
 
@@ -305,15 +306,17 @@ static int recover_file(recovery_options& options) {
 
     // Open source file.
     error_pass(couchstore_open_db_ex(options.src_filename.c_str(),
-                                    COUCHSTORE_OPEN_FLAG_RDONLY,
-                                    couchstore_get_default_file_ops(),
-                                    &db_src));
+                                     COUCHSTORE_OPEN_FLAG_RDONLY,
+                                     {},
+                                     couchstore_get_default_file_ops(),
+                                     &db_src));
 
     // Open source file for rewind.
     error_pass(couchstore_open_db_ex(options.src_filename.c_str(),
-                                    COUCHSTORE_OPEN_FLAG_RDONLY,
-                                    couchstore_get_default_file_ops(),
-                                    &db_src_alt));
+                                     COUCHSTORE_OPEN_FLAG_RDONLY,
+                                     {},
+                                     couchstore_get_default_file_ops(),
+                                     &db_src_alt));
     param.db_src = db_src_alt;
 
     // Compact with recovery mode.
@@ -329,6 +332,7 @@ static int recover_file(recovery_options& options) {
     // Open recovered file.
     errcode = couchstore_open_db_ex(options.dst_filename.c_str(),
                                     0x0,
+                                    {},
                                     couchstore_get_default_file_ops(),
                                     &db_recovered);
     DbInfo dbinfo;

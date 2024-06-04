@@ -38,7 +38,8 @@ protected:
     static UniqueDbPtr openDb(std::string fname) {
         auto [status, db] = openDatabase(
                 fname,
-                COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_WITH_MPROTECT);
+                COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_WITH_MPROTECT,
+                {});
         if (status != COUCHSTORE_SUCCESS) {
             throw std::runtime_error(std::string{"Failed to open database \""} +
                                      fname +
@@ -239,6 +240,7 @@ TEST_F(CouchstoreCompactTest, NormalCompactionDeduplicateHeaderBlocks) {
                                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
                                       {},
                                       {},
+                                      {},
                                       couchstore_get_default_file_ops()));
 
     db = openTargetDb();
@@ -275,6 +277,7 @@ TEST_F(CouchstoreCompactTest, CompactionAllowsForDroppingItems) {
                       *db,
                       targetFilename.c_str(),
                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                      {},
                       [&keys](Db&, DocInfo* docInfo, sized_buf value) -> int {
                           if (docInfo == nullptr) {
                               // Indication that we're done with compaction
@@ -329,6 +332,7 @@ TEST_F(CouchstoreCompactTest, CompactionAllowsForRequestingValue) {
                       *db,
                       targetFilename.c_str(),
                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                      {},
                       [&callbackWithoutValue, &dbValue](
                               Db&, DocInfo* docInfo, sized_buf value) -> int {
                           if (docInfo == nullptr) {
@@ -377,6 +381,7 @@ TEST_F(CouchstoreCompactTest, CompactionAllowsForRewritingDocInfo) {
                       *db,
                       targetFilename.c_str(),
                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                      {},
                       [](Db& db, DocInfo* info, sized_buf body) -> int {
                           return COUCHSTORE_COMPACT_KEEP_ITEM;
                       },
@@ -477,6 +482,7 @@ TEST_F(CouchstoreCompactTest, PitrCompaction) {
                                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
                                       {},
                                       {},
+                                      {},
                                       couchstore_get_default_file_ops(),
                                       {},
                                       50,
@@ -551,6 +557,7 @@ TEST_F(CouchstoreCompactTest, PitrCompactionSquashHeaders) {
                                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
                                       {},
                                       {},
+                                      {},
                                       couchstore_get_default_file_ops(),
                                       {},
                                       50,
@@ -594,6 +601,7 @@ TEST_F(CouchstoreCompactTest, PitrCompactionSquashHeaders_2) {
               cb::couchstore::compact(*sourceDb,
                                       targetFilename.c_str(),
                                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                      {},
                                       {},
                                       {},
                                       couchstore_get_default_file_ops(),
@@ -667,6 +675,7 @@ TEST_F(CouchstoreCompactTest, PitrCompactionNotLastBlock) {
                                     COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
                                     {},
                                     {},
+                                    {},
                                     couchstore_get_default_file_ops(),
                                     {},
                                     30,
@@ -684,6 +693,7 @@ TEST_F(CouchstoreCompactTest, PitrCompactionNotLastBlock) {
               cb::couchstore::compact(*db,
                                       targetFilename.c_str(),
                                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                      {},
                                       {},
                                       {},
                                       couchstore_get_default_file_ops(),
@@ -746,6 +756,7 @@ TEST_F(CouchstoreCompactTest, CheckMultipleMissingInBeginning) {
                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
                       {},
                       {},
+                      {},
                       couchstore_get_default_file_ops(),
                       {},
                       0 /*oldest*/,
@@ -784,6 +795,7 @@ TEST_F(CouchstoreCompactTest, MB45636) {
               cb::couchstore::compact(*db,
                                       targetFilename.c_str(),
                                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                      {},
                                       {},
                                       {},
                                       couchstore_get_default_file_ops(),

@@ -64,7 +64,7 @@ protected:
             couchstore_open_flags flags = COUCHSTORE_OPEN_FLAG_CREATE |
                                           COUCHSTORE_OPEN_FLAG_UNBUFFERED,
             FileOpsInterface* fileops = nullptr) {
-        auto [status, db] = openDatabase(filename, flags, fileops);
+        auto [status, db] = openDatabase(filename, flags, {}, fileops);
         if (status != COUCHSTORE_SUCCESS) {
             throw std::runtime_error(std::string{"Failed to open database: "} +
                                      couchstore_strerror(status));
@@ -316,7 +316,8 @@ TEST_P(CouchstoreCxxTestWithParam, ReplayOfDeletedDocuments) {
 
     auto [status, target] = openDatabase(
             targetdb,
-            COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED);
+            COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED,
+            {});
     ASSERT_EQ(COUCHSTORE_SUCCESS, status) << "Failed to open target db";
 
     ASSERT_EQ(COUCHSTORE_SUCCESS,
@@ -376,7 +377,8 @@ TEST_P(CouchstoreCxxTestWithParam,
 
     auto [status, target] = openDatabase(
             targetdb,
-            COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED);
+            COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED,
+            {});
     ASSERT_EQ(COUCHSTORE_SUCCESS, status) << "Failed to open target db";
 
     int local{0}, regular{0};

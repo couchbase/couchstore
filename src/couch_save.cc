@@ -78,7 +78,7 @@ static couchstore_error_t write_doc(Db *db, const Doc *doc, uint64_t *bp,
     if (writeopts & COMPRESS_DOC_BODIES) {
         errcode = db_write_buf_compressed(&db->file, &doc->data, (cs_off_t *) bp, disk_size);
     } else {
-        errcode = static_cast<couchstore_error_t>(db_write_buf(&db->file, &doc->data, (cs_off_t *) bp, disk_size));
+        errcode = db_write_buf(&db->file, &doc->data, (cs_off_t*)bp, disk_size);
     }
 
     return errcode;

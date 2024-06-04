@@ -111,7 +111,7 @@ CouchstoreInternalTest::~CouchstoreInternalTest() {
 couchstore_error_t CouchstoreInternalTest::open_db(couchstore_open_flags extra_flags) {
     return couchstore_open_db_ex(filePath.c_str(),
                                  extra_flags | COUCHSTORE_OPEN_FLAG_UNBUFFERED,
-                                 &ops, &db);
+                                 {}, &ops, &db);
 }
 
 

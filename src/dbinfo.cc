@@ -62,7 +62,7 @@ static int process_file(const char* file,
                                   "CRC-32C"};
 
     auto [errcode, db] = cb::couchstore::openDatabase(
-            file, COUCHSTORE_OPEN_FLAG_RDONLY, {}, header_offset);
+            file, COUCHSTORE_OPEN_FLAG_RDONLY, {}, {}, header_offset);
     if (errcode != COUCHSTORE_SUCCESS) {
         fprintf(stderr,
                 "Failed to open \"%s\": %s\n",

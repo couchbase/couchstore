@@ -17,15 +17,31 @@
 #define COUCHSTORE_COUCH_DB_H
 
 #include "couch_common.h"
-
 #include <libcouchstore/error.h>
 #include <libcouchstore/file_ops.h>
+
+#include <cbcrypto/common.h>
 
 #include <functional>
 #include <memory>
 #include <optional>
-
 #include <system_error>
+
+namespace cb::couchstore {
+
+using SharedEncryptionKey =
+        std::shared_ptr<const cb::crypto::DataEncryptionKey>;
+
+/**
+ * Callback that returns the encryption key that decrypts the per file key,
+ * or null if encryption should not be used or the requested key was not found.
+ *
+ * @param keyId Requested key id or empty when creating a file
+ */
+using EncryptionKeyGetter =
+        std::function<SharedEncryptionKey(std::string_view keyId)>;
+
+} // namespace cb::couchstore
 
 extern "C" {
 
@@ -184,6 +200,8 @@ extern "C" {
      * @param flags Additional flags for how the database should
      *              be opened. See couchstore_open_flags_* for the
      *              available flags.
+     * @param encryptionKeyCB Callback that returns the encryption key that
+     *                        decrypts the per file key
      * @param ops Pointer to the implementation of FileOpsInterface
      *            you want the library to use.
      * @param db Pointer to where you want the handle to the database to be
@@ -191,10 +209,12 @@ extern "C" {
      * @return COUCHSTORE_SUCCESS for success
      */
     LIBCOUCHSTORE_API
-    couchstore_error_t couchstore_open_db_ex(const char *filename,
-                                             couchstore_open_flags flags,
-                                             FileOpsInterface* ops,
-                                             Db **db);
+    couchstore_error_t couchstore_open_db_ex(
+            const char* filename,
+            couchstore_open_flags flags,
+            cb::couchstore::EncryptionKeyGetter encryptionKeyCB,
+            FileOpsInterface* ops,
+            Db** db);
 
     /**
      * Release all resources held by the database handle after the file
@@ -1171,6 +1191,8 @@ std::pair<couchstore_error_t, UniqueDocInfoPtr> openDocInfo(
  *
  * @param filename The file name to open the file
  * @param flags Open flags
+ * @param encryptionKeyCB Callback that returns the encryption key that
+ *                        decrypts the per file key
  * @param fileops optional file ops interface to use
  * @param offset optional offset in the file for the header to use
  * @return a pair containing the status of the operation and the database
@@ -1180,6 +1202,7 @@ LIBCOUCHSTORE_API
 std::pair<couchstore_error_t, UniqueDbPtr> openDatabase(
         const std::string& filename,
         couchstore_open_flags flags,
+        cb::couchstore::EncryptionKeyGetter encryptionKeyCB,
         FileOpsInterface* fileops = {},
         std::optional<cs_off_t> offset = {});
 
@@ -1236,6 +1259,18 @@ LIBCOUCHSTORE_API
 Header getHeader(Db& db);
 
 /**
+ * Returns true if the database is encrypted.
+ */
+LIBCOUCHSTORE_API
+bool isEncrypted(const Db& db);
+
+/**
+ * Returns the key identifier if the database is encrypted, empty otherwise.
+ */
+LIBCOUCHSTORE_API
+std::string_view getEncryptionKeyId(const Db& db);
+
+/**
  * The compact filter is called with the target database as the first
  * parameter, then the DocumentInfo as the second parameter (set to
  * nullptr in the callback after all documents was processed) and the
@@ -1265,6 +1300,8 @@ using CompactRewriteDocInfoCallback = std::function<int(DocInfo*&, sized_buf)>;
  * @param source The source database to compact
  * @param target_filename The name of the target database
  * @param flags Extra flags to open the database with
+ * @param targetEncrKeyCB Callback that returns the encryption key that
+ *                        will encrypt the target per file key
  * @param filterCallback The filter callback to call for each item to check
  *                       if the document should be part of the compacted
  *                       database or not
@@ -1278,6 +1315,7 @@ LIBCOUCHSTORE_API
 couchstore_error_t compact(Db& source,
                            const char* target_filename,
                            couchstore_compact_flags flags,
+                           cb::couchstore::EncryptionKeyGetter targetEncrKeyCB,
                            CompactFilterCallback filterCallback,
                            CompactRewriteDocInfoCallback rewriteDocInfoCallback,
                            FileOpsInterface* ops,
@@ -1337,6 +1375,8 @@ using PreCopyHook = std::function<couchstore_error_t(
  * @param source The source database to compact
  * @param target_filename The name of the target database
  * @param flags Extra flags to open the database with
+ * @param targetEncrKeyCB Callback that returns the encryption key that
+ *                        will encrypt the target per file key
  * @param filterCallback The filter callback to call for each item to check
  *                       if the document should be part of the compacted
  *                       database or not
@@ -1367,6 +1407,7 @@ LIBCOUCHSTORE_API
 couchstore_error_t compact(Db& source,
                            const char* target_filename,
                            couchstore_compact_flags flags,
+                           cb::couchstore::EncryptionKeyGetter targetEncrKeyCB,
                            CompactFilterCallback filterCallback,
                            CompactRewriteDocInfoCallback rewriteDocInfoCallback,
                            FileOpsInterface* ops,

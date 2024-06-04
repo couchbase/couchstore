@@ -21,6 +21,7 @@
 #include "couch_btree.h"
 #include "couch_latency_internal.h"
 #include "internal.h"
+#include "log_last_internal_error.h"
 #include "node_types.h"
 #include "platform/strerror.h"
 #include "reduces.h"
@@ -513,15 +514,16 @@ couchstore_error_t couchstore_open_db(const char *filename,
                                       couchstore_open_flags flags,
                                       Db **pDb)
 {
-    return couchstore_open_db_ex(filename, flags,
-                                 couchstore_get_default_file_ops(), pDb);
+    return couchstore_open_db_ex(
+            filename, flags, {}, couchstore_get_default_file_ops(), pDb);
 }
 
-couchstore_error_t couchstore_open_db_ex(const char *filename,
-                                         couchstore_open_flags flags,
-                                         FileOpsInterface* ops,
-                                         Db **pDb)
-{
+couchstore_error_t couchstore_open_db_ex(
+        const char* filename,
+        couchstore_open_flags flags,
+        cb::couchstore::EncryptionKeyGetter encryptionKeyCB,
+        FileOpsInterface* ops,
+        Db** pDb) {
     COLLECT_LATENCY();
 
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;

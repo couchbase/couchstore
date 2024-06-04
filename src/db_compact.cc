@@ -72,6 +72,7 @@ couchstore_error_t couchstore_compact_db_ex(Db* source,
     return cb::couchstore::compact(*source,
                                    target_filename,
                                    flags,
+                                   {},
                                    filterCallback,
                                    rewriteCallback,
                                    ops,
@@ -94,6 +95,7 @@ couchstore_error_t cb::couchstore::compact(
         Db& source,
         const char* target_filename,
         couchstore_compact_flags flags,
+        cb::couchstore::EncryptionKeyGetter targetEncrKeyCB,
         CompactFilterCallback filterCallback,
         CompactRewriteDocInfoCallback rewriteDocInfoCallback,
         FileOpsInterface* ops,
@@ -152,7 +154,8 @@ couchstore_error_t cb::couchstore::compact(
         open_flags |= (kv_flag << 16);
     }
 
-    error_pass(couchstore_open_db_ex(target_filename, open_flags, ops, &target));
+    error_pass(couchstore_open_db_ex(
+            target_filename, open_flags, targetEncrKeyCB, ops, &target));
 
     ctx.target = target;
     target->header.update_seq = source.header.update_seq;
@@ -349,12 +352,12 @@ static couchstore_error_t compact_seq_fetchcb(couchfile_lookup_request *rq,
         if (ctx->rewriteDocInfoCallback) {
             ret_val = ctx->rewriteDocInfoCallback(info, item);
         }
-        int err = db_write_buf(ctx->target_mr->rq->file, &item, &new_bp,
-                               &new_size);
+        auto err = db_write_buf(
+                ctx->target_mr->rq->file, &item, &new_bp, &new_size);
 
         bpWithDeleted = (bpWithDeleted & BP_DELETED_FLAG) | new_bp;  //Preserve high bit
         encode_raw48(bpWithDeleted, &rawSeq->bp);
-        error_pass(static_cast<couchstore_error_t>(err));
+        error_pass(err);
     }
 
     if (ret_val) {
@@ -678,6 +681,7 @@ couchstore_error_t findNextHeader(Db& source,
 couchstore_error_t compact(Db& source,
                            const char* target_filename,
                            couchstore_compact_flags flags,
+                           cb::couchstore::EncryptionKeyGetter targetEncrKeyCB,
                            CompactFilterCallback filterCallback,
                            CompactRewriteDocInfoCallback rewriteDocInfoCallback,
                            FileOpsInterface* ops,
@@ -711,6 +715,7 @@ couchstore_error_t compact(Db& source,
         return compact(source,
                        target_filename,
                        flags,
+                       targetEncrKeyCB,
                        filterCallback,
                        rewriteDocInfoCallback,
                        ops,
@@ -731,6 +736,7 @@ couchstore_error_t compact(Db& source,
     auto status = cb::couchstore::compact(source,
                                           target_filename,
                                           flags,
+                                          targetEncrKeyCB,
                                           filterCallback,
                                           rewriteDocInfoCallback,
                                           ops,
@@ -745,8 +751,10 @@ couchstore_error_t compact(Db& source,
 
     // time to move the data over!
     {
-        auto [status, target] = cb::couchstore::openDatabase(
-                target_filename, COUCHSTORE_OPEN_FLAG_UNBUFFERED);
+        auto [status, target] =
+                cb::couchstore::openDatabase(target_filename,
+                                             COUCHSTORE_OPEN_FLAG_UNBUFFERED,
+                                             targetEncrKeyCB);
         if (status != COUCHSTORE_SUCCESS) {
             ::remove(target_filename);
             return status;

@@ -131,8 +131,10 @@ couchstore_error_t write_header(tree_file *file, sized_buf *buf, cs_off_t *pos)
     return COUCHSTORE_SUCCESS;
 }
 
-int db_write_buf(tree_file *file, const sized_buf *buf, cs_off_t *pos, size_t *disk_size)
-{
+couchstore_error_t db_write_buf(tree_file* file,
+                                const sized_buf* buf,
+                                cs_off_t* pos,
+                                size_t* disk_size) {
     cs_off_t write_pos = file->pos;
     cs_off_t end_pos = write_pos;
     ssize_t written;
@@ -158,14 +160,14 @@ int db_write_buf(tree_file *file, const sized_buf *buf, cs_off_t *pos, size_t *d
     sized_buf sized_headerbuf = { headerbuf, 8 };
     written = raw_write(DiskBlockType::Data, file, &sized_headerbuf, end_pos);
     if (written < 0) {
-        return (int)written;
+        return static_cast<couchstore_error_t>(written);
     }
     end_pos += written;
 
     // Write actual buffer:
     written = raw_write(DiskBlockType::Data, file, buf, end_pos);
     if (written < 0) {
-        return (int)written;
+        return static_cast<couchstore_error_t>(written);
     }
     end_pos += written;
 
@@ -178,7 +180,7 @@ int db_write_buf(tree_file *file, const sized_buf *buf, cs_off_t *pos, size_t *d
         *disk_size = sized_headerbuf.size + buf->size;
     }
 
-    return 0;
+    return COUCHSTORE_SUCCESS;
 }
 
 couchstore_error_t db_write_buf_compressed(tree_file *file,
@@ -201,5 +203,5 @@ couchstore_error_t db_write_buf_compressed(tree_file *file,
     to_write.buf = buffer.data();
     to_write.size = buffer.size();
 
-    return static_cast<couchstore_error_t>(db_write_buf(file, &to_write, pos, disk_size));
+    return db_write_buf(file, &to_write, pos, disk_size);
 }
