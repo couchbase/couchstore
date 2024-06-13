@@ -31,20 +31,20 @@ extern "C" {
 
     /*///////////////////  OPENING/CLOSING DATABASES: */
 
-    /*
+    /**
      * Flags to pass as the flags parameter to couchstore_open_db
      */
-    typedef uint64_t couchstore_open_flags;
+    using couchstore_open_flags = uint64_t;
 
     /**
      * Create a new empty .couch file if file doesn't exist.
      */
-    const uint64_t COUCHSTORE_OPEN_FLAG_CREATE = 1;
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_FLAG_CREATE = 1;
 
     /**
      * Open the database in read only mode
      */
-    const uint64_t COUCHSTORE_OPEN_FLAG_RDONLY = 2;
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_FLAG_RDONLY = 2;
 
     /**
      * Require the database to use the legacy CRC.
@@ -53,7 +53,7 @@ extern "C" {
      * automatically chosen for existing files. When excluded the latest
      * file version is always used for new files.
      */
-    const uint64_t COUCHSTORE_OPEN_WITH_LEGACY_CRC = 4;
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_WITH_LEGACY_CRC = 4;
 
     /**
      * Open the database file without using an IO buffer
@@ -63,7 +63,7 @@ extern "C" {
      * *usually* result in performance degradation and is
      * primarily intended for testing purposes.
      */
-    const uint64_t COUCHSTORE_OPEN_FLAG_UNBUFFERED = 8;
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_FLAG_UNBUFFERED = 8;
 
     /**
      * Ensures that the call to open() creates the file.
@@ -72,7 +72,7 @@ extern "C" {
      * !! Note: Must be used in conjunction with O_CREAT, the behaviour of
      * open() is undefined otherwise.
      */
-    const uint64_t COUCHSTORE_OPEN_FLAG_EXCL = 16;
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_FLAG_EXCL = 16;
 
     /**
      * Customize IO buffer configurations.
@@ -84,7 +84,7 @@ extern "C" {
      *     8 * 1 << (N-1)
      * Note that all zeros represent the default setting.
      */
-    const uint64_t COUCHSTORE_OPEN_WITH_CUSTOM_BUFFER = 0xff00;
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_WITH_CUSTOM_BUFFER = 0xff00;
 
     /**
      * Customize B+tree node size.
@@ -96,7 +96,8 @@ extern "C" {
      * Note that all zeros represent the default setting,
      * 1279 (0x4ff) bytes.
      */
-    const uint64_t COUCHSTORE_OPEN_WITH_CUSTOM_NODESIZE = 0xff0000;
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_WITH_CUSTOM_NODESIZE =
+            0xff0000;
 
     /**
      * Enable periodic sync().
@@ -114,7 +115,8 @@ extern "C" {
      *
      * A value of N=0 specifies that automatic fsync is disabled.
      */
-    const uint64_t COUCHSTORE_OPEN_WITH_PERIODIC_SYNC = 0x1f000000;
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_WITH_PERIODIC_SYNC =
+            0x1f000000;
 
     /**
      * Enable tracing and verification.
@@ -132,9 +134,10 @@ extern "C" {
      * WRITE_VALIDATION - 0x40000000 validation of data writes
      * MPROTECT         - 0x60000000 mprotect of internal iobuffer
      */
-    const uint64_t COUCHSTORE_OPEN_WITH_TRACING = 0x20000000;
-    const uint64_t COUCHSTORE_OPEN_WITH_WRITE_VALIDATION = 0x40000000;
-    const uint64_t COUCHSTORE_OPEN_WITH_MPROTECT = 0x800000000;
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_WITH_TRACING = 0x20000000;
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_WITH_WRITE_VALIDATION =
+            0x40000000;
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_WITH_MPROTECT = 0x800000000;
 
     /**
      * Encode a periodic sync specified in bytes to the correct
