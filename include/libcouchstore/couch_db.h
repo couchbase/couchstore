@@ -75,6 +75,14 @@ extern "C" {
     constexpr couchstore_open_flags COUCHSTORE_OPEN_FLAG_EXCL = 16;
 
     /**
+     * Don't write the header when creating the database file.
+     *
+     * Allows to write items before writing the header.
+     */
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_FLAG_NO_COMMIT_AT_CREATE =
+            32;
+
+    /**
      * Customize IO buffer configurations.
      *
      * This specifies the capacity of a read buffer and its count.

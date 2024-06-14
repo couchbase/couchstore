@@ -122,7 +122,10 @@ TEST_F(CouchstoreCompactTest, NormalCompaction) {
                 cb::couchstore::openDocument(*db, std::to_string(ii));
         EXPECT_EQ(status, COUCHSTORE_SUCCESS)
                 << "Failed to get \"" << std::to_string(ii) << "\"";
-        EXPECT_EQ(value, std::string(doc->data.buf, doc->data.size));
+        EXPECT_TRUE(doc);
+        if (doc) {
+            EXPECT_EQ(value, std::string_view(doc->data.buf, doc->data.size));
+        }
     }
 }
 

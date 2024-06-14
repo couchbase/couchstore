@@ -300,8 +300,7 @@ couchstore_error_t db_write_header(Db* db) {
     }
 }
 
-static couchstore_error_t create_header(Db *db)
-{
+static couchstore_error_t create_header(Db* db, couchstore_open_flags flags) {
     // Select the version based upon selected CRC
     if (db->file.crc_mode == CRC32) {
         // user is creating down-level files
@@ -318,6 +317,9 @@ static couchstore_error_t create_header(Db *db)
     db->header.purge_ptr = 0;
     db->header.position = 0;
     db->header.timestamp = 0;
+    if (flags & COUCHSTORE_OPEN_FLAG_NO_COMMIT_AT_CREATE) {
+        return COUCHSTORE_SUCCESS;
+    }
     return db_write_header(db);
 }
 
@@ -564,14 +566,12 @@ couchstore_error_t couchstore_open_db_ex(const char *filename,
     pos = db->file.ops->goto_eof(&db->file.lastError, db->file.handle);
     db->file.pos = pos;
     if (pos == 0) {
-        /* This is an empty file. Create a new fileheader unless the
-         * user wanted a read-only version of the file
-         */
+        // This is an empty file. Create a new file header unless the user
+        // wanted a read-only version of the file or to not commit yet.
 
         if (flags & COUCHSTORE_OPEN_FLAG_RDONLY) {
             error_pass(COUCHSTORE_ERROR_NO_HEADER);
         } else {
-
             // Select the CRC to use on this new file
             if (flags & COUCHSTORE_OPEN_WITH_LEGACY_CRC) {
                 db->file.crc_mode = CRC32;
@@ -579,7 +579,20 @@ couchstore_error_t couchstore_open_db_ex(const char *filename,
                 db->file.crc_mode = CRC32C;
             }
 
-            error_pass(create_header(db));
+            error_pass(create_header(db, flags));
+
+            if (db->file.pos == 0) {
+                // docinfo.bp == 0 signifies "not found",
+                // so ensure data is written at offset 1 onward
+                DiskBlockType magic = DiskBlockType::Data;
+                error_unless(db->file.ops->pwrite(&db->file.lastError,
+                                                  db->file.handle,
+                                                  &magic,
+                                                  1,
+                                                  0) == 1,
+                             COUCHSTORE_ERROR_WRITE);
+                db->file.pos = 1;
+            }
         }
     } else if (pos > 0) {
         error_pass(find_header(db, db->file.pos - 2));

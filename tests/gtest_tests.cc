@@ -528,6 +528,38 @@ TEST_F(CouchstoreTest, open_file_error)
 #endif
 }
 
+TEST_F(CouchstoreTest, no_commit_at_create) {
+    constexpr auto read_only = COUCHSTORE_OPEN_FLAG_RDONLY;
+    constexpr auto no_commit = COUCHSTORE_OPEN_FLAG_CREATE |
+                               COUCHSTORE_OPEN_FLAG_NO_COMMIT_AT_CREATE;
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(filePath.c_str(), no_commit, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+    ASSERT_EQ(COUCHSTORE_ERROR_NO_HEADER,
+              couchstore_open_db(filePath.c_str(), read_only, &db));
+
+    ASSERT_EQ(COUCHSTORE_ERROR_NO_HEADER,
+              couchstore_open_db(filePath.c_str(), no_commit, &db));
+    ASSERT_EQ(COUCHSTORE_ERROR_NO_HEADER,
+              couchstore_open_db(filePath.c_str(), 0, &db));
+
+    ::remove(filePath.c_str());
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(filePath.c_str(), no_commit, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(filePath.c_str(), read_only, &db));
+    DbInfo info;
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_db_info(db, &info));
+    EXPECT_EQ(4096, info.header_position);
+}
+
 TEST_F(CouchstoreTest, changes_no_dups)
 {
     const size_t numdocs = 10000;

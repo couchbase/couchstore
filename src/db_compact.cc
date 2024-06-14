@@ -114,7 +114,8 @@ couchstore_error_t cb::couchstore::compact(
     compact_ctx ctx(std::move(filterCallback),
                     std::move(rewriteDocInfoCallback),
                     flags);
-    couchstore_open_flags open_flags = COUCHSTORE_OPEN_FLAG_CREATE;
+    couchstore_open_flags open_flags = COUCHSTORE_OPEN_FLAG_CREATE |
+                                       COUCHSTORE_OPEN_FLAG_NO_COMMIT_AT_CREATE;
     error_unless(!source.dropped, COUCHSTORE_ERROR_FILE_CLOSED);
     error_unless(ctx.transient_arena && ctx.persistent_arena, COUCHSTORE_ERROR_ALLOC_FAIL);
 
@@ -154,22 +155,6 @@ couchstore_error_t cb::couchstore::compact(
     error_pass(couchstore_open_db_ex(target_filename, open_flags, ops, &target));
 
     ctx.target = target;
-    target->file.pos = 1;
-    {
-        // MB-38788:
-        // couchstore_open_db_ex created a new header block at file offset 0
-        // and we want to get rid of that block as part of compaction (that's
-        // why we set target->file.pos = 1 above. But we need to change
-        // the block magic to reflect this change!!!
-        DiskBlockType magic = DiskBlockType::Data;
-        error_unless(target->file.ops->pwrite(&target->file.lastError,
-                                              target->file.handle,
-                                              &magic,
-                                              1,
-                                              0) == 1,
-                     COUCHSTORE_ERROR_WRITE);
-    }
-
     target->header.update_seq = source.header.update_seq;
     if (flags & COUCHSTORE_COMPACT_FLAG_DROP_DELETES) {
         //Count the number of times purge has happened
