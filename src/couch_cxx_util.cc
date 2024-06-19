@@ -152,11 +152,11 @@ Header getHeader(Db& db) {
 }
 
 bool isEncrypted(const Db& db) {
-    return false;
+    return db.file.cipher != nullptr;
 }
 
 std::string_view getEncryptionKeyId(const Db& db) {
-    return {};
+    return db.file.cipher_keyid;
 }
 
 } // namespace couchstore

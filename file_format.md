@@ -63,19 +63,44 @@ when reading the value.
 The data in the file (above the block level) is grouped into
 variable-length **chunks**.  All chunks are prefixed with their length
 as a 32-bit big endian integer, followed by the [CRC32][CRC32] checksum
-of the data. The CRC32 is *not* included in the length.
+of the data. The CRC32 is *not* included in the length. The data chunk
+length has its highest bit set.
 
 length   | content
 ---------|--------
- 32 bits | body length
+ 32 bits | body length (highest bit set)
  32 bits | CRC32 checksum of body
 
 followed by the body data
 
+## Encrypted Data Chunks
+
+Similarly to plain data chunks, encrypted chunks are prefixed with the
+ciphertext length as a 32-bit big endian integer. The highest bit is
+*not* set. The length is followed by the ciphertext, which includes
+the MAC tag. No extra checksum is included.
+
+A per-file random key is used, which is generated when creating the
+file.
+
+### AES-256-GCM cipher
+
+GCM is used with a 96-bit (12-byte) nonce/IV. The ciphertext is suffixed
+by a 16-byte MAC tag.
+
+As data chunks are always appended to the end of the file, we use the
+offset in the file as a unique value for the nonce. A chunk that appears
+at the beginning of a block may be read from the block boundary or one
+byte ahead, as the first byte of a block is the block type which will be
+skipped over. To ensure that the same nonce is used for encryption and
+decryption, we need to adjust the nonce such that it is the same in
+those two cases. If the offset is at the block boundary, we increment
+the nonce by one.
+
 ## File Header
 
 A file header always appears on a 4096-byte block boundary, and the
-first byte of the block is nonzero to signal that it contains a header.
+first byte of the block is 0x01 to signal that it contains a header.
 A file will contain many headers as it grows, since a new updated one is
 appended whenever data is saved; the current header is the _last_ one in
 the file. So the algorithm to find the header when opening the file is
@@ -86,20 +111,50 @@ The file header is prefixed with a 32 bit length and a checksum,
 similarly to other data chunks, but the length field **does** include
 the length of the hash.
 
+File headers are not encrypted.
+
+The CRC32 variant in header and data chunks depends on the file version.
+Since version 12, CRC32C (Castagnoli) is used, as some processors
+provide instructions for accelerating its computation.
+
+Support for encryption is introduced in version 14. The file header
+format is the same as in version 13.
+
 Values in the body of a file header:
 
 length  | content
 --------|--------
-8 bits  | File format version (Currently 10)
+8 bits  | File format version (currently 14)
 48 bits | Sequence number of next update.
 48 bits | Purge counter.
 48 bits | Purged documents pointer. (unused)
 16 bits | Size of by-sequence B-tree root
 16 bits | Size of by-ID B-tree root
 16 bits | Size of local documents B-tree root
+64 bits | Timestamp (present from version 13)
 
  * The B-tree roots, in the order of the sizes, are B-tree node pointers as
    described in the "Node Pointers" section.
+
+## Metadata Header
+
+When encryption is used, the master key ID and encrypted file key is
+stored in a metadata header. This appears as the first chunk of the
+first block. The first block then has type 0x02.
+
+length  | content
+--------|--------
+32 bits | Length of the following (including checksum)
+32 bits | CRC32C checksum of the following
+8 bits  | Version (currently 0)
+8 bits  | Key ID length
+...     | Key ID
+8 bits  | Encrypted File Key length
+...     | Encrypted File Key
+
+The encrypted file key is prefixed by a random nonce and suffixed by
+the MAC tag (all included in length). The key ID is Authenticated as
+Associated Data.
 
 ## B-Tree Format
 

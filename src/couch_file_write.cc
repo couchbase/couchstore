@@ -93,7 +93,10 @@ static ssize_t raw_write(const DiskBlockType diskBlockType,
     return (ssize_t)(write_pos - pos);
 }
 
-couchstore_error_t write_header(tree_file *file, sized_buf *buf, cs_off_t *pos)
+couchstore_error_t write_header(tree_file* file,
+                                const sized_buf* buf,
+                                cs_off_t* pos,
+                                DiskBlockType blockType)
 {
     cs_off_t write_pos = align_to_next_block(file->pos);
     ssize_t written;
@@ -106,7 +109,7 @@ couchstore_error_t write_header(tree_file *file, sized_buf *buf, cs_off_t *pos)
     *pos = write_pos;
 
     // Write the header's block header
-    headerbuf[0] = uint8_t(DiskBlockType::Header);
+    headerbuf[0] = uint8_t(blockType);
     memcpy(&headerbuf[1], &size, 4);
     memcpy(&headerbuf[5], &crc32, 4);
 
@@ -121,7 +124,7 @@ couchstore_error_t write_header(tree_file *file, sized_buf *buf, cs_off_t *pos)
     write_pos += written;
 
     //Write actual header
-    written = raw_write(DiskBlockType::Header, file, buf, write_pos);
+    written = raw_write(blockType, file, buf, write_pos);
     if (written < 0) {
         return (couchstore_error_t)written;
     }

@@ -18,7 +18,7 @@
 
 #include <gsl/gsl-lite.hpp>
 
-void stop_trace() {
+static void stop_trace() {
     PHOSPHOR_INSTANCE.stop();
 }
 
@@ -99,6 +99,8 @@ couchstore_error_t tree_file::close() {
     handle = nullptr;
     handle_open = false;
     path.clear();
+    cipher.reset();
+    cipher_keyid.clear();
     return errcode;
 }
 

@@ -23,6 +23,8 @@
  */
 #include "crc32.h"
 #include <libcouchstore/couch_db.h>
+
+#include <cbcrypto/symmetric.h>
 #include <platform/cb_malloc.h>
 
 #define COUCH_BLOCK_SIZE 4096
@@ -34,6 +36,8 @@
 // Version 13 of the file adds a timestamp to the header
 // (which the application may provide as part of commit)
 #define COUCH_DISK_VERSION_13 13
+// Version 14 adds support for encryption and has identical header to version 13
+#define COUCH_DISK_VERSION_14 14
 
 // Conservative estimate; just for sanity check
 #define MAX_DB_HEADER_SIZE 1024
@@ -52,6 +56,14 @@
 #endif
 
 #define MAX_ERR_STR_LEN 250
+
+struct cb_free_deleter {
+    void operator()(void* ptr) const {
+        if (ptr) {
+            cb_free(ptr);
+        }
+    }
+};
 
 struct time_purge_ctx {
     uint64_t purge_before_ts;
@@ -84,6 +96,16 @@ struct tree_file_options {
 
 /* Structure representing an open file; "superclass" of Db */
 struct tree_file {
+    tree_file() = default;
+
+    tree_file(const tree_file&) = delete;
+
+    tree_file(tree_file&&) = default;
+
+    tree_file& operator=(const tree_file&) = delete;
+
+    tree_file& operator=(tree_file&&) = default;
+
     couchstore_error_t close();
 
     ~tree_file();
@@ -96,6 +118,8 @@ struct tree_file {
     couchstore_error_info_t lastError{COUCHSTORE_SUCCESS};
     crc_mode_e crc_mode{CRC_UNKNOWN};
     tree_file_options options;
+    std::unique_ptr<cb::crypto::SymmetricCipher> cipher;
+    std::string cipher_keyid;
 };
 
 struct node_pointer {
@@ -136,7 +160,7 @@ struct Db {
  * This is the on-disk representation of the legal disk block types
  * stored at the 4k offsets within the file.
  */
-enum class DiskBlockType : uint8_t { Data = 0x00, Header = 0x01 };
+enum class DiskBlockType : uint8_t { Data = 0x00, Header = 0x01, Meta = 0x02 };
 
 /**
  * Returns a newed FileOpsInterface implementation
@@ -184,7 +208,11 @@ int pread_header(tree_file* file,
                  char** ret_ptr,
                  uint32_t max_header_size);
 
-couchstore_error_t write_header(tree_file* file, sized_buf* buf, cs_off_t* pos);
+couchstore_error_t write_header(
+        tree_file* file,
+        const sized_buf* buf,
+        cs_off_t* pos,
+        DiskBlockType blockType = DiskBlockType::Header);
 couchstore_error_t db_write_buf(tree_file* file,
                                 const sized_buf* buf,
                                 cs_off_t* pos,

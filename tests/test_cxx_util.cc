@@ -259,7 +259,7 @@ TEST_F(CouchstoreCxxTest, CommitTimestampOldDiskFormat) {
 TEST_F(CouchstoreCxxTest, CommitTimestamp) {
     auto db = openDb();
     auto header = cb::couchstore::getHeader(*db);
-    ASSERT_EQ(Header::Version::V13, header.version);
+    ASSERT_EQ(Header::Version::V14, header.version);
     // When we created the database in SetUp we did a commit which added
     // the current time as the header...
     EXPECT_NE(0, header.timestamp);
@@ -281,9 +281,9 @@ TEST_F(CouchstoreCxxTest, GetHeaderJson) {
     auto db = openDb();
     couchstore_commit_ex(db.get(), 0xdeadbeef);
     auto header = cb::couchstore::getHeader(*db);
-    ASSERT_EQ(Header::Version::V13, header.version);
+    ASSERT_EQ(Header::Version::V14, header.version);
     auto json = to_json(header);
-    EXPECT_EQ(13, json["version"]);
+    EXPECT_EQ(14, json["version"]);
     EXPECT_EQ("0x0000000000015000", json["header_position"]);
     EXPECT_EQ(3735928559, json["timestamp"]);
     EXPECT_EQ(0, json["purge_seq"]);

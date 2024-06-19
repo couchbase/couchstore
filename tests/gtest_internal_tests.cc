@@ -650,6 +650,53 @@ TEST_F(CouchstoreInternalTest, OpenFails_FileAlreadyExists) {
 #endif
 }
 
+class CouchstoreMetadataTest : public CouchstoreInternalTest,
+                               public ::testing::WithParamInterface<size_t> {};
+
+TEST_P(CouchstoreMetadataTest, Metadata) {
+    const std::string keyId(GetParam(), 'i');
+    auto encryptionKeyCB = [&keyId](std::string_view)
+            -> cb::couchstore::SharedEncryptionKey {
+        return std::make_shared<cb::crypto::DataEncryptionKey>(
+                cb::crypto::DataEncryptionKey{keyId,
+                                              cb::crypto::Cipher::AES_256_GCM,
+                                              std::string(32, 'k')});
+    };
+
+    if (GetParam() == 0 || GetParam() > UINT8_MAX) {
+        ASSERT_EQ(COUCHSTORE_ERROR_INVALID_ARGUMENTS,
+                  couchstore_open_db_ex(filePath.c_str(),
+                                        COUCHSTORE_OPEN_FLAG_CREATE,
+                                        encryptionKeyCB,
+                                        couchstore_get_default_file_ops(),
+                                        &db));
+        return;
+    }
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db_ex(filePath.c_str(),
+                                    COUCHSTORE_OPEN_FLAG_CREATE,
+                                    encryptionKeyCB,
+                                    couchstore_get_default_file_ops(),
+                                    &db));
+    ASSERT_EQ(keyId, cb::couchstore::getEncryptionKeyId(*db));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db_ex(filePath.c_str(),
+                                    COUCHSTORE_OPEN_FLAG_RDONLY,
+                                    encryptionKeyCB,
+                                    couchstore_get_default_file_ops(),
+                                    &db));
+    ASSERT_EQ(keyId, cb::couchstore::getEncryptionKeyId(*db));
+}
+
+INSTANTIATE_TEST_SUITE_P(Parameterised, CouchstoreMetadataTest,
+                         ::testing::Values(0, 1, 127, 128, 255, 256),
+                         ::testing::PrintToStringParamName());
+
 /**
  * Tests for automatic periodic sync() functionality.
  *

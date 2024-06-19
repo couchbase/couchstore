@@ -851,7 +851,7 @@ TEST_F(CouchstoreTest, legacy_crc_flags) {
 
     // Should be in crc32c
     EXPECT_EQ(CRC32C, db->file.crc_mode);
-    EXPECT_GE(uint64_t(COUCH_DISK_VERSION_13), db->header.disk_version);
+    EXPECT_GE(uint64_t(COUCH_DISK_VERSION_14), db->header.disk_version);
 
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
@@ -1004,7 +1004,7 @@ TEST_F(CouchstoreTest, crc_upgrade2) {
                                  COUCHSTORE_OPEN_FLAG_CREATE,
                                  &db));
     EXPECT_EQ(CRC32C, db->file.crc_mode);
-    // new file must be version 11 or less
+    // Source file must already be version 12 or greater
     EXPECT_GE(db->header.disk_version, uint64_t(COUCH_DISK_VERSION_12));
 
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_save_documents(db,

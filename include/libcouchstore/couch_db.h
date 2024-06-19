@@ -1223,12 +1223,14 @@ struct LIBCOUCHSTORE_API Header {
         /// Version 12 changed the hash to CRC32C
         V12 = 12,
         /// Version 13 adds a timestamp to the header
-        V13 = 13
+        V13 = 13,
+        /// Version 14 supports encryption
+        V14 = 14
     };
 
     /// The version number for the header
     Version version;
-    /// The timestamp for the commit (only valid for V13)
+    /// The timestamp for the commit (only valid for V13 and V14)
     uint64_t timestamp;
     /// The sequence number used for updates in the header
     uint64_t updateSeqNum;

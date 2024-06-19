@@ -117,7 +117,8 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
                 &db->file.lastError, db->file.handle, &diskBlockType, 1, pos);
     }
     error_unless(readsize == 1, COUCHSTORE_ERROR_READ);
-    if (diskBlockType == DiskBlockType::Data) {
+    if (diskBlockType == DiskBlockType::Data ||
+        diskBlockType == DiskBlockType::Meta) {
         return COUCHSTORE_ERROR_NO_HEADER;
     } else if (diskBlockType != DiskBlockType::Header) {
         return COUCHSTORE_ERROR_CORRUPT;
@@ -143,18 +144,21 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
     db->header.position = pos;
     db->header.disk_version = decode_raw08(header_buf.v12_raw->version);
 
-    // Only 13, 12 and 11 are valid (Use an explicit version list to make sure
-    // people re-evaulate this list when the format change.
+    // Only 14, 13, 12 and 11 are valid
+    // (Use an explicit version list to make sure people re-evaluate this list
+    // when the format change)
     //
+    // Version 14 adds support for encryption (header same as 13)
     // Version 13 adds a timestamp
     // Version 12 use CRC32C
     // Version 11 use CRC32
-    error_unless(db->header.disk_version == COUCH_DISK_VERSION_13 ||
+    error_unless(db->header.disk_version == COUCH_DISK_VERSION_14 ||
+                         db->header.disk_version == COUCH_DISK_VERSION_13 ||
                          db->header.disk_version == COUCH_DISK_VERSION_12 ||
                          db->header.disk_version == COUCH_DISK_VERSION_11,
                  COUCHSTORE_ERROR_HEADER_VERSION);
 
-    if (db->header.disk_version == COUCH_DISK_VERSION_13) {
+    if (db->header.disk_version >= COUCH_DISK_VERSION_13) {
         header_size = rawHeader2internalHeader(header_buf.v13_raw,
                                                db->header,
                                                seqrootsize,
@@ -238,7 +242,7 @@ static size_t calculate_header_size(Db* db,
     if (db->header.local_docs_root) {
         localrootsize = ROOT_BASE_SIZE + db->header.local_docs_root->reduce_value.size;
     }
-    if (db->header.disk_version == COUCH_DISK_VERSION_13) {
+    if (db->header.disk_version >= COUCH_DISK_VERSION_13) {
         return sizeof(raw_file_header_v13) + seqrootsize + idrootsize +
                localrootsize;
     } else {
@@ -265,7 +269,7 @@ static couchstore_error_t db_write_header_impl(Db* db) {
     header->idrootsize = encode_raw16((uint16_t)idrootsize);
     header->localrootsize = encode_raw16((uint16_t)localrootsize);
     char* root = writebuf.buf;
-    if (db->header.disk_version == COUCH_DISK_VERSION_13) {
+    if (db->header.disk_version >= COUCH_DISK_VERSION_13) {
         header->timestamp = encode_raw64(db->header.timestamp);
         root += sizeof(raw_file_header_v13);
     } else {
@@ -295,9 +299,202 @@ couchstore_error_t db_write_header(Db* db) {
         db->header.timestamp = 0;
         // FALL THROUGH
     case COUCH_DISK_VERSION_13:
+    case COUCH_DISK_VERSION_14:
         return db_write_header_impl(db);
     default:
         return COUCHSTORE_ERROR_HEADER_VERSION;
+    }
+}
+
+/**
+ * Parse a length-prefixed string
+ *
+ * @param remaining remaining bytes in the buffer
+ * @return the parsed string, or nullopt if buffer is too short
+ */
+static std::optional<std::string> parse_short_string(
+        std::string_view& remaining) {
+    if (remaining.empty()) {
+        return {};
+    }
+    const size_t len = static_cast<uint8_t>(remaining[0]);
+    remaining.remove_prefix(1);
+    if (remaining.size() < len) {
+        return {};
+    }
+    auto ret = std::string(remaining.substr(0, len));
+    remaining.remove_prefix(len);
+    return std::move(ret);
+}
+
+struct FileMetadata {
+    std::string keyId;
+    std::string encryptedFileKey;
+};
+
+/**
+ * Reads the metadata header (if present) that may contain the master key id
+ * and encrypted file key (version 0)
+ */
+static std::pair<couchstore_error_t, FileMetadata> read_metadata_header(
+        tree_file* file) {
+    DiskBlockType blockType;
+    auto gotBytes =
+            file->ops->pread(&file->lastError, file->handle, &blockType, 1, 0);
+    if (gotBytes < 0) {
+        return {static_cast<couchstore_error_t>(gotBytes), {}};
+    } else if (gotBytes != 1) {
+        return {COUCHSTORE_ERROR_READ, {}};
+    } else if (blockType != DiskBlockType::Meta) {
+        return {COUCHSTORE_ERROR_NO_HEADER, {}};
+    }
+
+    char* buf = nullptr;
+    gotBytes = pread_header(file, 0, &buf, COUCH_BLOCK_SIZE);
+    // buf allocated with cb_malloc, calls cb_free when exiting scope
+    std::unique_ptr<char, cb_free_deleter> scopedBuf{buf};
+    if (gotBytes < 0) {
+        return {static_cast<couchstore_error_t>(gotBytes), {}};
+    } else if (gotBytes == 0) {
+        log_last_internal_error(
+                "Couchstore::read_metadata_header() Read empty metadata");
+        return {COUCHSTORE_ERROR_NOT_SUPPORTED, {}};
+    } else if (buf[0] != 0) {
+        log_last_internal_error(
+                "Couchstore::read_metadata_header() "
+                "Expected version 0 but got %d",
+                buf[0]);
+        return {COUCHSTORE_ERROR_NOT_SUPPORTED, {}};
+    }
+
+    // View of remaining bytes to be parsed
+    std::string_view remaining{buf + 1, static_cast<size_t>(gotBytes - 1)};
+    FileMetadata metadata;
+    // Parse key ID
+    auto readString = parse_short_string(remaining);
+    if (!readString) {
+        return {COUCHSTORE_ERROR_CORRUPT, {}};
+    }
+    metadata.keyId = std::move(*readString);
+    // Parse encrypted file key
+    readString = parse_short_string(remaining);
+    if (!readString) {
+        return {COUCHSTORE_ERROR_CORRUPT, {}};
+    }
+    metadata.encryptedFileKey = std::move(*readString);
+    return {COUCHSTORE_SUCCESS, std::move(metadata)};
+}
+
+/**
+ * Read the metadata header, and if encryption is enabled, fetch the master key,
+ * decrypt the file key, and initialize the file cipher with the file key.
+ */
+static couchstore_error_t read_and_set_encryption_key(
+        Db* db, const cb::couchstore::EncryptionKeyGetter& encryptionKeyCB) {
+    if (db->file.cipher) {
+        // Should be initialized only once
+        return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+    } else if (db->header.disk_version < COUCH_DISK_VERSION_14) {
+        // Encryption not supported
+        return COUCHSTORE_SUCCESS;
+    }
+
+    cb::couchstore::SharedEncryptionKey key;
+    std::string encryptedFileKey;
+    try {
+        auto [err, metadata] = read_metadata_header(&db->file);
+        if (err == COUCHSTORE_ERROR_NO_HEADER) {
+            // Encryption disabled
+            return COUCHSTORE_SUCCESS;
+        } else if (err) {
+            return err;
+        } else if (metadata.keyId.empty()) {
+            // Encryption disabled
+            return COUCHSTORE_SUCCESS;
+        } else if (!encryptionKeyCB) {
+            return COUCHSTORE_ERROR_NO_ENCRYPTION_KEY;
+        }
+
+        key = encryptionKeyCB(metadata.keyId);
+        if (!key || key->id != metadata.keyId) {
+            return COUCHSTORE_ERROR_NO_ENCRYPTION_KEY;
+        }
+        encryptedFileKey = std::move(metadata.encryptedFileKey);
+    } catch (const std::bad_alloc&) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    } catch (const std::exception&) {
+        return COUCHSTORE_ERROR_NO_ENCRYPTION_KEY;
+    }
+
+    try {
+        auto cipher =
+                cb::crypto::SymmetricCipher::create(key->cipher, key->key);
+        // The key used for encrypting/decrypting data chunks
+        auto fileKey = cipher->decrypt(encryptedFileKey, key->id);
+        cipher = cb::crypto::SymmetricCipher::create(key->cipher,
+                                                     std::move(fileKey));
+        db->file.cipher_keyid = key->id;
+        db->file.cipher = std::move(cipher);
+        return COUCHSTORE_SUCCESS;
+    } catch (const std::bad_alloc&) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    } catch (const std::exception& ex) {
+        log_last_internal_error("Couchstore::read_and_set_encryption_key() %s",
+                                ex.what());
+        return COUCHSTORE_ERROR_DECRYPT;
+    }
+}
+
+/**
+ * If encryption is enabled, generate a per file key, and store it encrypted at
+ * the beginning of the file, along with the master key id.
+ */
+static couchstore_error_t create_metadata_header(
+        Db* db, const cb::couchstore::EncryptionKeyGetter& encryptionKeyCB) {
+    try {
+        if (!encryptionKeyCB) {
+            // Encryption disabled
+            return COUCHSTORE_SUCCESS;
+        }
+        auto key = encryptionKeyCB({}); // Empty id to request the active key
+        if (!key) {
+            // Encryption disabled
+            return COUCHSTORE_SUCCESS;
+        } else if (key->id.empty() || key->id.size() > UINT8_MAX) {
+            return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+        }
+
+        // Encrypts with the master encryption key
+        auto cipher =
+                cb::crypto::SymmetricCipher::create(key->cipher, key->key);
+        // Generate a random file key that will be used for encrypting
+        // data chunks
+        auto fileKey = cb::crypto::SymmetricCipher::generateKey(key->cipher);
+        // We will store the file key encrypted
+        auto encryptedFileKey = cipher->encrypt(fileKey, key->id);
+        // Initialize a cipher with the file key
+        db->file.cipher = cb::crypto::SymmetricCipher::create(
+                key->cipher, std::move(fileKey));
+        db->file.cipher_keyid = key->id;
+
+        // Serialized metadata
+        std::string meta;
+        meta.reserve(3 + key->id.size() + encryptedFileKey.size());
+        meta += '\0'; // Version
+        meta += static_cast<char>(key->id.size());
+        meta += key->id;
+        meta += static_cast<char>(encryptedFileKey.size());
+        meta += encryptedFileKey;
+
+        sized_buf buf{meta.data(), meta.size()};
+        cs_off_t pos = 0;
+        return write_header(&db->file, &buf, &pos, DiskBlockType::Meta);
+    } catch (const std::bad_alloc&) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    } catch (const std::exception& ex) {
+        log_last_internal_error("Couchstore::create_metadata_header() %s",
+                                ex.what());
+        return COUCHSTORE_ERROR_ENCRYPT;
     }
 }
 
@@ -308,7 +505,7 @@ static couchstore_error_t create_header(Db* db, couchstore_open_flags flags) {
         db->header.disk_version = COUCH_DISK_VERSION_11;
     } else {
         // user is using latest
-        db->header.disk_version = COUCH_DISK_VERSION_13;
+        db->header.disk_version = COUCH_DISK_VERSION_14;
     }
     db->header.update_seq = 0;
     db->header.by_id_root = nullptr;
@@ -354,8 +551,8 @@ couchstore_error_t precommit(Db *db)
                                           idrootsize, localrootsize);
 
     //Extend file size to where end of header will land before we do first sync
-    couchstore_error_t errcode = static_cast<couchstore_error_t>(
-            db_write_buf(&db->file, &zerobyte, nullptr, nullptr));
+    couchstore_error_t errcode =
+            db_write_buf(&db->file, &zerobyte, nullptr, nullptr);
 
     if (errcode == COUCHSTORE_SUCCESS) {
         errcode = db->file.ops->sync(&db->file.lastError, db->file.handle);
@@ -570,6 +767,7 @@ couchstore_error_t couchstore_open_db_ex(
     if (pos == 0) {
         // This is an empty file. Create a new file header unless the user
         // wanted a read-only version of the file or to not commit yet.
+        // The metadata header is written even if not committing.
 
         if (flags & COUCHSTORE_OPEN_FLAG_RDONLY) {
             error_pass(COUCHSTORE_ERROR_NO_HEADER);
@@ -581,18 +779,19 @@ couchstore_error_t couchstore_open_db_ex(
                 db->file.crc_mode = CRC32C;
             }
 
+            error_pass(create_metadata_header(db, encryptionKeyCB));
             error_pass(create_header(db, flags));
 
             if (db->file.pos == 0) {
                 // docinfo.bp == 0 signifies "not found",
                 // so ensure data is written at offset 1 onward
                 DiskBlockType magic = DiskBlockType::Data;
-                error_unless(db->file.ops->pwrite(&db->file.lastError,
-                                                  db->file.handle,
-                                                  &magic,
-                                                  1,
-                                                  0) == 1,
-                             COUCHSTORE_ERROR_WRITE);
+                auto written = db->file.ops->pwrite(
+                        &db->file.lastError, db->file.handle, &magic, 1, 0);
+                if (written < 0) {
+                    error_pass(static_cast<couchstore_error_t>(written));
+                }
+                error_unless(written == 1, COUCHSTORE_ERROR_WRITE);
                 db->file.pos = 1;
             }
         }
@@ -612,6 +811,10 @@ couchstore_error_t couchstore_open_db_ex(
         }
     } else {
         error_pass(static_cast<couchstore_error_t>(db->file.pos));
+    }
+
+    if (!db->file.cipher) {
+        error_pass(read_and_set_encryption_key(db, encryptionKeyCB));
     }
 
     *pDb = db;
