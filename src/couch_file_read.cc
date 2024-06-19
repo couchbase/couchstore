@@ -11,6 +11,7 @@
 
 #include "bitfield.h"
 #include "crc32.h"
+#include "crypto.h"
 #include "internal.h"
 #include "iobuffer.h"
 #include "log_last_internal_error.h"
@@ -139,6 +140,77 @@ static couchstore_error_t read_skipping_prefixes(tree_file *file,
     return COUCHSTORE_SUCCESS;
 }
 
+/**
+ * uint32_t value with only its highest bit set
+ *
+ * Used to set/test/mask that bit when dealing with chunk lengths.
+ * Unencrypted data chunk lengths should have the highest bit set,
+ * to differentiate them from header chunks and encrypted data chunks.
+ */
+constexpr uint32_t high_bit_set = 0x80000000;
+
+static int pread_encrypted(tree_file* file, cs_off_t pos, char** ret_ptr) {
+    const auto nonce = offset2nonce(pos);
+
+    uint32_t chunkLen;
+    auto err = read_skipping_prefixes(file, &pos, sizeof(chunkLen), &chunkLen);
+    if (err < 0) {
+        return err;
+    }
+    chunkLen = ntohl(chunkLen);
+    if (chunkLen & high_bit_set) {
+        log_last_internal_error(
+                "Couchstore::pread_encrypted() "
+                "Invalid chunk length:%u pos:%" PRId64,
+                chunkLen,
+                pos);
+        stop_trace();
+        return COUCHSTORE_ERROR_CORRUPT;
+    }
+
+    // pread_* return a cb_malloc:ed pointer.
+    // Manage the pointer with unique_ptr until it can be successfully returned.
+    std::unique_ptr<char, cb_free_deleter> buf{
+            reinterpret_cast<char*>(cb_malloc(chunkLen))};
+    if (!buf) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
+    err = read_skipping_prefixes(file, &pos, chunkLen, buf.get());
+    if (err < 0) {
+        return err;
+    }
+
+    try {
+        const size_t macSize = file->cipher->getMacSize();
+        if (chunkLen < macSize) {
+            log_last_internal_error(
+                    "Couchstore::pread_encrypted() chunkLen:%u < macSize:%zu",
+                    chunkLen,
+                    macSize);
+            stop_trace();
+            return COUCHSTORE_ERROR_CORRUPT;
+        }
+        const size_t msgSize = chunkLen - macSize;
+        // Decrypt inplace
+        file->cipher->decrypt(nonce,
+                              {buf.get(), msgSize},
+                              {buf.get() + msgSize, macSize},
+                              {buf.get(), msgSize});
+
+        *ret_ptr = buf.release();
+        return gsl::narrow<int>(msgSize);
+    } catch (const cb::crypto::MacVerificationError& ex) {
+        log_last_internal_error("Couchstore::pread_encrypted() %s",
+                                ex.what());
+        stop_trace();
+        return COUCHSTORE_ERROR_CORRUPT;
+    } catch (const std::exception& ex) {
+        log_last_internal_error("Couchstore::pread_encrypted() %s",
+                                ex.what());
+        return COUCHSTORE_ERROR_DECRYPT;
+    }
+}
+
 /*
  * Common subroutine of pread_bin, pread_compressed and pread_header.
  * Parameters and return value are the same as for pread_bin,
@@ -150,6 +222,10 @@ static int pread_bin_internal(tree_file *file,
                               char **ret_ptr,
                               uint32_t max_header_size)
 {
+    if (file->cipher && !max_header_size) {
+        return pread_encrypted(file, pos, ret_ptr);
+    }
+
     struct {
         uint32_t chunk_len;
         uint32_t crc32;
@@ -160,7 +236,20 @@ static int pread_bin_internal(tree_file *file,
         return err;
     }
 
-    info.chunk_len = ntohl(info.chunk_len) & ~0x80000000;
+    info.chunk_len = ntohl(info.chunk_len);
+    if ((max_header_size != 0) != !(info.chunk_len & high_bit_set)) {
+        // High bit must not be set for header chunks
+        // and must be set for unencrypted data chunks
+        log_last_internal_error(
+                "Couchstore::pread_bin_internal() "
+                "Invalid chunk length:%u max_header_size:%u pos:%" PRId64,
+                info.chunk_len,
+                max_header_size,
+                pos);
+        stop_trace();
+        return COUCHSTORE_ERROR_CORRUPT;
+    }
+    info.chunk_len &= ~high_bit_set;
     if (max_header_size) {
         if (info.chunk_len < 4 || info.chunk_len > max_header_size  ) {
             log_last_internal_error("Couchstore::pread_bin_internal() "

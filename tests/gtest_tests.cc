@@ -6,7 +6,6 @@
 
 #include "bitfield.h"
 #include "couchstoretest.h"
-#include "couchstoredoctest.h"
 #include "documents.h"
 #include "internal.h"
 #include "node_types.h"
@@ -70,7 +69,7 @@ static void test_raw_48(uint64_t value, const uint8_t expected[8])
     cb_assert(decode_raw48(data.raw) == value);
 }
 
-TEST_F(CouchstoreTest, bitfield_fns)
+TEST_F(CouchstoreBaseTest, bitfield_fns)
 {
     uint8_t expected1[8] = {0x12, 0x34, 0x56, 0x78, 0x90};
     uint8_t expected2[8] = {0x09, 0x87, 0x65, 0x43, 0x21};
@@ -118,7 +117,7 @@ TEST_F(CouchstoreTest, bitfield_fns)
     test_raw_48(0xBA9876543210ll, expected4);
 }
 
-TEST_P(CouchstoreDoctest, save_docs)
+TEST_P(CouchstoreDocTest, save_docs)
 {
     bool smallData = std::get<0>(GetParam());
     int  count = std::get<1>(GetParam());
@@ -252,8 +251,7 @@ TEST_P(CouchstoreDoctest, save_docs)
     EXPECT_LT((idtreesize + seqtreesize + docssize), dbfilesize);
 }
 
-TEST_F(CouchstoreTest, save_doc)
-{
+TEST_P(CouchstoreTest, save_doc) {
     DbInfo info;
 
     const uint32_t docsInTest = 4;
@@ -263,7 +261,7 @@ TEST_F(CouchstoreTest, save_doc)
     documents.setDoc(2, "doc3", "{\"test_doc_index\":3}");
     documents.setDoc(3, "doc4", "{\"test_doc_index\":4}");
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
 
     for (uint32_t ii = 0; ii < docsInTest; ii++) {
          ASSERT_EQ(COUCHSTORE_SUCCESS,
@@ -284,7 +282,7 @@ TEST_F(CouchstoreTest, save_doc)
     }
 
     /* Read back */
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(0));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_changes_since(db,
                                                            0,
                                                            0,
@@ -299,18 +297,16 @@ TEST_F(CouchstoreTest, save_doc)
     EXPECT_EQ(docsInTest, info.last_sequence);
     EXPECT_EQ(docsInTest, info.doc_count);
     EXPECT_EQ(0ul, info.deleted_count);
-    EXPECT_EQ(4096ll, info.header_position);
+    EXPECT_EQ((GetParam() ? 2 : 1) * COUCH_BLOCK_SIZE, info.header_position);
 }
 
-TEST_F(CouchstoreTest, save_del_docs_in_a_batch) {
+TEST_P(CouchstoreTest, save_del_docs_in_a_batch) {
     const uint32_t numDocs = 2;
     Documents documents(numDocs);
     documents.setDoc(0, "doc1", "{\"foo\":1}");
     documents.setDoc(1, "doc2", "{\"bar\":2}");
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS,
-              couchstore_open_db(
-                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
     ASSERT_EQ(COUCHSTORE_SUCCESS,
               couchstore_save_documents(
                       db, documents.getDocs(), documents.getDocInfos(), 2, 0));
@@ -346,14 +342,14 @@ TEST_F(CouchstoreTest, save_del_docs_in_a_batch) {
     ASSERT_EQ(nullptr, doc2);
 }
 
-TEST_F(CouchstoreTest, compressed_doc_body)
+TEST_P(CouchstoreTest, compressed_doc_body)
 {
     Documents documents(2);
     documents.setDoc(0, "doc1", "{\"test_doc_index\":1, \"val\":\"blah blah blah blah blah blah\"}");
     documents.setDoc(1, "doc2", "{\"test_doc_index\":2, \"val\":\"blah blah blah blah blah blah\"}");
     documents.setContentMeta(1, COUCH_DOC_IS_COMPRESSED);/* Mark doc2 as to be snappied. */
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_save_documents(db,
                                   documents.getDocs(),
                                   documents.getDocInfos(),
@@ -366,23 +362,23 @@ TEST_F(CouchstoreTest, compressed_doc_body)
     db = nullptr;
 
     /* Read back */
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(0));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_changes_since(db, 0, 0, &Documents::checkCallback, &documents));
     EXPECT_EQ(2, documents.getCallbacks());
     EXPECT_EQ(0, documents.getDeleted());
 }
 
-TEST_F(CouchstoreTest, dump_empty_db)
+TEST_P(CouchstoreTest, dump_empty_db)
 {
     DbInfo info;
     Documents documents(0);
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
     db = nullptr;
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(0));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_changes_since(db, 0, 0, &Documents::countCallback, &documents));
     EXPECT_EQ(0, documents.getCallbacks());
     EXPECT_EQ(0, documents.getDeleted());
@@ -393,14 +389,14 @@ TEST_F(CouchstoreTest, dump_empty_db)
     EXPECT_EQ(0ull, info.doc_count);
     EXPECT_EQ(0ull, info.deleted_count);
     EXPECT_EQ(0ull, info.space_used);
-    EXPECT_EQ(0ll, info.header_position);
+    EXPECT_EQ(GetParam() ? COUCH_BLOCK_SIZE : 0, info.header_position);
 }
 
-TEST_F(CouchstoreTest, local_doc) {
+TEST_P(CouchstoreTest, local_doc) {
     LocalDoc lDocWrite;
     LocalDoc* lDocRead = nullptr;
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
     lDocWrite.id.buf = const_cast<char*>("_local/testlocal");
     lDocWrite.id.size = 16;
     lDocWrite.json.buf = const_cast<char*>("{\"test\":true}");
@@ -411,7 +407,7 @@ TEST_F(CouchstoreTest, local_doc) {
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
     db = nullptr;
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(0));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_local_document(db, "_local/testlocal", 16, &lDocRead));
     ASSERT_NE(nullptr, lDocRead);
     EXPECT_EQ(13ull, lDocRead->json.size);
@@ -420,7 +416,7 @@ TEST_F(CouchstoreTest, local_doc) {
     couchstore_free_local_document(lDocRead);
 }
 
-TEST_F(CouchstoreTest, local_docs_write_read_delete_read) {
+TEST_P(CouchstoreTest, local_docs_write_read_delete_read) {
     // Note: 11 documents is important to cover a failure when the
     // couchstore_save_local_documents wasn't sorting the input
     // lexicographically, having this input sequence was enough to fail at read.
@@ -448,9 +444,7 @@ TEST_F(CouchstoreTest, local_docs_write_read_delete_read) {
     }
 
     // 1) Write all of the documents using couchstore_save_local_documents
-    ASSERT_EQ(COUCHSTORE_SUCCESS,
-              couchstore_open_db(
-                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
     ASSERT_EQ(COUCHSTORE_SUCCESS,
               cb::couchstore::saveLocalDocuments(*db, localDocRefs));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
@@ -458,7 +452,7 @@ TEST_F(CouchstoreTest, local_docs_write_read_delete_read) {
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
 
     // 2) Iterate and read back and compare values
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(0));
     ii = 0;
     for (auto& id : ids) {
         LocalDoc* lDocRead{};
@@ -484,7 +478,7 @@ TEST_F(CouchstoreTest, local_docs_write_read_delete_read) {
         ii++;
     }
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(0));
     ASSERT_EQ(COUCHSTORE_SUCCESS,
               cb::couchstore::saveLocalDocuments(*db, localDocRefs));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
@@ -492,7 +486,7 @@ TEST_F(CouchstoreTest, local_docs_write_read_delete_read) {
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
 
     // 4)  Iterate and read back and compare values
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(0));
     ii = 0;
     for (auto& id : ids) {
         LocalDoc* lDocRead;
@@ -514,7 +508,7 @@ TEST_F(CouchstoreTest, local_docs_write_read_delete_read) {
     }
 }
 
-TEST_F(CouchstoreTest, open_file_error)
+TEST_F(CouchstoreBaseTest, open_file_error)
 {
 
     int errcode;
@@ -528,7 +522,7 @@ TEST_F(CouchstoreTest, open_file_error)
 #endif
 }
 
-TEST_F(CouchstoreTest, no_commit_at_create) {
+TEST_P(CouchstoreTest, no_commit_at_create) {
     constexpr auto read_only = COUCHSTORE_OPEN_FLAG_RDONLY;
     constexpr auto no_commit = COUCHSTORE_OPEN_FLAG_CREATE |
                                COUCHSTORE_OPEN_FLAG_NO_COMMIT_AT_CREATE;
@@ -560,7 +554,7 @@ TEST_F(CouchstoreTest, no_commit_at_create) {
     EXPECT_EQ(4096, info.header_position);
 }
 
-TEST_F(CouchstoreTest, changes_no_dups)
+TEST_P(CouchstoreTest, changes_no_dups)
 {
     const size_t numdocs = 10000;
     int updatebatch = 1000;
@@ -573,7 +567,7 @@ TEST_F(CouchstoreTest, changes_no_dups)
         documents.setDoc(ii, key, data);
     }
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
     /* only save half the docs at first. */
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_save_documents(db,
                                                             documents.getDocs(),
@@ -593,7 +587,7 @@ TEST_F(CouchstoreTest, changes_no_dups)
     /* now shuffle so some bulk updates contain previous docs and new docs */
     documents.shuffle();
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(0));
 
     for (size_t ii=0; ii < numdocs; ii += updatebatch) {
         /* now do bulk updates and check the changes for dups */
@@ -615,7 +609,7 @@ TEST_F(CouchstoreTest, changes_no_dups)
     EXPECT_EQ(0ull, info.deleted_count);
 }
 
-TEST_F(CouchstoreTest, mb5086)
+TEST_F(CouchstoreBaseTest, mb5086)
 {
     Documents documents(1);
     documents.setDoc(0, "hi", "foo");
@@ -632,8 +626,7 @@ TEST_F(CouchstoreTest, mb5086)
     db = nullptr; // we've closed and deleted the test-case's file
 }
 
-TEST_F(CouchstoreTest, mb11104)
-{
+TEST_P(CouchstoreTest, mb11104) {
     DbInfo info;
     const int batchSize = 3;
     sized_buf ids[batchSize];
@@ -645,7 +638,7 @@ TEST_F(CouchstoreTest, mb11104)
     }
     int storeIndex[4] = {0, 2, 4, 6};
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
     // store some of the documents
     for (int ii = 0; ii < 4; ii++) {
        ASSERT_EQ(COUCHSTORE_SUCCESS,
@@ -659,7 +652,7 @@ TEST_F(CouchstoreTest, mb11104)
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
     db = nullptr;
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(0));
 
     /* Read back in bulk by doc IDs, some of which are not existent */
     {
@@ -718,15 +711,14 @@ TEST_F(CouchstoreTest, mb11104)
     EXPECT_EQ(4ull, info.last_sequence);
     EXPECT_EQ(4ull, info.doc_count);
     EXPECT_EQ(0ull, info.deleted_count);
-    EXPECT_EQ(4096ll, info.header_position);
+    EXPECT_EQ((GetParam() ? 2 : 1) * COUCH_BLOCK_SIZE, info.header_position);
 }
 
-TEST_F(CouchstoreTest, asis_seqs)
-{
+TEST_P(CouchstoreTest, asis_seqs) {
     DocInfo *ir = nullptr;
 
     Documents documents(3);
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
     documents.setDoc(0, "test", "foo");
     documents.getDocInfo(0)->db_seq = 1;
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_save_document(db,
@@ -766,7 +758,7 @@ TEST_F(CouchstoreTest, asis_seqs)
 
 }
 
-TEST_F(CouchstoreTest, huge_revseq)
+TEST_F(CouchstoreBaseTest, huge_revseq)
 {
     DocInfo *i2;
     Documents documents(1);
@@ -789,7 +781,7 @@ TEST_F(CouchstoreTest, huge_revseq)
 }
 
 // Create a new-file(s) and check crc is crc32-c
-TEST_F(CouchstoreTest, crc32c) {
+TEST_F(CouchstoreBaseTest, crc32c) {
     ASSERT_EQ(COUCHSTORE_SUCCESS,
               couchstore_open_db(filePath.c_str(),
                                  COUCHSTORE_OPEN_FLAG_CREATE,
@@ -798,7 +790,7 @@ TEST_F(CouchstoreTest, crc32c) {
 }
 
 // Create a new-file(s) and test that we can't open again with old CRC
-TEST_F(CouchstoreTest, legacy_crc_flags) {
+TEST_F(CouchstoreBaseTest, legacy_crc_flags) {
     // Open the new/clean file and ask for 'legacy-CRC'
     ASSERT_EQ(COUCHSTORE_SUCCESS,
               couchstore_open_db(filePath.c_str(),
@@ -869,7 +861,7 @@ TEST_F(CouchstoreTest, legacy_crc_flags) {
 }
 
 // Test compaction doesn't upgrade (no upgrade flag specified)
-TEST_F(CouchstoreTest, no_crc_upgrade) {
+TEST_F(CouchstoreBaseTest, no_crc_upgrade) {
 
     const int docCount = 100;
     Documents documents(docCount);
@@ -931,7 +923,7 @@ TEST_F(CouchstoreTest, no_crc_upgrade) {
 }
 
 // Test compaction upgrades when upgrade flag specified.
-TEST_F(CouchstoreTest, crc_upgrade) {
+TEST_F(CouchstoreBaseTest, crc_upgrade) {
     const int docCount = 100;
     Documents documents(docCount);
     documents.generateDocs();
@@ -994,7 +986,7 @@ TEST_F(CouchstoreTest, crc_upgrade) {
 
 // Test compaction upgrades has no ill effect when upgrade flag specified and the file
 // is already at version 12/crc32c
-TEST_F(CouchstoreTest, crc_upgrade2) {
+TEST_F(CouchstoreBaseTest, crc_upgrade2) {
     const size_t docCount = 100;
     Documents documents(docCount);
     documents.generateDocs();
@@ -1054,13 +1046,11 @@ TEST_F(CouchstoreTest, crc_upgrade2) {
     ASSERT_EQ(0, remove(target.c_str()));
 }
 
-TEST_F(CouchstoreTest, MB40415_precommit_hook) {
+TEST_P(CouchstoreTest, MB40415_precommit_hook) {
     const size_t docCount = 10;
     Documents documents(docCount);
     documents.generateDocs();
-    ASSERT_EQ(COUCHSTORE_SUCCESS,
-              couchstore_open_db(
-                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
     ASSERT_EQ(COUCHSTORE_SUCCESS,
               couchstore_save_documents(db,
                                         documents.getDocs(),
@@ -1232,7 +1222,7 @@ TEST_P(CouchstoreMTTest, MT_save)
 /* Test to check that retrieving an item with value of zero length
  * doesn't result in a memory leak
  */
-TEST_F(CouchstoreTest, mb23697) {
+TEST_F(CouchstoreBaseTest, mb23697) {
     DocInfo* ir = nullptr;
     Doc* doc = nullptr;
 
@@ -1285,7 +1275,7 @@ int mockTimePurgeHook(Db* target, DocInfo* info, sized_buf item, void* ctx_p) {
 /* Test to check that the compaction will send the full body in case the
  * client requests the same
  */
-TEST_F(CouchstoreTest, compact_need_body) {
+TEST_F(CouchstoreBaseTest, compact_need_body) {
     Documents documents(1);
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(filePath.c_str(),
               COUCHSTORE_OPEN_FLAG_CREATE, &db));
@@ -1324,10 +1314,8 @@ TEST_F(CouchstoreTest, compact_need_body) {
  * increase for updated and deleted documents but the count of original
  * documents between the 2 sequence #'s remains the same
  */
-TEST_F(CouchstoreTest, test_changes_count) {
-    ASSERT_EQ(COUCHSTORE_SUCCESS,
-              couchstore_open_db(
-                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+TEST_P(CouchstoreTest, test_changes_count) {
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
 
     /**
      * add some documents to the database and make sure the count =
@@ -1454,7 +1442,7 @@ TEST_F(CouchstoreTest, test_changes_count) {
  * verify that couchstore_set_purge_seq() sets the purge_seq and retains
  * that value if the file is closed and reopened.
  */
-TEST_F(CouchstoreTest, test_set_purge_seq) {
+TEST_F(CouchstoreBaseTest, test_set_purge_seq) {
     const int ndocs = 100; // use a value at least >= 5
     Documents documents(ndocs);
 
@@ -1515,14 +1503,12 @@ static int readDocInfos(Db *db, DocInfo *docinfo, void *ctx) {
     return 0;
 }
 
-TEST_F(CouchstoreTest, MB_29816) {
+TEST_P(CouchstoreTest, MB_29816) {
     {
         const int ndocs = 1;
         Documents documents(ndocs);
 
-        ASSERT_EQ(COUCHSTORE_SUCCESS,
-                  couchstore_open_db(
-                          filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+        ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
 
 
         documents.setDoc(0, "00005", "value");
@@ -1538,9 +1524,7 @@ TEST_F(CouchstoreTest, MB_29816) {
     }
     // Now create and update overlapping
     {
-        ASSERT_EQ(COUCHSTORE_SUCCESS,
-                  couchstore_open_db(
-                          filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+        ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
         const int ndocs = 2;
         Documents documents(ndocs);
 
@@ -1574,7 +1558,7 @@ TEST_F(CouchstoreTest, MB_29816) {
 }
 
 /// Test that a range scan doesn't scan past the ed of the given set of keys.
-TEST_F(CouchstoreTest, MB33373_RangeScan) {
+TEST_F(CouchstoreBaseTest, MB33373_RangeScan) {
     // Setup - store 5 keys (0..4)
     Documents documents(5);
     documents.generateDocs("");
@@ -1614,7 +1598,7 @@ TEST_F(CouchstoreTest, MB33373_RangeScan) {
 }
 
 /// Test that multiple range scans work correctly.
-TEST_F(CouchstoreTest, RangeScanMulti) {
+TEST_F(CouchstoreBaseTest, RangeScanMulti) {
     // Setup - store 10 keys (0..9)
     Documents documents(10);
     documents.generateDocs("");
@@ -1661,7 +1645,7 @@ TEST_F(CouchstoreTest, RangeScanMulti) {
 }
 
 // Test demonstrating inclusive range
-TEST_F(CouchstoreTest, RangeScanIsInclusive) {
+TEST_F(CouchstoreBaseTest, RangeScanIsInclusive) {
     Documents documents(4);
     documents.generateDocs();
 
@@ -1731,7 +1715,7 @@ TEST_F(CouchstoreTest, RangeScanIsInclusive) {
 
 // Minimal reproducer for MB-52010. Here 1 key exists in the kvstore and is
 // incorrectly returned by a range scan.
-TEST_F(CouchstoreTest, MB_52010) {
+TEST_F(CouchstoreBaseTest, MB_52010) {
     // Generate 1 document "d0"
     Documents documents(1);
     documents.generateDocs("d");
@@ -1777,7 +1761,7 @@ TEST_F(CouchstoreTest, MB_52010) {
     EXPECT_EQ(0, expected0.getCallbacks());
 }
 
-class RangeScanTest : public CouchstoreTest,
+class RangeScanTest : public CouchstoreBaseTest,
                       public ::testing::WithParamInterface<int> {
 public:
     void SetUp() override {
@@ -2151,7 +2135,7 @@ TEST_F(SaveCallbackTest, large3) {
 }
 
 #ifndef WIN32
-TEST_F(CouchstoreTest, mprotect) {
+TEST_F(CouchstoreBaseTest, mprotect) {
     DbInfo info;
 
     const uint32_t docsInTest = 4;
@@ -2204,14 +2188,26 @@ TEST_F(CouchstoreTest, mprotect) {
 
 INSTANTIATE_TEST_SUITE_P(
         DocTest,
-        CouchstoreDoctest,
+        CouchstoreDocTest,
         ::testing::Combine(::testing::Bool(),
-                           ::testing::Values(4, 69, 666, 4090)),
-        [](const ::testing::TestParamInfo<std::tuple<bool, int>>& testInfo) {
+                           ::testing::Values(4, 69, 666, 4090),
+                           ::testing::Bool()),
+        [](const ::testing::TestParamInfo<std::tuple<bool, int, bool>>&
+                   testInfo) {
             std::stringstream fmt;
-            fmt << ((std::get<0>(testInfo.param)) ? "Small" : "Large") << "x"
-                << std::get<1>(testInfo.param);
+            fmt << (std::get<0>(testInfo.param) ? "Small" : "Large") << 'x'
+                << std::get<1>(testInfo.param)
+                << (std::get<2>(testInfo.param) ? "Encrypted"
+                                                : "Unencrypted");
             return fmt.str();
+        });
+
+INSTANTIATE_TEST_SUITE_P(
+        CouchstoreTest,
+        CouchstoreTest,
+        ::testing::Bool(),
+        [](const ::testing::TestParamInfo<bool>& testInfo) -> std::string {
+            return testInfo.param ? "Encrypted" : "Unencrypted";
         });
 
 INSTANTIATE_TEST_SUITE_P(RangeScanTest,

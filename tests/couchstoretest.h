@@ -28,34 +28,68 @@
 #include <string>
 #include <vector>
 
-/*
-    CouchstoreTest
-        * Global test class for most of the couchstore tests.
-        * Auto-cleans when the test is complete.
-          a) If db is not null, closes the db
-          b) removes testfile.couch.
-*/
-class CouchstoreTest : public ::testing::Test {
+/**
+ * Base class for other tests
+ *
+ * Auto-cleans when the test is complete.
+ *   a) If db is not null, closes the db
+ *   b) removes testfile.couch.
+ */
+class CouchstoreBaseTest : public ::testing::Test {
 protected:
-    CouchstoreTest();
-    CouchstoreTest(const std::string& _filePath,
-                   const bool _display_latency_info = false);
-
-    virtual ~CouchstoreTest();
+    CouchstoreBaseTest();
+    CouchstoreBaseTest(
+            std::string file_path, bool display_latency_info = false);
+    ~CouchstoreBaseTest() override;
     void clean_up();
 
     Db* db;
-    std::string filePath;
-    bool displayLatencyInfo;
+    const std::string filePath;
+    const bool displayLatencyInfo;
 };
 
-/*
- * Global test class for internal only tests. Extends CouchstoreTest.
+/**
+ * Fixture for tests that will run with and without encryption
+ *
+ * Extends CouchstoreBaseTest
  */
-class CouchstoreInternalTest : public CouchstoreTest {
+class CouchstoreEncryptedUnencryptedTest : public CouchstoreBaseTest {
+protected:
+    CouchstoreEncryptedUnencryptedTest();
+
+    virtual bool isEncrypted() = 0;
+
+    cb::couchstore::EncryptionKeyGetter getEncryptionKeyCB();
+
+    couchstore_error_t open_db(couchstore_open_flags extra_flags);
+
+private:
+    cb::couchstore::SharedEncryptionKey sharedEncryptionKey;
+};
+
+class CouchstoreTest
+    : public CouchstoreEncryptedUnencryptedTest,
+      public ::testing::WithParamInterface<bool> {
+protected:
+    bool isEncrypted() override;
+};
+
+class CouchstoreDocTest
+    : public CouchstoreEncryptedUnencryptedTest,
+      public ::testing::WithParamInterface<std::tuple<bool, int, bool>> {
+protected:
+    bool isEncrypted() override;
+};
+
+/**
+ * Global test class for internal only tests
+ *
+ * Extends CouchstoreBaseTest
+ */
+class CouchstoreInternalTest : public CouchstoreBaseTest {
 protected:
     CouchstoreInternalTest();
-    virtual ~CouchstoreInternalTest();
+    ~CouchstoreInternalTest() override;
 
     /**
      * Opens a database instance with the current filePath, ops and with
@@ -104,7 +138,7 @@ class CouchstoreMTTest
       public ::testing::WithParamInterface<std::tuple<bool, size_t> > {
 protected:
     CouchstoreMTTest();
-    CouchstoreMTTest(const std::string& _filePath);
+    CouchstoreMTTest(std::string file_path);
 
     void TearDown();
 

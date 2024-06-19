@@ -16,6 +16,7 @@
 #include "couchstore_config.h"
 
 #include "crc32.h"
+#include "crypto.h"
 #include "internal.h"
 #include "log_last_internal_error.h"
 #include "util.h"
@@ -134,10 +135,57 @@ couchstore_error_t write_header(tree_file* file,
     return COUCHSTORE_SUCCESS;
 }
 
+static couchstore_error_t write_encrypted(tree_file* file,
+                                          const sized_buf* buf,
+                                          cs_off_t* pos,
+                                          size_t* disk_size) {
+    try {
+        const auto writePos = file->pos;
+        const size_t macSize = file->cipher->getMacSize();
+        const size_t chunkLen = buf->size + macSize;
+        const size_t diskSize = chunkLen + sizeof(uint32_t);
+        std::unique_ptr<char, cb_free_deleter> chunk{
+                reinterpret_cast<char*>(cb_malloc(diskSize))};
+        if (!chunk) {
+            return COUCHSTORE_ERROR_ALLOC_FAIL;
+        }
+        // Prefix with chunk length
+        *reinterpret_cast<uint32_t*>(chunk.get()) =
+                htonl(gsl::narrow<uint32_t>(chunkLen));
+        char* encrypted = chunk.get() + sizeof(uint32_t);
+        file->cipher->encrypt(offset2nonce(writePos),
+                              {encrypted, buf->size},
+                              {encrypted + buf->size, macSize},
+                              {buf->buf, buf->size});
+
+        sized_buf chunkBuf{chunk.get(), diskSize};
+        auto written =
+                raw_write(DiskBlockType::Data, file, &chunkBuf, writePos);
+        if (written < 0) {
+            return static_cast<couchstore_error_t>(written);
+        }
+        file->pos = writePos + written;
+        if (pos) {
+            *pos = writePos;
+        }
+        if (disk_size) {
+            *disk_size = diskSize;
+        }
+        return COUCHSTORE_SUCCESS;
+    } catch (const std::exception& ex) {
+        log_last_internal_error("Couchstore::write_encrypted() %s", ex.what());
+        return COUCHSTORE_ERROR_ENCRYPT;
+    }
+}
+
 couchstore_error_t db_write_buf(tree_file* file,
                                 const sized_buf* buf,
                                 cs_off_t* pos,
                                 size_t* disk_size) {
+    if (file->cipher) {
+        return write_encrypted(file, buf, pos, disk_size);
+    }
+
     cs_off_t write_pos = file->pos;
     cs_off_t end_pos = write_pos;
     ssize_t written;

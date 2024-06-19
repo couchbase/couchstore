@@ -13,6 +13,8 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
+#include "couchstoretest.h"
+
 #include <folly/portability/GTest.h>
 #include <libcouchstore/couch_db.h>
 #include <platform/cb_malloc.h>
@@ -20,11 +22,11 @@
 
 using namespace cb::couchstore;
 
-class CouchstoreSeekTest : public ::testing::Test {
+class CouchstoreSeekTest : public CouchstoreTest {
 protected:
-    static void SetUpTestCase() {
+    void SetUp() override {
+        CouchstoreTest::SetUp();
         sourceFilename = cb::io::mktemp("CouchstoreSeekTest");
-        ;
         auto db = openDb();
         rootHeader = getHeader(*db);
         // Create an "aligned" timestamp so that we don't need to worry about
@@ -44,15 +46,16 @@ protected:
         }
     }
 
-    static void TearDownTestCase() {
+    void TearDown() override {
+        CouchstoreTest::TearDown();
         cb::io::rmrf(sourceFilename);
     }
 
-    static UniqueDbPtr openDb() {
+    UniqueDbPtr openDb() {
         auto [status, db] = openDatabase(
                 sourceFilename,
                 COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED,
-                {});
+                getEncryptionKeyCB());
         if (status != COUCHSTORE_SUCCESS) {
             throw std::runtime_error(std::string{"Failed to open database \""} +
                                      sourceFilename +
@@ -73,14 +76,10 @@ protected:
                   couchstore_save_document(&db, &doc, &docInfo, 0));
     }
 
-    static uint64_t alignedStartTimestamp;
-    static Header rootHeader;
-    static std::string sourceFilename;
+    uint64_t alignedStartTimestamp;
+    Header rootHeader;
+    std::string sourceFilename;
 };
-
-uint64_t CouchstoreSeekTest::alignedStartTimestamp;
-Header CouchstoreSeekTest::rootHeader;
-std::string CouchstoreSeekTest::sourceFilename;
 
 /**
  * Try to open a sequence number higher than the one we have (that should
@@ -89,7 +88,7 @@ std::string CouchstoreSeekTest::sourceFilename;
  * Given that we start by rewinding one header back we also test that we won't
  * seek beyond the provided header.
  */
-TEST_F(CouchstoreSeekTest, OpenTheCurrentHead) {
+TEST_P(CouchstoreSeekTest, OpenTheCurrentHead) {
     auto db = openDb();
     ASSERT_EQ(COUCHSTORE_SUCCESS, seek(*db, Direction::Backward));
 
@@ -103,7 +102,7 @@ TEST_F(CouchstoreSeekTest, OpenTheCurrentHead) {
  * Try to open the database where sequence number 5 exists. Given that we
  * provide a granularity of 1 we should get the exact match
  */
-TEST_F(CouchstoreSeekTest, OpenHistorical_ExactRevision) {
+TEST_P(CouchstoreSeekTest, OpenHistorical_ExactRevision) {
     auto db = openDb();
     const uint64_t seqno = 5;
 
@@ -120,7 +119,7 @@ TEST_F(CouchstoreSeekTest, OpenHistorical_ExactRevision) {
  * Try to open the database where sequence number 5 exists, but we provide
  * a granularity of 10 so we should fast forward to the closest barrier.
  */
-TEST_F(CouchstoreSeekTest, OpenHistorical_WithDeduplication) {
+TEST_P(CouchstoreSeekTest, OpenHistorical_WithDeduplication) {
     auto db = openDb();
     const uint64_t seqno = 5;
     const uint64_t granularity = 10;
@@ -148,7 +147,7 @@ TEST_F(CouchstoreSeekTest, OpenHistorical_WithDeduplication) {
  * a granularity of 1000 so we should fast forward to the provided header
  * (and not go beyond that).
  */
-TEST_F(CouchstoreSeekTest, OpenHistorical_WithDeduplicationWontSeekintoFuture) {
+TEST_P(CouchstoreSeekTest, OpenHistorical_WithDeduplicationWontSeekintoFuture) {
     auto db = openDb();
     ASSERT_EQ(COUCHSTORE_SUCCESS, seek(*db, Direction::Backward));
     const auto header = getHeader(*db);
@@ -176,3 +175,11 @@ TEST_F(CouchstoreSeekTest, OpenHistorical_WithDeduplicationWontSeekintoFuture) {
             << "Range                  :[" << minBarrier << ", " << maxBarrier
             << ">" << std::endl;
 }
+
+INSTANTIATE_TEST_SUITE_P(
+        CouchstoreSeekTest,
+        CouchstoreSeekTest,
+        ::testing::Bool(),
+        [](const ::testing::TestParamInfo<bool>& testInfo) -> std::string {
+            return testInfo.param ? "Encrypted" : "Unencrypted";
+        });

@@ -20,7 +20,9 @@
 
 using namespace cb::couchstore;
 
-class CouchstoreCompactTest : public ::testing::Test {
+class CouchstoreCompactTest
+    : public ::testing::Test,
+      public ::testing::WithParamInterface<std::tuple<bool, bool>> {
 protected:
     void SetUp() override {
         Test::SetUp();
@@ -35,11 +37,16 @@ protected:
         ::remove(targetFilename.c_str());
     }
 
-    static UniqueDbPtr openDb(std::string fname) {
+    UniqueDbPtr openDb(const std::string& fname) {
+        const bool encrypt =
+                (fname == sourceFilename && std::get<0>(GetParam())) ||
+                (fname == targetFilename && std::get<1>(GetParam()));
         auto [status, db] = openDatabase(
                 fname,
                 COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_WITH_MPROTECT,
-                {});
+                [encrypt](std::string_view) {
+                    return getEncryptionKey(encrypt);
+                });
         if (status != COUCHSTORE_SUCCESS) {
             throw std::runtime_error(std::string{"Failed to open database \""} +
                                      fname +
@@ -56,7 +63,8 @@ protected:
         return openDb(targetFilename);
     }
 
-    void storeDocument(Db& db, std::string_view key, std::string_view value) {
+    static void storeDocument(
+            Db& db, std::string_view key, std::string_view value) {
         Doc doc = {};
         doc.id = {const_cast<char*>(key.data()), key.size()};
         doc.data = {const_cast<char*>(value.data()), value.size()};
@@ -66,13 +74,28 @@ protected:
                   couchstore_save_document(&db, &doc, &docInfo, 0));
     }
 
-    void storeLocalDocument(Db& db, std::string_view key, std::string_view value) {
+    static void storeLocalDocument(
+            Db& db, std::string_view key, std::string_view value) {
         LocalDoc localDoc;
         localDoc.deleted = 0;
         localDoc.id = {const_cast<char*>(key.data()), key.size()};
         localDoc.json = {const_cast<char*>(value.data()), value.size()};
         ASSERT_EQ(COUCHSTORE_SUCCESS,
                   couchstore_save_local_document(&db, &localDoc));
+    }
+
+    static SharedEncryptionKey getEncryptionKey(bool encrypt) {
+        if (!encrypt) {
+            return nullptr;
+        }
+        return std::make_shared<cb::crypto::DataEncryptionKey>(
+                cb::crypto::DataEncryptionKey{"MyKeyId",
+                                              cb::crypto::Cipher::AES_256_GCM,
+                                              std::string(32, 'k')});
+    }
+
+    static SharedEncryptionKey getTargetEncryptionKey(std::string_view) {
+        return getEncryptionKey(std::get<1>(GetParam()));
     }
 
     std::string sourceFilename;
@@ -98,13 +121,14 @@ protected:
  * After compaction I expect it to be:
  *  | d0d1d2d3d4d5d6d7d8d9 | H |
  */
-TEST_F(CouchstoreCompactTest, NormalCompaction) {
+TEST_P(CouchstoreCompactTest, NormalCompaction) {
     auto db = openSourceDb();
 
     const std::string value = "This is a small value";
     for (auto ii = 0; ii < 10; ii++) {
-        ASSERT_EQ(cb::couchstore::getDiskBlockSize(*db) * ii,
-                  couchstore_get_header_position(db.get()))
+        ASSERT_EQ(
+                cb::couchstore::getDiskBlockSize(*db) * (ii + isEncrypted(*db)),
+                couchstore_get_header_position(db.get()))
                 << "Unexpected header location";
         storeDocument(*db, std::to_string(ii), value);
         ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
@@ -134,13 +158,14 @@ TEST_F(CouchstoreCompactTest, NormalCompaction) {
  * Compaction removed the initial header block created automatically
  * as part of couchstore_open_db_ex, but not set the block magic to Data
  */
-TEST_F(CouchstoreCompactTest, MB38788_IncorrectBlockSize) {
+TEST_P(CouchstoreCompactTest, MB38788_IncorrectBlockSize) {
     auto db = openSourceDb();
 
     const std::string value = "This is a small value";
     for (auto ii = 0; ii < 10; ii++) {
-        ASSERT_EQ(cb::couchstore::getDiskBlockSize(*db) * ii,
-                  couchstore_get_header_position(db.get()))
+        ASSERT_EQ(
+                cb::couchstore::getDiskBlockSize(*db) * (ii + isEncrypted(*db)),
+                couchstore_get_header_position(db.get()))
                 << "Unexpected header location";
         storeDocument(*db, std::to_string(ii), value);
         ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
@@ -183,13 +208,14 @@ static int couchstore_compact_hook_wrapper(Db*, DocInfo*, sized_buf, void*) {
 static int couchstore_compact_docinfo_hook(DocInfo**, const sized_buf*) {
     return 0;
 }
-TEST_F(CouchstoreCompactTest, NormalCompactionEx) {
+TEST_P(CouchstoreCompactTest, NormalCompactionEx) {
     auto db = openSourceDb();
 
     const std::string value = "This is a small value";
     for (auto ii = 0; ii < 10; ii++) {
-        ASSERT_EQ(cb::couchstore::getDiskBlockSize(*db) * ii,
-                  couchstore_get_header_position(db.get()))
+        ASSERT_EQ(
+                cb::couchstore::getDiskBlockSize(*db) * (ii + isEncrypted(*db)),
+                couchstore_get_header_position(db.get()))
                 << "Unexpected header location";
         storeDocument(*db, std::to_string(ii), value);
         ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
@@ -222,13 +248,14 @@ TEST_F(CouchstoreCompactTest, NormalCompactionEx) {
  * Rerun the same test above, but use the new C++ method which allows for
  * binding std::functions to do stuff for us
  */
-TEST_F(CouchstoreCompactTest, NormalCompactionDeduplicateHeaderBlocks) {
+TEST_P(CouchstoreCompactTest, NormalCompactionDeduplicateHeaderBlocks) {
     auto db = openSourceDb();
 
     const std::string value = "This is a small value";
     for (auto ii = 0; ii < 10; ii++) {
-        ASSERT_EQ(cb::couchstore::getDiskBlockSize(*db) * ii,
-                  couchstore_get_header_position(db.get()))
+        ASSERT_EQ(
+                cb::couchstore::getDiskBlockSize(*db) * (ii + isEncrypted(*db)),
+                couchstore_get_header_position(db.get()))
                 << "Unexpected header location";
         storeDocument(*db, std::to_string(ii), value);
         ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db.get()));
@@ -261,7 +288,7 @@ TEST_F(CouchstoreCompactTest, NormalCompactionDeduplicateHeaderBlocks) {
  * Generate a database with some documents and verify that we can drop
  * documents as part of the compaction.
  */
-TEST_F(CouchstoreCompactTest, CompactionAllowsForDroppingItems) {
+TEST_P(CouchstoreCompactTest, CompactionAllowsForDroppingItems) {
     auto db = openSourceDb();
 
     std::string value = "This is a small value";
@@ -277,7 +304,7 @@ TEST_F(CouchstoreCompactTest, CompactionAllowsForDroppingItems) {
                       *db,
                       targetFilename.c_str(),
                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
-                      {},
+                      getTargetEncryptionKey,
                       [&keys](Db&, DocInfo* docInfo, sized_buf value) -> int {
                           if (docInfo == nullptr) {
                               // Indication that we're done with compaction
@@ -316,7 +343,7 @@ TEST_F(CouchstoreCompactTest, CompactionAllowsForDroppingItems) {
  * Generate a database with a document and verify that we can request the
  * value for the document as part of the compaction
  */
-TEST_F(CouchstoreCompactTest, CompactionAllowsForRequestingValue) {
+TEST_P(CouchstoreCompactTest, CompactionAllowsForRequestingValue) {
     auto db = openSourceDb();
 
     std::string value;
@@ -332,7 +359,7 @@ TEST_F(CouchstoreCompactTest, CompactionAllowsForRequestingValue) {
                       *db,
                       targetFilename.c_str(),
                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
-                      {},
+                      getTargetEncryptionKey,
                       [&callbackWithoutValue, &dbValue](
                               Db&, DocInfo* docInfo, sized_buf value) -> int {
                           if (docInfo == nullptr) {
@@ -369,7 +396,7 @@ TEST_F(CouchstoreCompactTest, CompactionAllowsForRequestingValue) {
  *
  * For key 1 we won't change the doc info, for key 2 we'll make it bigger
  */
-TEST_F(CouchstoreCompactTest, CompactionAllowsForRewritingDocInfo) {
+TEST_P(CouchstoreCompactTest, CompactionAllowsForRewritingDocInfo) {
     auto db = openSourceDb();
 
     storeDocument(*db, "1", "value");
@@ -381,7 +408,7 @@ TEST_F(CouchstoreCompactTest, CompactionAllowsForRewritingDocInfo) {
                       *db,
                       targetFilename.c_str(),
                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
-                      {},
+                      getTargetEncryptionKey,
                       [](Db& db, DocInfo* info, sized_buf body) -> int {
                           return COUCHSTORE_COMPACT_KEEP_ITEM;
                       },
@@ -428,3 +455,16 @@ TEST_F(CouchstoreCompactTest, CompactionAllowsForRewritingDocInfo) {
         EXPECT_EQ(256, info->rev_meta.size);
     }
 }
+
+INSTANTIATE_TEST_SUITE_P(
+        CouchstoreCompactTest,
+        CouchstoreCompactTest,
+        ::testing::Combine(::testing::Bool(), ::testing::Bool()),
+        [](const ::testing::TestParamInfo<std::tuple<bool, bool>>& testInfo)
+                -> std::string {
+            return std::string(std::get<0>(testInfo.param)
+                                       ? "FromEncrypted"
+                                       : "FromUnencrypted") +
+                   (std::get<1>(testInfo.param) ? "ToEncrypted"
+                                                : "ToUnencrypted");
+        });

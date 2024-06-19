@@ -25,7 +25,6 @@
 #include <folly/portability/GTest.h>
 
 #include "couchstoretest.h"
-#include "couchstoredoctest.h"
 #include "documents.h"
 
 #include <libcouchstore/couch_db.h>

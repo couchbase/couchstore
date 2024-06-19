@@ -19,6 +19,8 @@
 #include <libcouchstore/couch_db.h>
 #include <src/internal.h>
 
+#include <utility>
+
 /**
  * Callback function for latency info.
  * This is a simple example how to get latency info.
@@ -49,15 +51,15 @@ int couchstore_test_latency_callback(const char* stat_name,
     return 0;
 }
 
-CouchstoreTest::CouchstoreTest()
-    : CouchstoreTest("testfile.couch"){
+CouchstoreBaseTest::CouchstoreBaseTest()
+    : CouchstoreBaseTest("testfile.couch") {
 }
 
-CouchstoreTest::CouchstoreTest(const std::string& _filePath,
-                               const bool _display_latency_info)
+CouchstoreBaseTest::CouchstoreBaseTest(
+        std::string file_path, bool display_latency_info)
     : db(nullptr),
-      filePath(_filePath),
-      displayLatencyInfo(_display_latency_info) {
+      filePath(std::move(file_path)),
+      displayLatencyInfo(display_latency_info) {
     couchstore_latency_collector_start();
     remove(filePath.c_str());
 }
@@ -67,7 +69,7 @@ CouchstoreTest::CouchstoreTest(const std::string& _filePath,
       - Closes db (if non-null)
       - Removes testfile.couch
 **/
-CouchstoreTest::~CouchstoreTest() {
+CouchstoreBaseTest::~CouchstoreBaseTest() {
     clean_up();
     /* make sure os.c didn't accidentally call close(0): */
 #ifndef WIN32
@@ -75,7 +77,7 @@ CouchstoreTest::~CouchstoreTest() {
 #endif
 }
 
-void CouchstoreTest::clean_up() {
+void CouchstoreBaseTest::clean_up() {
     if (db) {
         couchstore_close_file(db);
         couchstore_free_db(db);
@@ -93,8 +95,43 @@ void CouchstoreTest::clean_up() {
     remove(filePath.c_str());
 }
 
+CouchstoreEncryptedUnencryptedTest::CouchstoreEncryptedUnencryptedTest()
+    : sharedEncryptionKey(std::make_shared<cb::crypto::DataEncryptionKey>(
+              cb::crypto::DataEncryptionKey{"MyKeyId",
+                                            cb::crypto::Cipher::AES_256_GCM,
+                                            std::string(32, 'k')})) {
+}
+
+couchstore_error_t CouchstoreEncryptedUnencryptedTest::open_db(
+        couchstore_open_flags extra_flags) {
+    return couchstore_open_db_ex(filePath.c_str(),
+                                 extra_flags,
+                                 getEncryptionKeyCB(),
+                                 couchstore_get_default_file_ops(),
+                                 &db);
+}
+
+cb::couchstore::EncryptionKeyGetter
+CouchstoreEncryptedUnencryptedTest::getEncryptionKeyCB() {
+    return [this](std::string_view) -> cb::couchstore::SharedEncryptionKey {
+        if (!isEncrypted()) {
+            return nullptr;
+        }
+        return sharedEncryptionKey;
+    };
+}
+
+bool CouchstoreTest::isEncrypted() {
+    return GetParam();
+}
+
+bool CouchstoreDocTest::isEncrypted() {
+    auto& [a, b, encrypt] = GetParam();
+    return encrypt;
+}
+
 CouchstoreInternalTest::CouchstoreInternalTest()
-        : CouchstoreTest("testfile_internal.couch"),
+        : CouchstoreBaseTest("testfile_internal.couch"),
           compactPath("testfile_internal.couch.compact"),
           documents(Documents(0)),
           ops(create_default_file_ops()) {
@@ -113,7 +150,6 @@ couchstore_error_t CouchstoreInternalTest::open_db(couchstore_open_flags extra_f
                                  extra_flags | COUCHSTORE_OPEN_FLAG_UNBUFFERED,
                                  {}, &ops, &db);
 }
-
 
 void CouchstoreInternalTest::open_db_and_populate(couchstore_open_flags extra_flags,
                                                   size_t count) {
@@ -141,10 +177,10 @@ CouchstoreMTTest::CouchstoreMTTest()
     : CouchstoreMTTest("testfile_mt.couch") {
 }
 
-CouchstoreMTTest::CouchstoreMTTest(const std::string& _filePath)
+CouchstoreMTTest::CouchstoreMTTest(std::string file_path)
     : numThreads(std::get<1>(GetParam())),
       dbs(numThreads),
-      filePath(_filePath) {
+      filePath(std::move(file_path)) {
 }
 
 void CouchstoreMTTest::TearDown() {
