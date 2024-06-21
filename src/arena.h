@@ -66,3 +66,9 @@ void arena_free_from_mark(arena *a, const arena_position *mark);
  * Frees all blocks from the arena.
  */
 void arena_free_all(arena *a);
+
+struct arena_deleter {
+    void operator()(arena* ptr) const {
+        delete_arena(ptr);
+    }
+};

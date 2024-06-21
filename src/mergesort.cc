@@ -48,14 +48,17 @@ static int compare_records(void *p, void *q, void *pointer)
 }
 
 FILE *openTmpFile(char *path) {
-    FILE* tempFile = nullptr;
-    int pos = strlen(path);
+    auto pos = strlen(path);
     // If file name is 4.couch.2.compact.btree-tmp_356
     // pull out suffix as int in reverse i.e 653
     // increment suffix by 1 to 654
     // append new suffix in reverse as 4.couch.2.compact.btree-tmp_456
-    int suffix = 0;
-    while (path[--pos] != '_'){ // ok to crash on underflow
+    unsigned int suffix = 0;
+    while (pos) {
+        --pos;
+        if (path[pos] < '0' || path[pos] > '9') {
+            break;
+        }
         suffix = suffix * 10 + (path[pos] - '0'); // atoi
     }
 
@@ -63,15 +66,13 @@ FILE *openTmpFile(char *path) {
 
     // do itoa in reverse
     while (suffix) {
-        int tens = suffix % 10;
+        auto tens = suffix % 10;
         path[++pos] = tens + '0';
         suffix = suffix / 10;
     }
     path[++pos] = '\0';
 
-    tempFile = fopen(path, "w+b");
-
-    return tempFile;
+    return fopen(path, "w+b");
 }
 
 void releaseTmpFile(struct tape *tmp_file) {

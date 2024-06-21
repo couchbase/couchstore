@@ -37,6 +37,7 @@
  */
 #include "src/couch_btree.h"
 #include "src/internal.h"
+#include "src/tree_writer.h"
 
 using namespace testing;
 
@@ -1282,3 +1283,103 @@ TEST_P(CompactTargetWrite, fail) {
 INSTANTIATE_TEST_SUITE_P(Parameterised, CompactTargetWrite,
                         ::testing::Range(0, 6),
                         ::testing::PrintToStringParamName());
+
+class MockTreeWriter : public TreeWriter {
+public:
+    using TreeWriter::cipher;
+    using TreeWriter::file;
+    using TreeWriter::read_record;
+};
+
+class TreeWriterTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        treeWriter = std::make_unique<MockTreeWriter>();
+        ASSERT_EQ(
+                COUCHSTORE_SUCCESS,
+                treeWriter->open(
+                        "tree_writer.tmp", nullptr, nullptr, nullptr, nullptr));
+    }
+
+    void TearDown() override {
+        if (treeWriter) {
+            treeWriter->close();
+            treeWriter.reset();
+        }
+    }
+
+    void populate() {
+        for (size_t ii = 0; ii < 128; ++ii) {
+            auto key = std::to_string(ii ^ 41);
+            auto value = "value" + key;
+            ASSERT_EQ(COUCHSTORE_SUCCESS,
+                      treeWriter->add({key.data(), key.size()},
+                                      {value.data(), value.size()}));
+        }
+    }
+
+    void sortAndVerify() {
+        ASSERT_EQ(COUCHSTORE_SUCCESS, treeWriter->sort());
+        ::rewind(treeWriter->file);
+        std::string previous;
+        size_t count = 0;
+        for (;; ++count) {
+            TreeWriter::KeyValue record;
+            auto ret = MockTreeWriter::read_record(
+                    treeWriter->file, &record, treeWriter.get());
+            if (ret == 0) {
+                break;
+            }
+            ASSERT_EQ(1, ret);
+            EXPECT_GT(record.key, previous);
+            EXPECT_EQ("value" + record.key, record.value);
+            previous = std::move(record.key);
+        }
+        EXPECT_EQ(128, count);
+    }
+
+    std::unique_ptr<MockTreeWriter> treeWriter;
+};
+
+TEST_F(TreeWriterTest, Unencrypted) {
+    populate();
+    sortAndVerify();
+}
+
+TEST_F(TreeWriterTest, Encrypted) {
+    ASSERT_EQ(COUCHSTORE_SUCCESS, treeWriter->enable_encryption());
+    populate();
+    sortAndVerify();
+}
+
+TEST_F(TreeWriterTest, DecryptNotEncrypted) {
+    populate();
+    ASSERT_EQ(COUCHSTORE_SUCCESS, treeWriter->sort());
+    ASSERT_EQ(COUCHSTORE_SUCCESS, treeWriter->enable_encryption());
+    ::rewind(treeWriter->file);
+    TreeWriter::KeyValue record;
+    EXPECT_EQ(-1,
+              MockTreeWriter::read_record(
+                      treeWriter->file, &record, treeWriter.get()));
+}
+
+TEST_F(TreeWriterTest, ReadWithWrongKey) {
+    ASSERT_EQ(COUCHSTORE_SUCCESS, treeWriter->enable_encryption());
+    populate();
+    ASSERT_EQ(COUCHSTORE_SUCCESS, treeWriter->sort());
+    treeWriter->cipher.reset();
+    ASSERT_EQ(COUCHSTORE_SUCCESS, treeWriter->enable_encryption());
+    ::rewind(treeWriter->file);
+    TreeWriter::KeyValue record;
+    EXPECT_EQ(-1,
+              MockTreeWriter::read_record(
+                      treeWriter->file, &record, treeWriter.get()));
+}
+
+TEST_F(TreeWriterTest, SortWithWrongKey) {
+    ASSERT_EQ(COUCHSTORE_SUCCESS, treeWriter->enable_encryption());
+    populate();
+    treeWriter->cipher.reset();
+    ASSERT_EQ(COUCHSTORE_SUCCESS, treeWriter->enable_encryption());
+    ASSERT_EQ(COUCHSTORE_ERROR_READ, treeWriter->sort());
+}
