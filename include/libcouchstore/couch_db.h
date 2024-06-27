@@ -1351,80 +1351,11 @@ using PreCopyHook = std::function<couchstore_error_t(
         Db&, Db&, const DocInfo*, const DocInfo*)>;
 
 /**
- * Compact a Couchstore file with support for Point in Time Recovery (PiTR)
- *
- * PiTR enabled compaction differs from normal compaction that it won't
- * do full compaction of the entire database file, but keep multiple headers
- * in the compacted database file.
- *
- * It does full compaction up to the provided timestamp, then squash as
- * many of the intermediate headers as possible but leave the header closest
- * to the requested interval.
- *
- * The intended use case for this is to allow for the system to keep the
- * history around for some period of time (a sliding windows with "full"
- * history so that a backup client may be able to roll back to a given time).
- * The delta used as an offset based off "epoch" to make sure that the headers
- * always align to the same position no matter what the oldest is. (and we can
- * calculate the closest boundary by using: now -= now % granularity)
- *
- * NOTE: This is currently experimental and subject to change. Currently it'll
- *       throw exceptions in some of the error paths (these needs to be cleaned
- *       up and changed to couchstore_error etc).
- *
- * @param source The source database to compact
- * @param target_filename The name of the target database
- * @param flags Extra flags to open the database with
- * @param targetEncrKeyCB Callback that returns the encryption key that
- *                        will encrypt the target per file key
- * @param filterCallback The filter callback to call for each item to check
- *                       if the document should be part of the compacted
- *                       database or not
- * @param rewriteDocInfoCallback The rewrite callback which is called for
- *                       each DocInfo to be put into the new database (to
- *                       allow upgrading the metadata section in the DocInfo)
- * @param ops The File operations to use (defaults to
- *            couchstore_get_default_file_ops if set to nullptr)
- * @param timestamp The timestamp for the oldest revision to use (The header
- *                  _before_ this value is chosen if no exact match is found)
- * @param delta The delta to add to the between each timestamp to keep
- *              in the database.
- * @param preCompactionCallback A callback which is called when the oldest
- *                              database is located, but _before_ compaction
- *                              start. You may use this callback to look at
- *                              the header fields (or for instance look at
- *                              the _local documents)
- * @param postCompactionCallback A callback is called after the full
- *                              compaction is done, but before replay of
- *                              additional changes.
- * @param replayPreCopyHook A callback which happens _before_ each copy of the
- *                          documents during the replay.
- * @param replayPrecommitHook The precommit hook to use for replay
- * @return Couchstore error code
- * @throws std::runtime_error
- */
-LIBCOUCHSTORE_API
-couchstore_error_t compact(Db& source,
-                           const char* target_filename,
-                           couchstore_compact_flags flags,
-                           cb::couchstore::EncryptionKeyGetter targetEncrKeyCB,
-                           CompactFilterCallback filterCallback,
-                           CompactRewriteDocInfoCallback rewriteDocInfoCallback,
-                           FileOpsInterface* ops,
-                           PrecommitHook precommitHook,
-                           uint64_t timestamp,
-                           uint64_t delta,
-                           PreCompactionCallback preCompactionCallback,
-                           PostCompactionCallback postCompactionCallback,
-                           PreCopyHook replayPreCopyHook,
-                           PrecommitHook replayPrecommitHook);
-
-/**
- * Replay mutations (with PiTR compaction) from the current header in the
- * source database to the target database by using the specified delta
- * as the granularity for the number of headers to deduplicate. Stop
- * when we reach the provided sourceHeaderEndOffset. The precommit hook
- * will be called for each commit in the destination database
+ * Replay mutations from the current header in the source database to the
+ * target database by using the specified delta as the granularity for the
+ * number of headers to deduplicate. Stop when we reach the provided
+ * sourceHeaderEndOffset. The precommit hook will be called for each commit
+ * in the destination database
  *
  * @param source The database to copy from (current header offset)
  * @param target The database to copy data to
