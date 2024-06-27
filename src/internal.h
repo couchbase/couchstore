@@ -84,10 +84,15 @@ struct tree_file_options {
 
 /* Structure representing an open file; "superclass" of Db */
 struct tree_file {
+    couchstore_error_t close();
+
+    ~tree_file();
+
     uint64_t pos{0};
     FileOpsInterface* ops{nullptr};
     couch_file_handle handle{nullptr};
-    const char* path{nullptr};
+    bool handle_open{false};
+    std::string path;
     couchstore_error_info_t lastError{COUCHSTORE_SUCCESS};
     crc_mode_e crc_mode{CRC_UNKNOWN};
     tree_file_options options;
@@ -157,9 +162,6 @@ couchstore_error_t tree_file_open(tree_file* file,
                                   crc_mode_e crc_mode,
                                   FileOpsInterface* ops,
                                   tree_file_options options);
-/** Closes a tree_file.
-    @param file  Pointer to open tree_file. Does not free this pointer! */
-couchstore_error_t tree_file_close(tree_file* file);
 
 /** Reads a chunk from the file at a given position.
     @param file The tree_file to read from

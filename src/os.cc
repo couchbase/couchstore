@@ -240,6 +240,9 @@ couchstore_error_t PosixFileOps::close(couchstore_error_info_t* errinfo,
     int rv = 0;
     couchstore_error_t error = COUCHSTORE_SUCCESS;
 
+    if (!file) {
+        return error;
+    }
     if (file->fd != -1) {
         do {
             cb_assert(file->fd >= 3);

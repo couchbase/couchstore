@@ -1070,7 +1070,7 @@ static int process_view_file(const char *file, int *total)
     char* header_buf = nullptr;
     int header_len;
 
-    info = (view_group_info_t *)cb_calloc(1, sizeof(view_group_info_t));
+    info = new (std::nothrow) view_group_info_t();
     if (info == nullptr) {
         fprintf(stderr, "Unable to allocate memory\n");
         return -1;

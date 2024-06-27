@@ -35,11 +35,16 @@ couchstore_error_t tree_file_open(tree_file* file,
 
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
 
-    *file = {};
-    file->crc_mode = crc_mode;
-    file->options = file_options;
-    file->path = (const char *) cb_strdup(filename);
-    error_unless(file->path, COUCHSTORE_ERROR_ALLOC_FAIL);
+    try {
+        *file = {};
+        file->crc_mode = crc_mode;
+        file->options = file_options;
+        file->path = filename;
+    } catch (const std::bad_alloc&) {
+        error_pass(COUCHSTORE_ERROR_ALLOC_FAIL);
+    } catch (const std::exception&) {
+        error_pass(COUCHSTORE_ERROR_INVALID_ARGUMENTS);
+    }
 
     if (file_options.buf_io_enabled) {
         buffered_file_ops_params params((openflags == O_RDONLY),
@@ -56,10 +61,11 @@ couchstore_error_t tree_file_open(tree_file* file,
         file->handle = file->ops->constructor(&file->lastError);
     }
 
-    error_unless(file->ops, COUCHSTORE_ERROR_ALLOC_FAIL);
+    error_unless(file->ops && file->handle, COUCHSTORE_ERROR_ALLOC_FAIL);
 
     error_pass(file->ops->open(&file->lastError, &file->handle,
                                filename, openflags));
+    file->handle_open = true;
 
     if (file->options.periodic_sync_bytes != 0) {
         error_pass(file->ops->set_periodic_sync(
@@ -76,26 +82,28 @@ couchstore_error_t tree_file_open(tree_file* file,
     }
 cleanup:
     if (errcode != COUCHSTORE_SUCCESS) {
-        cb_free((char *) file->path);
-        file->path = nullptr;
-        if (file->ops) {
-            file->ops->destructor(file->handle);
-            file->ops = nullptr;
-            file->handle = nullptr;
-        }
+        file->close();
     }
     return errcode;
 }
 
-couchstore_error_t tree_file_close(tree_file* file)
-{
+couchstore_error_t tree_file::close() {
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
-    if (file->ops) {
-        errcode = file->ops->close(&file->lastError, file->handle);
-        file->ops->destructor(file->handle);
+    if (ops && handle) {
+        if (handle_open) {
+            errcode = ops->close(&lastError, handle);
+        }
+        ops->destructor(handle);
     }
-    cb_free((char*)file->path);
+    ops = nullptr;
+    handle = nullptr;
+    handle_open = false;
+    path.clear();
     return errcode;
+}
+
+tree_file::~tree_file() {
+    close();
 }
 
 /** Read bytes from the database file, skipping over the header-detection bytes at every block

@@ -217,6 +217,9 @@ couchstore_error_t WindowsFileOps::close(couchstore_error_info_t* errinfo,
                                          couch_file_handle handle)
 {
     auto* file = to_file(handle);
+    if (!file) {
+        return COUCHSTORE_SUCCESS;
+    }
     if(!CloseHandle(file->fh)) {
         save_windows_error(errinfo);
         return COUCHSTORE_ERROR_FILE_CLOSE;

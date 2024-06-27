@@ -1704,7 +1704,7 @@ static void test_view_btree_large_reducer(void)
     finish_root(mr->rq, targ_mr, &ret);
     cb_assert(ret == COUCHSTORE_SUCCESS);
 
-    tree_file_close(&index_file);
+    index_file.close();
     remove(dst_file);
     free_view_reduction(&reduction1);
     free_view_reduction(&reduction2);

@@ -58,11 +58,11 @@ union view_infos_t {
 };
 
 struct view_group_info_t {
-    const char* filepath;
-    uint64_t header_pos;
-    int num_btrees;
-    view_index_type_t type;
-    view_infos_t view_infos;
+    const char* filepath{nullptr};
+    uint64_t header_pos{0};
+    int num_btrees{0};
+    view_index_type_t type{};
+    view_infos_t view_infos{};
     tree_file file;
 };
 

@@ -537,7 +537,7 @@ couchstore_error_t couchstore_open_db_ex(
         return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     }
 
-    if ((db = static_cast<Db*>(cb_calloc(1, sizeof(Db)))) == nullptr) {
+    if ((db = new (std::nothrow) Db()) == nullptr) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
 
@@ -633,7 +633,7 @@ couchstore_error_t couchstore_close_file(Db* db)
     if(db->dropped) {
         return COUCHSTORE_SUCCESS;
     }
-    couchstore_error_t error = tree_file_close(&db->file);
+    auto error = db->file.close();
     db->dropped = 1;
     return error;
 }
@@ -725,13 +725,13 @@ couchstore_error_t couchstore_free_db(Db* db)
     cb_free(db->header.by_id_root);
     cb_free(db->header.by_seq_root);
     cb_free(db->header.local_docs_root);
-    cb_free(db);
+    delete db;
 
     return COUCHSTORE_SUCCESS;
 }
 
 const char* couchstore_get_db_filename(Db *db) {
-    return db->file.path;
+    return db->file.path.c_str();
 }
 
 FileOpsInterface::FHStats* couchstore_get_db_filestats(Db* db) {
@@ -1477,7 +1477,7 @@ couchstore_error_t couchstore_db_info(Db *db, DbInfo* dbinfo) {
     const node_pointer *id_root = db->header.by_id_root;
     const node_pointer *seq_root = db->header.by_seq_root;
     const node_pointer *local_root = db->header.local_docs_root;
-    dbinfo->filename = db->file.path;
+    dbinfo->filename = db->file.path.c_str();
     dbinfo->header_position = db->header.position;
     dbinfo->last_sequence = db->header.update_seq;
     dbinfo->purge_seq = db->header.purge_seq;

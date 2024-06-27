@@ -201,7 +201,7 @@ view_group_info_t *couchstore_read_view_group_info(FILE *in_stream,
     couchstore_error_t ret;
     uint64_t type;
 
-    info = (view_group_info_t *) cb_calloc(1, sizeof(*info));
+    info = new (std::nothrow) view_group_info_t();
     if (info == nullptr) {
         fprintf(error_stream, "Memory allocation failure\n");
         goto out_error;
@@ -453,20 +453,12 @@ void couchstore_free_view_group_info(view_group_info_t *info)
         break;
     }
     cb_free((void *) info->filepath);
-    cb_free(info);
+    delete info;
 }
 
 
-static void close_view_group_file(view_group_info_t *info)
-{
-    if (info->file.ops != nullptr) {
-        info->file.ops->close(&info->file.lastError, info->file.handle);
-        info->file.ops->destructor(info->file.handle);
-        info->file.ops = nullptr;
-        info->file.handle = nullptr;
-    }
-    cb_free((void *) info->file.path);
-    info->file.path = nullptr;
+static void close_view_group_file(view_group_info_t *info) {
+    info->file.close();
 }
 
 
@@ -516,9 +508,6 @@ couchstore_error_t couchstore_build_view_group(view_group_info_t *info,
 
     error_info->view_name = nullptr;
     error_info->error_msg = nullptr;
-    index_file.handle = nullptr;
-    index_file.ops = nullptr;
-    index_file.path = nullptr;
 
     view_roots = (node_pointer **) cb_calloc(
         info->num_btrees, sizeof(node_pointer *));
@@ -593,7 +582,7 @@ couchstore_error_t couchstore_build_view_group(view_group_info_t *info,
 out:
     free_index_header(header);
     close_view_group_file(info);
-    tree_file_close(&index_file);
+    index_file.close();
     cb_free(id_root);
     if (view_roots != nullptr) {
         for (i = 0; i < info->num_btrees; ++i) {
@@ -1074,9 +1063,6 @@ couchstore_error_t couchstore_cleanup_view_group(view_group_info_t *info,
 
     error_info->view_name = nullptr;
     error_info->error_msg = nullptr;
-    index_file.handle = nullptr;
-    index_file.ops = nullptr;
-    index_file.path = nullptr;
 
     view_roots = (node_pointer **) cb_calloc(
         info->num_btrees, sizeof(node_pointer *));
@@ -1167,7 +1153,7 @@ couchstore_error_t couchstore_cleanup_view_group(view_group_info_t *info,
 cleanup:
     free_index_header(header);
     close_view_group_file(info);
-    tree_file_close(&index_file);
+    index_file.close();
     cb_free(id_root);
     if (view_roots != nullptr) {
         for (i = 0; i < info->num_btrees; ++i) {
@@ -1418,8 +1404,7 @@ couchstore_error_t couchstore_update_view_group(view_group_info_t *info,
                                                view_error_t *error_info)
 {
     couchstore_error_t ret;
-    tree_file index_file = {
-            0, nullptr, nullptr, nullptr, {}, CRC32, tree_file_options{}};
+    tree_file index_file;
     index_header_t* header = nullptr;
     node_pointer* id_root = nullptr;
     node_pointer** view_roots = nullptr;
@@ -1561,7 +1546,7 @@ couchstore_error_t couchstore_update_view_group(view_group_info_t *info,
 cleanup:
     free_index_header(header);
     close_view_group_file(info);
-    tree_file_close(&index_file);
+    index_file.close();
     cb_free(id_root);
     if (view_roots != nullptr) {
         for (i = 0; i < info->num_btrees; ++i) {
@@ -1794,12 +1779,6 @@ couchstore_error_t couchstore_compact_view_group(view_group_info_t *info,
 
     error_info->view_name = nullptr;
     error_info->error_msg = nullptr;
-    index_file.handle = nullptr;
-    index_file.ops = nullptr;
-    index_file.path = nullptr;
-    compact_file.handle = nullptr;
-    compact_file.ops = nullptr;
-    compact_file.path = nullptr;
 
     ret = decode_index_header(header_buf->buf, header_buf->size, &header);
     if (ret < 0) {
@@ -1894,8 +1873,8 @@ couchstore_error_t couchstore_compact_view_group(view_group_info_t *info,
 cleanup:
     free_index_header(header);
     close_view_group_file(info);
-    tree_file_close(&index_file);
-    tree_file_close(&compact_file);
+    index_file.close();
+    compact_file.close();
     cb_free(id_root);
     if (view_roots != nullptr) {
         for (i = 0; i < info->num_btrees; ++i) {
