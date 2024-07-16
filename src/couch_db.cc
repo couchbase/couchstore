@@ -412,17 +412,30 @@ static couchstore_error_t read_and_set_encryption_key(
             // Encryption disabled
             return COUCHSTORE_SUCCESS;
         } else if (!encryptionKeyCB) {
+            log_last_internal_error(
+                    "Couchstore::read_and_set_encryption_key() "
+                    "Encrypted file but no encryption key callback provided");
             return COUCHSTORE_ERROR_NO_ENCRYPTION_KEY;
         }
 
         key = encryptionKeyCB(metadata.keyId);
-        if (!key || key->id != metadata.keyId) {
+        if (!key) {
+            log_last_internal_error(
+                    "Couchstore::read_and_set_encryption_key() "
+                    "Encrypted file but no encryption key returned");
+            return COUCHSTORE_ERROR_NO_ENCRYPTION_KEY;
+        } else if (key->id != metadata.keyId) {
+            log_last_internal_error(
+                    "Couchstore::read_and_set_encryption_key() "
+                    "Returned encryption key ID mismatch");
             return COUCHSTORE_ERROR_NO_ENCRYPTION_KEY;
         }
         encryptedFileKey = std::move(metadata.encryptedFileKey);
     } catch (const std::bad_alloc&) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
-    } catch (const std::exception&) {
+    } catch (const std::exception& ex) {
+        log_last_internal_error("Couchstore::read_and_set_encryption_key() %s",
+                                ex.what());
         return COUCHSTORE_ERROR_NO_ENCRYPTION_KEY;
     }
 
