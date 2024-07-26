@@ -42,14 +42,16 @@ struct compact_ctx {
 static couchstore_error_t compact_seq_tree(Db* source, Db* target, compact_ctx *ctx);
 static couchstore_error_t compact_localdocs_tree(Db* source, Db* target, compact_ctx *ctx);
 
-couchstore_error_t couchstore_compact_db_ex(Db* source,
-                                            const char* target_filename,
-                                            couchstore_compact_flags flags,
-                                            couchstore_compact_hook hook,
-                                            couchstore_docinfo_hook dhook,
-                                            void* hook_ctx,
-                                            FileOpsInterface* ops,
-                                            PrecommitHook precommitHook) {
+couchstore_error_t couchstore_compact_db_ex(
+        Db* source,
+        const char* target_filename,
+        couchstore_compact_flags flags,
+        cb::couchstore::EncryptionKeyGetter targetEncrKeyCB,
+        couchstore_compact_hook hook,
+        couchstore_docinfo_hook dhook,
+        void* hook_ctx,
+        FileOpsInterface* ops,
+        PrecommitHook precommitHook) {
     // Concert C-style hooks into C++ std::function. Note that
     // COUCHSTORE_COMPACT_FLAG_DROP_DELETES drops deletes iff compaction hook is
     // nullptr - i.e. we need to map a null value for the C function pointer
@@ -72,7 +74,7 @@ couchstore_error_t couchstore_compact_db_ex(Db* source,
     return cb::couchstore::compact(*source,
                                    target_filename,
                                    flags,
-                                   {},
+                                   std::move(targetEncrKeyCB),
                                    filterCallback,
                                    rewriteCallback,
                                    ops,
@@ -84,6 +86,7 @@ couchstore_error_t couchstore_compact_db(Db* source,
     return couchstore_compact_db_ex(source,
                                     target_filename,
                                     0,
+                                    {},
                                     nullptr,
                                     nullptr,
                                     nullptr,

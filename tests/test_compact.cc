@@ -225,6 +225,7 @@ TEST_P(CouchstoreCompactTest, NormalCompactionEx) {
               couchstore_compact_db_ex(db.get(),
                                        targetFilename.c_str(),
                                        COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                       getTargetEncryptionKey,
                                        couchstore_compact_hook_wrapper,
                                        couchstore_compact_docinfo_hook,
                                        nullptr,
@@ -265,7 +266,7 @@ TEST_P(CouchstoreCompactTest, NormalCompactionDeduplicateHeaderBlocks) {
               cb::couchstore::compact(*db,
                                       targetFilename.c_str(),
                                       COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
-                                      {},
+                                      getTargetEncryptionKey,
                                       {},
                                       {},
                                       couchstore_get_default_file_ops()));

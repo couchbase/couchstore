@@ -993,6 +993,8 @@ extern "C" {
      * @param source the source database
      * @param target_filename the filename of the new database to create.
      * @param flags flags that change compaction behavior
+     * @param targetEncrKeyCB Callback that returns the encryption key that
+     *                        will encrypt the target per file key
      * @param hook time_purge_hook callback
      * @param dhook callback which allows the user to rewrite the document info
      *              as part of compaction
@@ -1010,6 +1012,7 @@ extern "C" {
             Db* source,
             const char* target_filename,
             couchstore_compact_flags flags,
+            cb::couchstore::EncryptionKeyGetter targetEncrKeyCB,
             couchstore_compact_hook hook,
             couchstore_docinfo_hook dhook,
             void* hook_ctx,

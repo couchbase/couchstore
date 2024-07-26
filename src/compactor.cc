@@ -129,6 +129,7 @@ int main(int argc, char** argv) {
     errcode = couchstore_compact_db_ex(source,
                                        argv[optind + 1],
                                        flags,
+                                       {},
                                        hook,
                                        dhook,
                                        hook_ctx,

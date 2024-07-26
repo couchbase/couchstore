@@ -1282,10 +1282,14 @@ TEST_P(CompactSourceRead, fail) {
         EXPECT_CALL(ops, pread(_, _, _, _, _)).Times(GetParam());
         EXPECT_CALL(ops, pread(_, _, _, _, _)).WillOnce(Return(COUCHSTORE_ERROR_READ));
         EXPECT_EQ(COUCHSTORE_ERROR_READ,
-                  couchstore_compact_db_ex(db, compactPath.c_str(),
+                  couchstore_compact_db_ex(db,
+                                           compactPath.c_str(),
                                            COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
-                                           nullptr, nullptr, nullptr, &ops));
-
+                                           {},
+                                           nullptr,
+                                           nullptr,
+                                           nullptr,
+                                           &ops));
     }
 }
 INSTANTIATE_TEST_SUITE_P(Parameterised, CompactSourceRead,
@@ -1300,10 +1304,14 @@ TEST_P(CompactTargetWrite, fail) {
         EXPECT_CALL(ops, pwrite(_, _, _, _, _)).Times(GetParam());
         EXPECT_CALL(ops, pwrite(_, _, _, _, _)).WillOnce(Return(COUCHSTORE_ERROR_WRITE));
         EXPECT_EQ(COUCHSTORE_ERROR_WRITE,
-                  couchstore_compact_db_ex(db, compactPath.c_str(),
+                  couchstore_compact_db_ex(db,
+                                           compactPath.c_str(),
                                            COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
-                                           nullptr, nullptr, nullptr, &ops));
-
+                                           {},
+                                           nullptr,
+                                           nullptr,
+                                           nullptr,
+                                           &ops));
     }
 }
 INSTANTIATE_TEST_SUITE_P(Parameterised, CompactTargetWrite,

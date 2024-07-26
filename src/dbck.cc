@@ -320,14 +320,15 @@ static int recover_file(recovery_options& options) {
     param.db_src = db_src_alt;
 
     // Compact with recovery mode.
-    errcode_compaction = couchstore_compact_db_ex(
-            db_src,
-            options.dst_filename.c_str(),
-            COUCHSTORE_COMPACT_RECOVERY_MODE,
-            recover_file_hook,
-            nullptr,
-            &param,
-            couchstore_get_default_file_ops());
+    errcode_compaction =
+            couchstore_compact_db_ex(db_src,
+                                     options.dst_filename.c_str(),
+                                     COUCHSTORE_COMPACT_RECOVERY_MODE,
+                                     {},
+                                     recover_file_hook,
+                                     nullptr,
+                                     &param,
+                                     couchstore_get_default_file_ops());
 
     // Open recovered file.
     errcode = couchstore_open_db_ex(options.dst_filename.c_str(),

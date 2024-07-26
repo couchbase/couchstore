@@ -896,13 +896,15 @@ TEST_F(CouchstoreBaseTest, no_crc_upgrade) {
     EXPECT_LE(db->header.disk_version, uint64_t(COUCH_DISK_VERSION_11));
 
     std::string target("compacted.couch");
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_compact_db_ex(db,
-                                                           target.c_str(),
-                                                           0,
-                                                           nullptr,
-                                                           nullptr,
-                                                           nullptr,
-                                                           couchstore_get_default_file_ops()));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_compact_db_ex(db,
+                                       target.c_str(),
+                                       0,
+                                       {},
+                                       nullptr,
+                                       nullptr,
+                                       nullptr,
+                                       couchstore_get_default_file_ops()));
 
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
@@ -957,13 +959,15 @@ TEST_F(CouchstoreBaseTest, crc_upgrade) {
     EXPECT_EQ(CRC32, db->file.crc_mode);
 
     std::string target("compacted.couch");
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_compact_db_ex(db,
-                                                           target.c_str(),
-                                                           COUCHSTORE_COMPACT_FLAG_UPGRADE_DB,
-                                                           nullptr,
-                                                           nullptr,
-                                                           nullptr,
-                                                           couchstore_get_default_file_ops()));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_compact_db_ex(db,
+                                       target.c_str(),
+                                       COUCHSTORE_COMPACT_FLAG_UPGRADE_DB,
+                                       {},
+                                       nullptr,
+                                       nullptr,
+                                       nullptr,
+                                       couchstore_get_default_file_ops()));
 
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
@@ -1008,13 +1012,15 @@ TEST_F(CouchstoreBaseTest, crc_upgrade2) {
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
 
     std::string target("compacted.couch");
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_compact_db_ex(db,
-                                                           target.c_str(),
-                                                           COUCHSTORE_COMPACT_FLAG_UPGRADE_DB,
-                                                           nullptr,
-                                                           nullptr,
-                                                           nullptr,
-                                                           couchstore_get_default_file_ops()));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_compact_db_ex(db,
+                                       target.c_str(),
+                                       COUCHSTORE_COMPACT_FLAG_UPGRADE_DB,
+                                       {},
+                                       nullptr,
+                                       nullptr,
+                                       nullptr,
+                                       couchstore_get_default_file_ops()));
 
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
@@ -1065,6 +1071,7 @@ TEST_P(CouchstoreTest, MB40415_precommit_hook) {
                       db,
                       target.c_str(),
                       0,
+                      getEncryptionKeyCB(),
                       nullptr,
                       nullptr,
                       nullptr,
@@ -1084,7 +1091,12 @@ TEST_P(CouchstoreTest, MB40415_precommit_hook) {
 
     // Open target and verify there is a single header in the file and
     // the local doc is present
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_open_db(target.c_str(), 0, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db_ex(target.c_str(),
+                                    0,
+                                    getEncryptionKeyCB(),
+                                    couchstore_get_default_file_ops(),
+                                    &db));
 
     LocalDoc* ldoc;
     ASSERT_EQ(COUCHSTORE_SUCCESS,
@@ -1293,13 +1305,15 @@ TEST_F(CouchstoreBaseTest, compact_need_body) {
                                             .WillOnce(testing::Return(COUCHSTORE_SUCCESS))
                                             .WillOnce(testing::Return(COUCHSTORE_SUCCESS));
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_compact_db_ex(db,
-                                                           target.c_str(),
-                                                           0,
-                                                           mockTimePurgeHook,
-                                                           nullptr,
-                                                           &tph,
-                                                           couchstore_get_default_file_ops()));
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_compact_db_ex(db,
+                                       target.c_str(),
+                                       0,
+                                       {},
+                                       mockTimePurgeHook,
+                                       nullptr,
+                                       &tph,
+                                       couchstore_get_default_file_ops()));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
     db = nullptr;
