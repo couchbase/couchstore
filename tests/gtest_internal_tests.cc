@@ -167,6 +167,44 @@ TEST_F(CouchstoreInternalTest, commit_alignment) {
               db->file.ops->goto_eof(&errinfo, db->file.handle));
 }
 
+TEST_F(CouchstoreInternalTest, rewind_db_header) {
+    open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, 200);
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    const auto lastHeader = couchstore_get_header_position(db);
+    EXPECT_GT(lastHeader, COUCH_BLOCK_SIZE * 2);
+
+    EXPECT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::seek(*db, cb::couchstore::Direction::End));
+    EXPECT_EQ(lastHeader, couchstore_get_header_position(db));
+    {
+        auto [status, info] =
+                cb::couchstore::openDocInfo(*db, documents.getKey(0));
+        EXPECT_EQ(COUCHSTORE_SUCCESS, status);
+    }
+    {
+        InSequence s;
+        EXPECT_CALL(ops, pread(_, _, _, _, 0)).Times(1);
+        EXPECT_CALL(ops, pread(_, _, _, _, 1)).Times(1);
+        EXPECT_CALL(ops, pread(_, _, _, _, _)).Times(1);
+        EXPECT_EQ(COUCHSTORE_SUCCESS, couchstore_rewind_db_header(db));
+        EXPECT_EQ(0, couchstore_get_header_position(db));
+    }
+    {
+        auto [status, info] =
+                cb::couchstore::openDocInfo(*db, documents.getKey(0));
+        EXPECT_EQ(COUCHSTORE_ERROR_DOC_NOT_FOUND, status);
+    }
+    {
+        InSequence s;
+        EXPECT_CALL(ops, pread(_, _, _, _, _)).Times(0);
+        auto errcode = couchstore_rewind_db_header(db);
+        if (errcode == COUCHSTORE_ERROR_DB_NO_LONGER_VALID) {
+            db = nullptr;
+        }
+        EXPECT_EQ(COUCHSTORE_ERROR_DB_NO_LONGER_VALID, errcode);
+    }
+}
+
 /**
  * Test to check whether or not buffered IO configurations passed to
  * open_db() API correctly set internal file options.

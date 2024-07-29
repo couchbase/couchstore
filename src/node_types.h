@@ -26,7 +26,7 @@ struct raw_file_header_v12 {
     raw_16 localrootsize;
     /* Three variable-size raw_btree_root structures follow */
 };
-static_assert(sizeof(raw_file_header_v12) == 25, "Unexpected file header side");
+static_assert(sizeof(raw_file_header_v12) == 25, "Unexpected file header size");
 
 struct raw_file_header_v13 {
     raw_08 version;
@@ -39,7 +39,21 @@ struct raw_file_header_v13 {
     raw_64 timestamp;
     /* Three variable-size raw_btree_root structures follow */
 };
-static_assert(sizeof(raw_file_header_v13) == 33, "Unexpected file header side");
+static_assert(sizeof(raw_file_header_v13) == 33, "Unexpected file header size");
+
+struct raw_file_header_v14 {
+    raw_08 version;
+    raw_48 update_seq;
+    raw_48 purge_seq;
+    raw_48 purge_ptr;
+    raw_16 seqrootsize;
+    raw_16 idrootsize;
+    raw_16 localrootsize;
+    raw_64 timestamp;
+    raw_48 prev_header_pos;
+    /* Three variable-size raw_btree_root structures follow */
+};
+static_assert(sizeof(raw_file_header_v14) == 39, "Unexpected file header size");
 
 struct raw_btree_root {
     raw_48 pointer;

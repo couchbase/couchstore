@@ -60,36 +60,55 @@ cleanup:
     return errcode;
 }
 
-int rawHeader2internalHeader(const raw_file_header_v12* source,
-                             db_header& header,
-                             int& seqrootsize,
-                             int& idrootsize,
-                             int& localrootsize) {
+static int rawHeader2internalHeader(const raw_file_header_v12* source,
+                                    db_header& header,
+                                    int& seqrootsize,
+                                    int& idrootsize,
+                                    int& localrootsize) {
     header.disk_version = decode_raw08(source->version);
     header.update_seq = decode_raw48(source->update_seq);
     header.purge_seq = decode_raw48(source->purge_seq);
     header.purge_ptr = decode_raw48(source->purge_ptr);
     header.timestamp = 0;
+    header.prev_header_pos = UNKNOWN_PREV_HEADER_POS;
     seqrootsize = decode_raw16(source->seqrootsize);
     idrootsize = decode_raw16(source->idrootsize);
     localrootsize = decode_raw16(source->localrootsize);
     return sizeof(raw_file_header_v12);
 }
 
-int rawHeader2internalHeader(const raw_file_header_v13* source,
-                             db_header& header,
-                             int& seqrootsize,
-                             int& idrootsize,
-                             int& localrootsize) {
+static int rawHeader2internalHeader(const raw_file_header_v13* source,
+                                    db_header& header,
+                                    int& seqrootsize,
+                                    int& idrootsize,
+                                    int& localrootsize) {
     header.disk_version = decode_raw08(source->version);
     header.update_seq = decode_raw48(source->update_seq);
     header.purge_seq = decode_raw48(source->purge_seq);
     header.purge_ptr = decode_raw48(source->purge_ptr);
     header.timestamp = decode_raw64(source->timestamp);
+    header.prev_header_pos = UNKNOWN_PREV_HEADER_POS;
     seqrootsize = decode_raw16(source->seqrootsize);
     idrootsize = decode_raw16(source->idrootsize);
     localrootsize = decode_raw16(source->localrootsize);
     return sizeof(raw_file_header_v13);
+}
+
+static int rawHeader2internalHeader(const raw_file_header_v14* source,
+                                    db_header& header,
+                                    int& seqrootsize,
+                                    int& idrootsize,
+                                    int& localrootsize) {
+    header.disk_version = decode_raw08(source->version);
+    header.update_seq = decode_raw48(source->update_seq);
+    header.purge_seq = decode_raw48(source->purge_seq);
+    header.purge_ptr = decode_raw48(source->purge_ptr);
+    header.timestamp = decode_raw64(source->timestamp);
+    header.prev_header_pos = decode_raw48(source->prev_header_pos);
+    seqrootsize = decode_raw16(source->seqrootsize);
+    idrootsize = decode_raw16(source->idrootsize);
+    localrootsize = decode_raw16(source->localrootsize);
+    return sizeof(raw_file_header_v14);
 }
 
 // Attempts to initialize the database from a header at the given file position
@@ -104,6 +123,7 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
     union {
         raw_file_header_v12* v12_raw;
         raw_file_header_v13* v13_raw;
+        raw_file_header_v14* v14_raw;
         char *buf;
     } header_buf = {nullptr};
     int header_size = 0;
@@ -148,17 +168,21 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
     // (Use an explicit version list to make sure people re-evaluate this list
     // when the format change)
     //
-    // Version 14 adds support for encryption (header same as 13)
+    // Version 14 adds position of previous header and support for encryption
     // Version 13 adds a timestamp
     // Version 12 use CRC32C
     // Version 11 use CRC32
-    error_unless(db->header.disk_version == COUCH_DISK_VERSION_14 ||
-                         db->header.disk_version == COUCH_DISK_VERSION_13 ||
-                         db->header.disk_version == COUCH_DISK_VERSION_12 ||
-                         db->header.disk_version == COUCH_DISK_VERSION_11,
-                 COUCHSTORE_ERROR_HEADER_VERSION);
-
-    if (db->header.disk_version >= COUCH_DISK_VERSION_13) {
+    switch (db->header.disk_version) {
+    case COUCH_DISK_VERSION_14:
+        header_size = rawHeader2internalHeader(header_buf.v14_raw,
+                                               db->header,
+                                               seqrootsize,
+                                               idrootsize,
+                                               localrootsize);
+        root_data =
+                (char*)(header_buf.v14_raw + 1); // i.e. just past *header_buf
+        break;
+    case COUCH_DISK_VERSION_13:
         header_size = rawHeader2internalHeader(header_buf.v13_raw,
                                                db->header,
                                                seqrootsize,
@@ -166,7 +190,9 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
                                                localrootsize);
         root_data =
                 (char*)(header_buf.v13_raw + 1); // i.e. just past *header_buf
-    } else {
+        break;
+    case COUCH_DISK_VERSION_12:
+    case COUCH_DISK_VERSION_11:
         header_size = rawHeader2internalHeader(header_buf.v12_raw,
                                                db->header,
                                                seqrootsize,
@@ -174,6 +200,9 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
                                                localrootsize);
         root_data =
                 (char*)(header_buf.v12_raw + 1); // i.e. just past *header_buf
+        break;
+    default:
+        error_pass(COUCHSTORE_ERROR_HEADER_VERSION);
     }
 
     error_unless(db->header.purge_ptr <= db->header.position, COUCHSTORE_ERROR_CORRUPT);
@@ -242,12 +271,13 @@ static size_t calculate_header_size(Db* db,
     if (db->header.local_docs_root) {
         localrootsize = ROOT_BASE_SIZE + db->header.local_docs_root->reduce_value.size;
     }
-    if (db->header.disk_version >= COUCH_DISK_VERSION_13) {
-        return sizeof(raw_file_header_v13) + seqrootsize + idrootsize +
-               localrootsize;
+    const auto rootsSize = seqrootsize + idrootsize + localrootsize;
+    if (db->header.disk_version >= COUCH_DISK_VERSION_14) {
+        return sizeof(raw_file_header_v14) + rootsSize;
+    } else if (db->header.disk_version == COUCH_DISK_VERSION_13) {
+        return sizeof(raw_file_header_v13) + rootsSize;
     } else {
-        return sizeof(raw_file_header_v12) + seqrootsize + idrootsize +
-               localrootsize;
+        return sizeof(raw_file_header_v12) + rootsSize;
     }
 }
 
@@ -260,7 +290,7 @@ static couchstore_error_t db_write_header_impl(Db* db) {
     if (!writebuf.buf) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
-    auto* header = reinterpret_cast<raw_file_header_v13*>(writebuf.buf);
+    auto* header = reinterpret_cast<raw_file_header_v14*>(writebuf.buf);
     header->version = encode_raw08(db->header.disk_version);
     encode_raw48(db->header.update_seq, &header->update_seq);
     encode_raw48(db->header.purge_seq, &header->purge_seq);
@@ -269,7 +299,11 @@ static couchstore_error_t db_write_header_impl(Db* db) {
     header->idrootsize = encode_raw16((uint16_t)idrootsize);
     header->localrootsize = encode_raw16((uint16_t)localrootsize);
     char* root = writebuf.buf;
-    if (db->header.disk_version >= COUCH_DISK_VERSION_13) {
+    if (db->header.disk_version >= COUCH_DISK_VERSION_14) {
+        header->timestamp = encode_raw64(db->header.timestamp);
+        encode_raw48(db->header.prev_header_pos, &header->prev_header_pos);
+        root += sizeof(raw_file_header_v14);
+    } else if (db->header.disk_version == COUCH_DISK_VERSION_13) {
         header->timestamp = encode_raw64(db->header.timestamp);
         root += sizeof(raw_file_header_v13);
     } else {
@@ -299,6 +333,8 @@ couchstore_error_t db_write_header(Db* db) {
         db->header.timestamp = 0;
         // FALL THROUGH
     case COUCH_DISK_VERSION_13:
+        db->header.prev_header_pos = UNKNOWN_PREV_HEADER_POS;
+        // FALL THROUGH
     case COUCH_DISK_VERSION_14:
         return db_write_header_impl(db);
     default:
@@ -528,6 +564,7 @@ static couchstore_error_t create_header(Db* db, couchstore_open_flags flags) {
     db->header.purge_ptr = 0;
     db->header.position = 0;
     db->header.timestamp = 0;
+    db->header.prev_header_pos = NO_PREV_HEADER_POS;
     if (flags & COUCHSTORE_OPEN_FLAG_NO_COMMIT_AT_CREATE) {
         return COUCHSTORE_SUCCESS;
     }
@@ -601,8 +638,10 @@ couchstore_error_t couchstore_commit_ex(Db* db,
     while (true) {
         const auto preflushPos = db->file.pos;
 
-        // Flush header to kernel buffer
         db->header.timestamp = timestamp;
+        db->header.prev_header_pos = db->header.position;
+
+        // Flush header to kernel buffer
         res = db_write_header(db);
         if (res != COUCHSTORE_SUCCESS) {
             return res;
@@ -874,7 +913,22 @@ static couchstore_error_t couchstore_rewind_db_header_impl(Db* db) {
     error_unless(!db->dropped, COUCHSTORE_ERROR_FILE_CLOSED);
     // free current header guts
     db->header.reset();
-    error_unless(db->header.position != 0, COUCHSTORE_ERROR_DB_NO_LONGER_VALID);
+
+    if (db->header.disk_version >= COUCH_DISK_VERSION_14) {
+        error_unless(db->header.prev_header_pos != NO_PREV_HEADER_POS,
+                     COUCHSTORE_ERROR_DB_NO_LONGER_VALID);
+        if (db->header.prev_header_pos != UNKNOWN_PREV_HEADER_POS &&
+            db->header.prev_header_pos < db->header.position) {
+            errcode = find_header_at_pos(db, db->header.prev_header_pos);
+            if (errcode == COUCHSTORE_SUCCESS ||
+                errcode == COUCHSTORE_ERROR_ALLOC_FAIL) {
+                return errcode;
+            }
+        }
+    }
+
+    error_unless(db->header.position >= COUCH_BLOCK_SIZE,
+                 COUCHSTORE_ERROR_DB_NO_LONGER_VALID);
     // find older header
     error_pass(find_header(db, db->header.position - 2));
 
@@ -2028,6 +2082,8 @@ couchstore_error_t seek(Db& db, Direction direction) {
         } else {
             db.file.pos = uint64_t(offset);
             db.header.position = db.file.pos - 2;
+            // Don't use the previous header pointer
+            db.header.prev_header_pos = UNKNOWN_PREV_HEADER_POS;
             errorcode = couchstore_rewind_db_header_impl(&db);
         }
         break;

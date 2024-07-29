@@ -117,8 +117,9 @@ The CRC32 variant in header and data chunks depends on the file version.
 Since version 12, CRC32C (Castagnoli) is used, as some processors
 provide instructions for accelerating its computation.
 
-Support for encryption is introduced in version 14. The file header
-format is the same as in version 13.
+Version 14 introduces support for encryption and adds the position of
+the previous header to the file header. The position is all ones if
+there is no previous header.
 
 Values in the body of a file header:
 
@@ -132,6 +133,7 @@ length  | content
 16 bits | Size of by-ID B-tree root
 16 bits | Size of local documents B-tree root
 64 bits | Timestamp (present from version 13)
+48 bits | Position of previous header (present from version 14)
 
  * The B-tree roots, in the order of the sizes, are B-tree node pointers as
    described in the "Node Pointers" section.

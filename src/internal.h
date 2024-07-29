@@ -36,7 +36,7 @@
 // Version 13 of the file adds a timestamp to the header
 // (which the application may provide as part of commit)
 #define COUCH_DISK_VERSION_13 13
-// Version 14 adds support for encryption and has identical header to version 13
+// Version 14 adds position of previous header and support for encryption
 #define COUCH_DISK_VERSION_14 14
 
 // Conservative estimate; just for sanity check
@@ -56,6 +56,13 @@
 #endif
 
 #define MAX_ERR_STR_LEN 250
+
+// Previous header position is not stored in the file header (version < 14)
+// or we don't want to use that offset. The value is not written to disk.
+constexpr uint64_t UNKNOWN_PREV_HEADER_POS = -1;
+// Maximum 48-bit offset (max that can be stored)
+// which indicates that this is the first header in the file
+constexpr uint64_t NO_PREV_HEADER_POS = (1ULL << 48) - 1;
 
 struct cb_free_deleter {
     void operator()(void* ptr) const {
@@ -139,6 +146,7 @@ struct db_header {
     uint64_t purge_ptr;
     uint64_t position;
     uint64_t timestamp;
+    uint64_t prev_header_pos;
     void reset() {
         cb_free(by_id_root);
         cb_free(by_seq_root);
