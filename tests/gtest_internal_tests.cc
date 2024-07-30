@@ -650,6 +650,32 @@ TEST_F(CouchstoreInternalTest, OpenFails_FileAlreadyExists) {
 #endif
 }
 
+/**
+ * Verifies that compaction will not open an existing target file
+ */
+TEST_F(CouchstoreInternalTest, CompactFails_FileAlreadyExists) {
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(
+                      compactPath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+    db = nullptr;
+    ASSERT_TRUE(cb::io::isFile(compactPath));
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db(
+                      filePath.c_str(), COUCHSTORE_OPEN_FLAG_CREATE, &db));
+
+    EXPECT_EQ(COUCHSTORE_ERROR_OPEN_FILE,
+              couchstore_compact_db(db, compactPath.c_str()));
+    EXPECT_TRUE(cb::io::isFile(compactPath));
+#ifdef WIN32
+    EXPECT_EQ(ERROR_FILE_EXISTS, GetLastError());
+#else
+    EXPECT_EQ(EEXIST, errno);
+#endif
+}
+
 class CouchstoreMetadataTest : public CouchstoreInternalTest,
                                public ::testing::WithParamInterface<size_t> {};
 

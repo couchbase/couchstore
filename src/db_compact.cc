@@ -117,6 +117,7 @@ couchstore_error_t cb::couchstore::compact(
                     std::move(rewriteDocInfoCallback),
                     flags);
     couchstore_open_flags open_flags = COUCHSTORE_OPEN_FLAG_CREATE |
+                                       COUCHSTORE_OPEN_FLAG_EXCL |
                                        COUCHSTORE_OPEN_FLAG_NO_COMMIT_AT_CREATE;
     error_unless(!source.dropped, COUCHSTORE_ERROR_FILE_CLOSED);
     error_unless(ctx.transient_arena && ctx.persistent_arena, COUCHSTORE_ERROR_ALLOC_FAIL);

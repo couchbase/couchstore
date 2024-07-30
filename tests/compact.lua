@@ -44,6 +44,7 @@ end
 function compaction_test(dbname)
    local db = couch.open(dbname, true)
    outfile = os.tmpname()
+   os.remove(outfile)
    insdata(db)
    local origdat = into_table(db)
    os.execute("./couch_compact " .. dbname .. " " .. outfile)

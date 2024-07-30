@@ -48,6 +48,7 @@ end
 function compaction_test(dbname)
    local db = couch.open(dbname, true)
    outfile = os.tmpname()
+   os.remove(outfile)
    insdata(db)
    db:delete("k99")
    db:delete("k200")

@@ -68,6 +68,7 @@ class PurgeTest(unittest.TestCase):
         self.assertRaises(KeyError, self.newdb.getInfo, "foo4")
 
         self.newdb.close()
+        os.remove(self.purgedname)
 
         os.system(path.join(os.getcwd(), "couch_compact") +
                   " --purge-before 15 --purge-only-upto-seq " + str(seqKept) +
@@ -82,6 +83,7 @@ class PurgeTest(unittest.TestCase):
         self.assertIsNotNone(self.newdb.getInfo("foo4"))
 
         self.newdb.close()
+        os.remove(self.purgedname)
 
         os.system(path.join(os.getcwd(), "couch_compact") +
                   " --purge-before 15 --purge-only-upto-seq " + str(seqLateDelete) +
