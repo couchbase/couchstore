@@ -30,6 +30,8 @@
 #include <libcouchstore/couch_db.h>
 #include <platform/dirutils.h>
 
+#include <queue>
+
 /**
  * Note: below internal Couchstore header files should be located
  *       at the end of all above includes. Otherwise it causes
@@ -37,6 +39,7 @@
  */
 #include "src/couch_btree.h"
 #include "src/internal.h"
+#include "src/merge_sort.h"
 #include "src/stream.h"
 #include "src/tree_writer.h"
 
@@ -1417,6 +1420,67 @@ INSTANTIATE_TEST_SUITE_P(Parameterised,
                              return testInfo.param ? "EncryptedStream"
                                                    : "FileStream";
                          });
+
+template <typename Element>
+class TestQueue {
+public:
+    std::optional<Element> pop() {
+        EXPECT_TRUE(has_rewound);
+        if (queue.empty()) {
+            return {};
+        }
+        auto ret = std::move(queue.front());
+        queue.pop();
+        return ret;
+    }
+
+    void push(Element elem) {
+        EXPECT_FALSE(has_rewound);
+        queue.push(std::move(elem));
+    }
+
+    void rewind() {
+        has_rewound = true;
+    }
+
+protected:
+    std::queue<Element> queue;
+    bool has_rewound = false;
+};
+
+class MergeSortTest : public ::testing::Test,
+                      public ::testing::WithParamInterface<int> {};
+
+TEST_P(MergeSortTest, Int) {
+    TestQueue<int> source;
+    unsigned char r = 1;
+    for (auto ii = GetParam(); ii--;) {
+        source.push(r);
+        r = r * 37 + 1;
+    }
+
+    auto sorted = cb::couchstore::merge_sort<int>(
+            123,
+            std::move(source),
+            []() { return TestQueue<int>(); },
+            [](auto& queue) { return queue.pop(); },
+            [](auto& queue, int elem) { queue.push(elem); },
+            [](auto& queue) { queue.rewind(); });
+
+    int prev = -1;
+    size_t count = 0;
+    while (auto elem = sorted.pop()) {
+        ASSERT_GE(*elem, prev);
+        prev = *elem;
+        ++count;
+    }
+    EXPECT_EQ(GetParam(), count);
+}
+
+INSTANTIATE_TEST_SUITE_P(Parameterised,
+                         MergeSortTest,
+                         ::testing::Values(122, 123, 124, 123 * 8, 1000),
+                         ::testing::PrintToStringParamName());
 
 class MockTreeWriter : public TreeWriter {
 public:
