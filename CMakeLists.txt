@@ -74,6 +74,7 @@ ADD_LIBRARY(couchstore_objs OBJECT
         src/node_types.cc
         src/quicksort.c
         src/reduces.cc
+        src/stream.cc
         src/strerror.cc
         src/tree_writer.cc
         src/util.cc

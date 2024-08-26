@@ -37,6 +37,7 @@
  */
 #include "src/couch_btree.h"
 #include "src/internal.h"
+#include "src/stream.h"
 #include "src/tree_writer.h"
 
 using namespace testing;
@@ -1355,6 +1356,67 @@ TEST_P(CompactTargetWrite, fail) {
 INSTANTIATE_TEST_SUITE_P(Parameterised, CompactTargetWrite,
                         ::testing::Range(0, 6),
                         ::testing::PrintToStringParamName());
+
+class StreamTest : public ::testing::Test,
+                   public ::testing::WithParamInterface<bool> {
+protected:
+    void SetUp() override {
+        path = GetParam() ? "encrypted_stream.stream" : "file_stream.stream";
+        stream = cb::couchstore::make_file_stream(path, "w+b");
+        if (GetParam()) {
+            stream = cb::couchstore::make_encrypted_stream(
+                    std::move(stream),
+                    cb::crypto::SymmetricCipher::create(
+                            cb::crypto::Cipher::AES_256_GCM,
+                            std::string(32, 'k')),
+                    8);
+        }
+    }
+
+    void TearDown() override {
+        stream.reset();
+        if (!path.empty()) {
+            std::filesystem::remove(path);
+        }
+    }
+
+    std::unique_ptr<cb::couchstore::Stream> stream;
+    std::filesystem::path path;
+};
+
+TEST_P(StreamTest, ReadWrite) {
+    for (auto ii = 5; ii--;) {
+        stream->write("hello");
+    }
+    std::string buf;
+    buf.resize(11);
+    stream->seek_begin();
+    stream->read(buf);
+    EXPECT_EQ("hellohelloh", buf);
+
+    buf.resize(6);
+    stream->read(buf);
+    EXPECT_EQ("ellohe", buf);
+
+    stream->seek_end();
+    stream->write({"bye", 3});
+
+    buf.resize(28);
+    stream->seek_begin();
+    EXPECT_TRUE(stream->read(buf));
+    EXPECT_EQ("hellohellohellohellohellobye", buf);
+
+    buf.resize(1);
+    EXPECT_FALSE(stream->read(buf));
+}
+
+INSTANTIATE_TEST_SUITE_P(Parameterised,
+                         StreamTest,
+                         ::testing::Bool(),
+                         [](const ::testing::TestParamInfo<bool>& testInfo) {
+                             return testInfo.param ? "EncryptedStream"
+                                                   : "FileStream";
+                         });
 
 class MockTreeWriter : public TreeWriter {
 public:
