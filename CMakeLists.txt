@@ -196,29 +196,16 @@ cb_add_test_executable(couch_create src/couch_create.cc src/crc32.cc)
 TARGET_LINK_LIBRARIES(couch_create couchstore platform gsl::gsl-lite)
 TARGET_INCLUDE_DIRECTORIES(couch_create PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
-IF (INSTALL_HEADER_FILES)
-   INSTALL(FILES
-           include/libcouchstore/couch_db.h
-           include/libcouchstore/couch_common.h
-           include/libcouchstore/error.h
-           include/libcouchstore/file_ops.h
-           include/libcouchstore/visibility.h
-           DESTINATION include/libcouchstore)
-ENDIF(INSTALL_HEADER_FILES)
-
-INSTALL(TARGETS couchstore
-                couchstore_views
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
-
 IF (APPLE)
     SET_TARGET_PROPERTIES(couchstore
                           PROPERTIES
                           INSTALL_RPATH "@loader_path")
 ENDIF (APPLE)
 
-INSTALL(TARGETS couch_dbdump
+INSTALL(TARGETS
+                couchstore
+                couchstore_views
+                couch_dbdump
                 couch_dbinfo
                 couch_dbck
                 couch_compact
@@ -227,7 +214,9 @@ INSTALL(TARGETS couch_dbdump
                 couch_view_group_cleanup
                 couch_view_index_updater
                 couch_view_group_compactor
-        RUNTIME DESTINATION bin)
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake.h.in
                ${CMAKE_CURRENT_BINARY_DIR}/couchstore_config.h)
