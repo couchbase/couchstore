@@ -14,7 +14,6 @@
  *   limitations under the License.
  */
 
-#include <getopt.h>
 #include <inttypes.h>
 #include <libcouchstore/couch_db.h>
 #include <platform/cbassert.h>
@@ -28,6 +27,9 @@
 #include <optional>
 
 #include "internal.h"
+#include "program_getopt.h"
+
+static cb::couchstore::ProgramGetopt program_options;
 
 static bool format_timestamp = false;
 
@@ -61,8 +63,12 @@ static int process_file(const char* file,
                                   "CRC-32",
                                   "CRC-32C"};
 
-    auto [errcode, db] = cb::couchstore::openDatabase(
-            file, COUCHSTORE_OPEN_FLAG_RDONLY, {}, {}, header_offset);
+    auto [errcode, db] =
+            cb::couchstore::openDatabase(file,
+                                         COUCHSTORE_OPEN_FLAG_RDONLY,
+                                         program_options.getKeyLookupFunction(),
+                                         {},
+                                         header_offset);
     if (errcode != COUCHSTORE_SUCCESS) {
         fprintf(stderr,
                 "Failed to open \"%s\": %s\n",
@@ -125,98 +131,89 @@ next_header:
     return 0;
 }
 
-static void usage() {
+static void usage(int exitcode) {
     std::cerr << R"(Usage: couch_dbinfo [options] <file> [<file2> <file3>]
-Options:
-   -i / --iterate-headers[=<direction>]
-      Dump all headers in the file. Direction may be:
-         forward   Going forward in history (oldest first, newest last)
-         backward  Going back in history (newest first, oldest last)
-   -o / --header-offset <offset>
-      Specify the offset of the header to use (may be combined with
-      --iterate-header to iterate a subset of the file).
-   -l / --localtime
-      Assume that the timestamp in the headers is the number of ns
-      since epoch and print it as a human readable form (local time)
 
+Options:
+
+)" << program_options
+              << std::endl
+              << R"(
 Note:
 Unless --header-offset is specified the program selects the last
-header block found in the file.
-
-)";
-    exit(EXIT_FAILURE);
+header block found in the file.)"
+              << std::endl;
+    std::exit(exitcode);
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char** argv) {
     int error = 0;
-    int ii;
     int iterate_headers = getenv("ITERATE_HEADERS") != nullptr;
-    int cmd;
     std::optional<cs_off_t> header_offset;
     using cb::couchstore::Direction;
     Direction direction = Direction::Backward;
 
-    struct option long_options[] = {
-            {"header-offset", required_argument, nullptr, 'o'},
-            {"iterate-headers", optional_argument, nullptr, 'i'},
-            {"localtime", no_argument, nullptr, 'l'},
-            {"help", no_argument, nullptr, '?'},
-            {nullptr, 0, nullptr, 0}};
+    program_options.addOption(
+            {[&header_offset](auto value) {
+                 if (value.rfind("0x") == 0) {
+                     header_offset.emplace(cb::from_hex(value));
+                 } else {
+                     header_offset.emplace(std::stoi(std::string(value)));
+                 }
+             },
+             'o',
+             "header-offset",
+             cb::getopt::Argument::Required,
+             "<offset>",
+             "Specify the offset of the header to use (may be combined with "
+             "--iterate-header to iterate a subset of the file)."});
 
-    while ((cmd = getopt_long(argc, argv, "io:l", long_options, nullptr)) !=
-           EOF) {
-        switch (cmd) {
-        case 'i':
-            iterate_headers = 1;
-            if (optarg) {
-                std::string_view arg{optarg};
-                if (arg == "forward") {
-                    direction = Direction::Forward;
-                } else if (arg == "backward") {
-                    direction = Direction::Backward;
-                } else {
-                    std::cerr << "Invalid direction for --iterate-headers"
-                              << std::endl;
-                    usage();
-                }
-            }
-            break;
-        case 'o':
-            // There is a bug in clang-analyze that it _thinks_ that optarg
-            // may be nullptr as I did check for it at line 165, but the
-            // the observant reader should see that header-offset have a
-            // required argument, and iterate-headers have an _optional_
-            // argument so optarg MUST be non-null here. Lets add a test
-            // for it to make clang-analyze happy...
-            cb_assert(optarg);
-            if (strcmp(optarg, "0x") == 0) {
-                header_offset.emplace(cb::from_hex(optarg));
-            } else {
-                header_offset.emplace(std::atoi(optarg));
-            }
-            break;
-        case 'l':
-            format_timestamp = true;
-            break;
-        default:
-            usage();
-            /* NOTREACHED */
-        }
+    program_options.addOption(
+            {[&iterate_headers, &direction](auto value) {
+                 iterate_headers = 1;
+                 if (value == "forward") {
+                     direction = Direction::Forward;
+                 } else if (value == "backward") {
+                     direction = Direction::Backward;
+                 } else if (!value.empty()) {
+                     std::cerr << "Invalid direction for --iterate-headers"
+                               << std::endl;
+                     usage(EXIT_FAILURE);
+                 }
+             },
+             'i',
+             "iterate-headers",
+             cb::getopt::Argument::Optional,
+             "<direction>",
+             R"(Dump all headers in the file. Direction may be:
+            forward   Going forward in history (oldest first, newest last)
+            backward  Going back in history (newest first, oldest last))"});
+
+    program_options.addOption(
+            {[](auto) { format_timestamp = true; },
+             'l',
+             "localtime",
+             "Assume that the timestamp in the headers is the number of ns "
+             "since epoch and print it as a human readable form (local time)"});
+
+    program_options.addOption(
+            {[](auto) { usage(EXIT_SUCCESS); }, "help", "This help text "});
+
+    auto arguments =
+            program_options.parse(argc, argv, [] { usage(EXIT_FAILURE); });
+    if (arguments.empty()) {
+        usage(EXIT_FAILURE);
     }
 
-    if (optind == argc) {
-        usage();
-    }
-
-    for (ii = optind; ii < argc; ++ii) {
-        error += process_file(
-                argv[ii], iterate_headers, header_offset, direction);
+    for (const auto& arg : arguments) {
+        error |= process_file(std::string(arg).c_str(),
+                              iterate_headers,
+                              header_offset,
+                              direction);
     }
 
     if (error) {
         exit(EXIT_FAILURE);
-    } else {
-        exit(EXIT_SUCCESS);
     }
+    exit(EXIT_SUCCESS);
 }

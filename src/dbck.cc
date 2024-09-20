@@ -1,4 +1,3 @@
-/* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
  *     Copyright 2017 Couchbase, Inc
  *
@@ -16,32 +15,32 @@
  */
 
 #include "internal.h"
+#include "program_getopt.h"
 #include "util.h"
 
 #include <libcouchstore/couch_db.h>
-
-#include <getopt.h>
 #include <cinttypes>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
 
-static void usage() {
-    printf("USAGE: couch_dbck [options] "
-           "source_filename [destination_filename]\n");
-    printf("\nOptions:\n");
-    printf("    -s, --stale       "
-           "Recover from stale commits if corruption detected.\n");
-    printf("    -v, --verbose     "
-           "Display detailed messages.\n");
-    printf("    -j, --json        "
-           "Display corrupt document info as JSON objects "
-           "(one per line).\n");
-    exit(EXIT_FAILURE);
+static cb::couchstore::ProgramGetopt program_options;
+
+static void usage(int exitcode) {
+    std::cerr
+            << R"(Usage: couch_dbck [options] "source_filename [destination_filename]
+
+Options:
+
+)" << program_options
+            << std::endl
+            << std::endl;
+    std::exit(exitcode);
 }
 
 struct recovery_options {
@@ -287,7 +286,7 @@ static int recover_file(recovery_options& options) {
 
     if (options.src_filename == options.dst_filename) {
         // Both filenames shouldn't be the same.
-        usage();
+        usage(EXIT_FAILURE);
     }
 
     // Source (may be corrupted) DB.
@@ -402,52 +401,44 @@ cleanup:
 }
 
 int main(int argc, char** argv) {
-    const std::vector<option> long_options = {
-            {"stale", no_argument, nullptr, 's'},
-            {"verbose", no_argument, nullptr, 'v'},
-            {"json", no_argument, nullptr, 'j'},
-            {nullptr, 0, nullptr, 0}};
-
     recovery_options options;
-    int opt;
 
-    while ((opt = getopt_long(
-                    argc, argv, "svj", long_options.data(), nullptr)) != -1) {
-        switch (opt) {
-        case 's': // stale
-            options.enable_rewind = true;
-            break;
-        case 'v': // verbose
-            options.verbose_msg = true;
-            break;
-        case 'j': // json
-            options.json = true;
-            break;
+    program_options.addOption(
+            {[&options](auto) { options.enable_rewind = true; },
+             's',
+             "stale",
+             "Recover from stale commits if corruption detected"});
 
-        default:
-            usage();
-        }
-    }
+    program_options.addOption({[&options](auto) { options.verbose_msg = true; },
+                               'v',
+                               "verbose",
+                               "Display detailed messages"});
 
-    if (argc - optind < 1) {
+    program_options.addOption(
+            {[&options](auto) { options.json = true; },
+             'j',
+             "json",
+             "Display corrupt document info as JSON objects (one per line)"});
+
+    program_options.addOption(
+            {[](auto) { usage(EXIT_SUCCESS); }, "help", "This help text "});
+
+    auto arguments =
+            program_options.parse(argc, argv, [] { usage(EXIT_FAILURE); });
+
+    if (arguments.size() < 1) {
         // After option fields, one or two more fields
         // (for src/dst files) should exist.
-        usage();
+        usage(EXIT_FAILURE);
     }
 
-    options.src_filename = argv[optind];
-    if (argc - optind == 1) {
+    options.src_filename = arguments[0];
+    if (arguments.size() == 1) {
         // Destination file name is not given, automatically set it.
         options.dst_filename = options.src_filename + ".recovered";
     } else {
-        options.dst_filename = argv[optind+1];
+        options.dst_filename = arguments[1];
     }
 
-    int errcode = recover_file(options);
-
-    if (errcode == 0) {
-        return EXIT_SUCCESS;
-    } else {
-        return EXIT_FAILURE;
-    }
+    return recover_file(options) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

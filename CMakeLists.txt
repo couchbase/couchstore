@@ -146,12 +146,22 @@ SET(COUCHSTORE_VIEW_LIBS_WITHOUT_GLOBAL_NEW_REPLACEMENT ${V8_LIBRARIES} ${ICU_LI
 TARGET_LINK_LIBRARIES(couchstore_views ${COUCHSTORE_VIEW_LIBS_WITHOUT_GLOBAL_NEW_REPLACEMENT})
 TARGET_INCLUDE_DIRECTORIES(couchstore_views PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
+add_library(couchstore_program_utilities OBJECT
+        src/program_getopt.cc
+        src/program_getopt.h)
+target_link_libraries(couchstore_program_utilities PUBLIC  platform cbcrypto)
+target_compile_definitions(couchstore_program_utilities
+        PRIVATE DESTINATION_ROOT="${CMAKE_INSTALL_PREFIX}"
+        PRODUCT_VERSION="${PRODUCT_VERSION}")
+
 ADD_EXECUTABLE(couch_dbdump
                src/dbdump.cc
                src/tracking_file_ops.cc
                $<TARGET_OBJECTS:couchstore_objs>
                $<TARGET_OBJECTS:couchstore_view_objs>)
-
+target_compile_definitions(couch_dbdump
+        PRIVATE DESTINATION_ROOT="${CMAKE_INSTALL_PREFIX}"
+        PRODUCT_VERSION="${PRODUCT_VERSION}")
 SET_TARGET_PROPERTIES(couch_dbdump PROPERTIES COMPILE_FLAGS "-DLIBCOUCHSTORE_NO_VISIBILITY=1")
 TARGET_INCLUDE_DIRECTORIES(couch_dbdump
                            PRIVATE
@@ -166,13 +176,15 @@ TARGET_LINK_LIBRARIES(couch_dbdump
                       ${COUCHSTORE_VIEW_LIBS} gsl::gsl-lite)
 
 ADD_EXECUTABLE(couch_dbck src/dbck.cc)
-TARGET_LINK_LIBRARIES(couch_dbck couchstore platform)
+TARGET_LINK_LIBRARIES(couch_dbck couchstore platform couchstore_program_utilities)
 
 ADD_EXECUTABLE(couch_dbinfo src/dbinfo.cc)
-TARGET_LINK_LIBRARIES(couch_dbinfo couchstore platform)
+TARGET_COMPILE_DEFINITIONS(couch_dbinfo
+        PRIVATE DESTINATION_ROOT="${CMAKE_INSTALL_PREFIX}")
+TARGET_LINK_LIBRARIES(couch_dbinfo PRIVATE couchstore platform couchstore_program_utilities)
 
 ADD_EXECUTABLE(couch_compact src/compactor.cc)
-TARGET_LINK_LIBRARIES(couch_compact couchstore platform)
+TARGET_LINK_LIBRARIES(couch_compact couchstore platform couchstore_program_utilities)
 
 ADD_EXECUTABLE(couch_view_file_merger src/views/bin/couch_view_file_merger.cc src/views/bin/util.cc)
 TARGET_LINK_LIBRARIES(couch_view_file_merger couchstore_views)

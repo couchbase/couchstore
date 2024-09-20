@@ -2,16 +2,17 @@
 #include "couchstore_config.h"
 
 #include "bitfield.h"
+#include "program_getopt.h"
 
 #include <libcouchstore/couch_db.h>
 #include <platform/compress.h>
 
-#include <getopt.h>
 #include <cctype>
+#include <cinttypes>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <string>
-#include <cinttypes>
 
 static int quiet = 0;
 struct compare_context {
@@ -22,10 +23,17 @@ struct compare_context {
     int diff;
 };
 
-static void usage() {
-    printf("USAGE: dbdiff [-q] file1 file2\n");
-    printf("   -q\tquiet\n");
-    exit(EXIT_FAILURE);
+static cb::couchstore::ProgramGetopt program_options;
+
+static void usage(int exitcode) {
+    std::cerr << R"(Usage: dbdiff [options] file1 file2
+
+Options:
+
+)" << program_options
+              << std::endl
+              << std::endl;
+    std::exit(exitcode);
 }
 
 static int is_printable_key(sized_buf key) {
@@ -388,37 +396,35 @@ static int diff(Db** dbs) {
 }
 
 int main(int argc, char** argv) {
-    int cmd;
     int ii;
     Db* dbs[2];
     int difference;
 
-    while ((cmd = getopt(argc, argv, "q")) != -1) {
-        switch (cmd) {
-        case 'q':
-            quiet = 1;
-            break;
+    program_options.addOption({[](auto) { quiet = 1; },
+                               'q',
+                               "quiet",
+                               "Print a minimum of output"});
 
-        default:
-            usage();
-            /* NOT REACHED */
-        }
-    }
+    program_options.addOption(
+            {[](auto) { usage(EXIT_SUCCESS); }, "help", "This help text "});
 
-    if ((optind + 2) != argc) {
-        fprintf(stderr, "Exactly two filenames should be specified\n");
-        usage();
-        /* NOT REACHED */
+    auto arguments =
+            program_options.parse(argc, argv, [] { usage(EXIT_FAILURE); });
+    if (arguments.size() != 2) {
+        std::cerr << "Exactly two filenames should be specified" << std::endl;
+        usage(EXIT_FAILURE);
     }
 
     for (ii = 0; ii < 2; ++ii) {
-        couchstore_error_t err;
-        err = couchstore_open_db(
-                argv[optind + ii], COUCHSTORE_OPEN_FLAG_RDONLY, &dbs[ii]);
+        auto err = couchstore_open_db_ex(std::string(arguments[ii]).c_str(),
+                                         COUCHSTORE_OPEN_FLAG_RDONLY,
+                                         program_options.getKeyLookupFunction(),
+                                         couchstore_get_default_file_ops(),
+                                         &dbs[ii]);
         if (err != COUCHSTORE_SUCCESS) {
             fprintf(stderr,
                     "Failed to open \"%s\": %s\n",
-                    argv[optind + ii],
+                    std::string(arguments[ii]).c_str(),
                     couchstore_strerror(err));
             if (ii == 1) {
                 couchstore_close_file(dbs[0]);

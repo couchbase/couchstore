@@ -10,6 +10,9 @@
 #include "views/index_header.h"
 #include "views/util.h"
 #include "views/view_group.h"
+
+#include <cbcrypto/dump_keys_runner.h>
+#include <cbcrypto/key_store.h>
 #include <libcouchstore/couch_db.h>
 #include <libcouchstore/json_utils.h>
 #include <mcbp/protocol/unsigned_leb128.h>
@@ -18,6 +21,7 @@
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
 #include <platform/compress.h>
+#include <platform/getpass.h>
 #include <platform/split_string.h>
 #include <platform/string_hex.h>
 #include <storage_common/doc_key_encoder.h>
@@ -31,6 +35,38 @@
 #include <optional>
 
 #define MAX_HEADER_SIZE (64 * 1024)
+
+static std::string password;
+static std::string dump_keys_executable = DESTINATION_ROOT "/bin/dump-keys";
+static std::string gosecrets =
+        DESTINATION_ROOT "/var/lib/couchbase/config/gosecrets.cfg";
+
+static cb::crypto::SharedEncryptionKey lookup_encryption_key(
+        std::string_view id) {
+    static cb::crypto::KeyStore key_store;
+    if (id.empty()) {
+        return key_store.getActiveKey();
+    }
+
+    auto ret = key_store.lookup(id);
+    if (ret) {
+        return ret;
+    }
+
+    auto dump_keys_runner = cb::crypto::DumpKeysRunner::create(
+            password, dump_keys_executable, gosecrets);
+    auto key = dump_keys_runner->lookup(id);
+    if (key) {
+        // add for later requests
+        key_store.add(key);
+        // set it as the active key. This is useful if for command line
+        // utilities which opens file A for reading and B for writing..
+        // then they'll reuse the same key (will of course fail if they
+        // open B before A.. that'll cause the file to be unencrypted...)
+        key_store.setActiveKey(key);
+    }
+    return key;
+}
 
 enum DumpMode{
     DumpBySequence,
@@ -837,9 +873,14 @@ static int process_vbucket_file(const char *file, int *total)
     if (mode == DumpFileMap) {
         flags |= COUCHSTORE_OPEN_FLAG_UNBUFFERED;
         trackingFileOps = new TrackingFileOps();
-        errcode = couchstore_open_db_ex(file, flags, {}, trackingFileOps, &db);
+        errcode = couchstore_open_db_ex(
+                file, flags, lookup_encryption_key, trackingFileOps, &db);
     } else {
-        errcode = couchstore_open_db(file, flags, &db);
+        errcode = couchstore_open_db_ex(file,
+                                        flags,
+                                        lookup_encryption_key,
+                                        couchstore_get_default_file_ops(),
+                                        &db);
     }
     if (errcode != COUCHSTORE_SUCCESS) {
         fprintf(stderr, "Failed to open \"%s\": %s\n",
@@ -1160,6 +1201,14 @@ static void usage() {
     printf("    --tree       show file b-tree structure instead of data\n");
     printf("    --local      dump local documents. Can be used in conjunction with --tree\n");
     printf("    --map        dump block map \n");
+    printf("    --password password Use the provided password to decrypt "
+           "encryption keys (Use '-' to read from stdin)\n");
+    printf("    --with-dump-keys /path/to/dump-keys Use an alternative "
+           "dump-keys binary (Default: %s)\n",
+           dump_keys_executable.c_str());
+    printf("    --with-gosecrets /path/to/gosecrets.cfg Use an aternative "
+           "configuration file (Default: %s)\n",
+           gosecrets.c_str());
     exit(EXIT_FAILURE);
 }
 
@@ -1225,6 +1274,27 @@ int main(int argc, char **argv)
             mode = DumpLocals;
         } else if (command == "--map") {
             mode = DumpFileMap;
+        } else if (command == "--with-dump-keys") {
+            if (argc < (ii + 1)) {
+                usage();
+            }
+            dump_keys_executable = argv[ii + 1];
+            ++ii;
+        } else if (command == "--with-gosecrets") {
+            if (argc < (ii + 1)) {
+                usage();
+            }
+            gosecrets = argv[ii + 1];
+            ++ii;
+        } else if (command == "--password") {
+            if (argc < (ii + 1)) {
+                usage();
+            }
+            password = argv[ii + 1];
+            ++ii;
+            if (password == "-") {
+                password = cb::getpass();
+            }
         } else if (command == "--iterate-headers") {
             iterateHeaders = true;
         } else if (command == "--dump-headers") {

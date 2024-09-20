@@ -15,27 +15,31 @@
  */
 
 #include "bitfield.h"
-#include <getopt.h>
+#include "program_getopt.h"
+
+#include <fmt/format.h>
 #include <libcouchstore/couch_db.h>
+#include <cinttypes>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
-#include <cinttypes>
+
+static cb::couchstore::ProgramGetopt program_options;
 
 static void exit_error(couchstore_error_t errcode) {
     fprintf(stderr, "Couchstore error: %s\n", couchstore_strerror(errcode));
     exit(-1);
 }
 
-static void usage() {
+static void usage(int exitcode) {
     std::cerr << R"(Usage: couch_compact [options] <input file> <output file>
+
 Options:
-    -p / --purge-before <timestamp>
-    -s / --purge-only-upto-seq <seq>
-    -d / --dropdeletes
-    -u / --upgrade
-)";
-    exit(-1);
+
+)" << program_options
+              << std::endl
+              << std::endl;
+    std::exit(exitcode);
 }
 
 typedef struct {
@@ -77,68 +81,75 @@ int main(int argc, char** argv) {
     couchstore_docinfo_hook dhook = nullptr;
     void* hook_ctx = nullptr;
     couchstore_compact_flags flags = 0;
-    FileOpsInterface* target_io_ops = couchstore_get_default_file_ops();
-    if (argc < 3) {
-        usage();
+
+    program_options.addOption(
+            {[&hook, &hook_ctx, &timepurge](auto value) {
+                 hook = time_purge_hook;
+                 hook_ctx = &timepurge;
+                 timepurge.purge_before_ts = std::stoi(std::string(value));
+                 printf("Purging items before timestamp %" PRIu64 "\n",
+                        timepurge.purge_before_ts);
+             },
+             'p',
+             "purge-before",
+             cb::getopt::Argument::Required,
+             "<timestamp>",
+             "Purge items before timestamp"});
+
+    program_options.addOption(
+            {[&timepurge](auto value) {
+                 timepurge.purge_before_seq = std::stoull(std::string(value));
+                 printf("Purging items only up-to seq %" PRIu64 "\n",
+                        timepurge.purge_before_seq);
+             },
+             's',
+             "purge-only-upto-seq",
+             cb::getopt::Argument::Required,
+             "<seq>",
+             "Purge items only up to provided sequence number"});
+
+    program_options.addOption(
+            {[&flags](auto) { flags |= COUCHSTORE_COMPACT_FLAG_DROP_DELETES; },
+             'd',
+             "dropdeletes",
+             "Drop deletes as part of compaction"});
+
+    program_options.addOption(
+            {[&flags](auto) { flags |= COUCHSTORE_COMPACT_FLAG_UPGRADE_DB; },
+             'u',
+             "upgrade",
+             "Upgrade to latest version of file format"});
+
+    program_options.addOption(
+            {[](auto) { usage(EXIT_SUCCESS); }, "help", "This help text "});
+
+    auto arguments =
+            program_options.parse(argc, argv, [] { usage(EXIT_FAILURE); });
+    if (arguments.size() != 2) {
+        usage(EXIT_FAILURE);
     }
 
-    struct option long_options[] = {
-            {"purge-before", required_argument, nullptr, 'p'},
-            {"purge-only-upto-seq", required_argument, nullptr, 's'},
-            {"dropdeletes", no_argument, nullptr, 'd'},
-            {"upgrade", no_argument, nullptr, 'u'},
-            {"help", no_argument, nullptr, '?'},
-            {nullptr, 0, nullptr, 0}};
-
-    int cmd;
-    while ((cmd = getopt_long(argc, argv, "p:s:du", long_options, nullptr)) !=
-           EOF) {
-        switch (cmd) {
-        case 'p':
-            hook = time_purge_hook;
-            hook_ctx = &timepurge;
-            timepurge.purge_before_ts = std::stoi(optarg);
-            printf("Purging items before timestamp %" PRIu64 "\n",
-                   timepurge.purge_before_ts);
-            break;
-        case 's':
-            timepurge.purge_before_seq = std::stoull(optarg);
-            printf("Purging items only up-to seq %" PRIu64 "\n",
-                   timepurge.purge_before_seq);
-            break;
-        case 'd':
-            flags |= COUCHSTORE_COMPACT_FLAG_DROP_DELETES;
-            break;
-        case 'u':
-            flags |= COUCHSTORE_COMPACT_FLAG_UPGRADE_DB;
-            break;
-        default:
-            usage();
-        }
-    }
-
-    if (optind + 2 > argc) {
-        usage();
-    }
-
-    errcode = couchstore_open_db(
-            argv[optind], COUCHSTORE_OPEN_FLAG_RDONLY, &source);
+    errcode = couchstore_open_db_ex(std::string(arguments[0]).c_str(),
+                                    COUCHSTORE_OPEN_FLAG_RDONLY,
+                                    program_options.getKeyLookupFunction(),
+                                    couchstore_get_default_file_ops(),
+                                    &source);
     if (errcode) {
         exit_error(errcode);
     }
     errcode = couchstore_compact_db_ex(source,
-                                       argv[optind + 1],
+                                       std::string(arguments[1]).c_str(),
                                        flags,
-                                       {},
+                                       program_options.getKeyLookupFunction(),
                                        hook,
                                        dhook,
                                        hook_ctx,
-                                       target_io_ops);
+                                       couchstore_get_default_file_ops());
     if (errcode) {
         exit_error(errcode);
     }
 
-    printf("Compacted %s -> %s\n", argv[optind], argv[optind + 1]);
+    fmt::println("Compacted {} -> {}", arguments[0], arguments[1]);
 
     errcode = couchstore_close_file(source);
     couchstore_free_db(source);
