@@ -42,6 +42,12 @@ const char *couchstore_strerror(couchstore_error_t errcode)
         return "scan yield";
     case COUCHSTORE_ERROR_SCAN_CANCELLED:
         return "scan cancelled";
+    case COUCHSTORE_ERROR_NO_ENCRYPTION_KEY:
+        return "encryption key not found";
+    case COUCHSTORE_ERROR_ENCRYPT:
+        return "encryption failed";
+    case COUCHSTORE_ERROR_DECRYPT:
+        return "decryption failed";
     default:
         return "couchstore_strerror unknown errcode";
     }
