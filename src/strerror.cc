@@ -1,10 +1,6 @@
-/* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-#include "couchstore_config.h"
-#include <stdlib.h>
 #include <libcouchstore/couch_db.h>
 
-const char *couchstore_strerror(couchstore_error_t errcode)
-{
+const char* couchstore_strerror(couchstore_error_t errcode) {
     switch (errcode) {
     case COUCHSTORE_SUCCESS:
         return "success";
@@ -38,6 +34,12 @@ const char *couchstore_strerror(couchstore_error_t errcode)
         return "error closing file";
     case COUCHSTORE_ERROR_CANCEL:
         return "error cancel";
+    case COUCHSTORE_ERROR_NOT_SUPPORTED:
+        return "not supported";
+    case COUCHSTORE_ERROR_REDUCTION_TOO_LARGE:
+        return "reduction too large";
+    case COUCHSTORE_ERROR_REDUCER_FAILURE:
+        return "reducer failure";
     case COUCHSTORE_ERROR_SCAN_YIELD:
         return "scan yield";
     case COUCHSTORE_ERROR_SCAN_CANCELLED:
@@ -48,7 +50,6 @@ const char *couchstore_strerror(couchstore_error_t errcode)
         return "encryption failed";
     case COUCHSTORE_ERROR_DECRYPT:
         return "decryption failed";
-    default:
-        return "couchstore_strerror unknown errcode";
     }
+    return "couchstore_strerror unknown errcode";
 }
