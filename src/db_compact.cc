@@ -1,19 +1,18 @@
-/* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-#include "couchstore_config.h"
-#include "internal.h"
-#include "couch_btree.h"
-#include "reduces.h"
-#include "bitfield.h"
 #include "arena.h"
-#include "tree_writer.h"
-#include "node_types.h"
-#include "util.h"
+#include "bitfield.h"
+#include "couch_btree.h"
 #include "couch_latency_internal.h"
+#include "internal.h"
+#include "log_last_internal_error.h"
+#include "node_types.h"
+#include "reduces.h"
+#include "tree_writer.h"
+#include "util.h"
 
 #include <platform/cb_malloc.h>
+#include <cstdio>
+#include <cstdlib>
 #include <stdexcept>
-#include <stdio.h>
-#include <stdlib.h>
 
 struct compact_ctx {
     compact_ctx(cb::couchstore::CompactFilterCallback filterCallback,
@@ -26,7 +25,7 @@ struct compact_ctx {
           rewriteDocInfoCallback(std::move(rewriteDocInfoCallback)),
           flags(flags) {
     }
-    TreeWriter tree_writer;
+    cb::couchstore::TreeWriter tree_writer;
     /* Using this for stuff that doesn't need to live longer than it takes to write
      * out a b-tree node (the k/v pairs) */
     std::unique_ptr<arena, arena_deleter> transient_arena;
@@ -179,6 +178,7 @@ couchstore_error_t cb::couchstore::compact(
         strcpy(tmpFile.data(), target_filename);
         strcat(tmpFile.data(), ".btree-tmp_0");
         error_pass(ctx.tree_writer.open(tmpFile.data(),
+                                        false,
                                         ebin_cmp,
                                         by_id_reduce,
                                         by_id_rereduce,
@@ -190,6 +190,12 @@ couchstore_error_t cb::couchstore::compact(
         } // Recovery mode: we can tolerate corruptions.
         error_pass(ctx.tree_writer.sort());
         error_pass(ctx.tree_writer.write(&target->file, &target->header.by_id_root));
+        if (ctx.tree_writer.num_added != ctx.tree_writer.num_written) {
+            log_last_internal_error(
+                    "cb::couchstore::compact() Number of written by-id entries "
+                    "is different from those added");
+            error_pass(COUCHSTORE_ERROR_CORRUPT);
+        }
     }
 
     if (source.header.local_docs_root) {

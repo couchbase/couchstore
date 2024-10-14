@@ -6,7 +6,11 @@
 #include <cbcrypto/symmetric.h>
 
 #include <array>
-#include <cstdio>
+#include <filesystem>
+
+namespace cb::couchstore {
+
+struct StreamHolder;
 
 /**
  * Writes key/value pairs to a tree file after external-merge-sorting them.
@@ -21,8 +25,8 @@
  * write()
  * close()
  *
- * open()
  * enable_encryption()
+ * open()
  * add()
  * sort()
  * write()
@@ -36,17 +40,23 @@ public:
         std::string value;
     };
 
+    TreeWriter();
+
+    ~TreeWriter();
+
     /**
      * Opens a file for adding items and sorting.
      *
      * Any previously open file must be closed before calling.
      *
-     * @param unsorted_file_path Path to an existing file containing a series of
-     *                           unsorted key/value pairs in TreeWriter format.
+     * @param file_path Path to file which may containing a series of key/value
+     *                  pairs in TreeWriter format.
+     * @param open_existing Whether to read/ add to an existing file
      * @param key_compare Callback function that compares two keys.
      * @return Error code or COUCHSTORE_SUCCESS.
      */
-    couchstore_error_t open(const char* unsorted_file_path,
+    couchstore_error_t open(const char* file_path,
+                            bool open_existing,
                             compare_callback key_compare,
                             reduce_fn reduce,
                             reduce_fn rereduce,
@@ -78,60 +88,62 @@ public:
      */
     couchstore_error_t enable_encryption();
 
-    ~TreeWriter();
+    /// Counter for key/value pairs added in add()
+    unsigned long long num_added{0};
+
+    /// Counter for key/value pairs written to a new tree in write()
+    unsigned long long num_written{0};
 
 protected:
     /**
-     * Writes a key/value pair to the provided file, optionally encrypted.
-     * Used by add(key, value) and the write_record callback.
+     * Creates a new stream of a file with a file name generated from the
+     * initial file name. When the StreamHolder is destroyed the underlying
+     * file is removed.
+     *
+     * @param mode fopen() mode to open the file in
      */
-    couchstore_error_t add(FILE* out,
-                           std::string_view key,
-                           std::string_view value);
-
-    // Callbacks for the merge-sort subroutine
+    std::unique_ptr<StreamHolder> create_stream(const char* mode);
 
     /**
-     * Callback to read a key/value pair from the provided file.
+     * Creates a new stream of the given file. When the StreamHolder is
+     * destroyed the underlying file is removed.
      *
-     * @param in File to read from
-     * @param ptr Pointer to KeyValue struct
-     * @param ctx Pointer to TreeWriter
-     * @return 1 on success
-     *         0 on file end
-     *         -1 on error
+     * @param path File path
+     * @param mode fopen() mode to open the file in
      */
-    static int read_record(FILE* in, void* ptr, void* ctx);
+    std::unique_ptr<StreamHolder> create_stream(std::filesystem::path path,
+                                                const char* mode);
 
     /**
-     * Callback to write a key/value pair to the provided file.
+     * Reads a key/value pair from a stream.
      *
-     * @param out File to write to
-     * @param ptr Pointer to KeyValue struct
-     * @param ctx Pointer to TreeWriter
-     * @return 1 on success
-     *         0 on error
+     * @return Read KeyValue record or std::nullopt on EOF
      */
-    static int write_record(FILE* out, void* ptr, void* ctx);
+    static std::optional<KeyValue> read_record(StreamHolder& sh);
 
     /**
-     * Callback to compare two key/value pairs.
-     *
-     * @param r1 Pointer to first KeyValue struct
-     * @param r2 Pointer to second KeyValue struct
-     * @param ctx Pointer to TreeWriter
-     * @return -1 if r1->key < r2->key
-     *         0 if r1->key == r2->key
-     *         1 if r1->key > r2->key
+     * Writes a key/value pair to a stream.
      */
-    static int compare_records(const void* r1, const void* r2, void* ctx);
+    static void write_record(StreamHolder& sh,
+                             std::string_view key,
+                             std::string_view value);
 
-    std::unique_ptr<cb::crypto::SymmetricCipher> cipher;
-    FILE* file{nullptr};
+    /**
+     * Sets the file position to the beginning of the file.
+     */
+    static void rewind(StreamHolder& sh);
+
+    /// Stream where key/value pairs are stored
+    std::unique_ptr<StreamHolder> stream;
+    /// Cipher to be used for encrypting Streams
+    std::shared_ptr<cb::crypto::SymmetricCipher> cipher;
+    /// Callback for comparing keys
     compare_callback key_compare{nullptr};
     reduce_fn reduce{nullptr};
     reduce_fn rereduce{nullptr};
     void* user_reduce_ctx{nullptr};
-    std::array<char, PATH_MAX> path;
-    std::array<char, PATH_MAX> tmp_path;
+    /// Buffer for temporary file name generation
+    std::filesystem::path tmp_path;
 };
+
+} // namespace cb::couchstore
