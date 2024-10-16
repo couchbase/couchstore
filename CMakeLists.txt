@@ -69,8 +69,6 @@ ADD_LIBRARY(couchstore_objs OBJECT
         src/file_merger.cc
         src/file_sorter.cc
         src/iobuffer.cc
-        src/llmsort.cc
-        src/mergesort.cc
         src/node_types.cc
         src/quicksort.c
         src/reduces.cc
