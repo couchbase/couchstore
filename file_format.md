@@ -133,7 +133,8 @@ length  | content
 16 bits | Size of by-ID B-tree root
 16 bits | Size of local documents B-tree root
 64 bits | Timestamp (present from version 13)
-48 bits | Position of previous header (present from version 14)
+47 bits | Position of previous header (present from version 14)
+1 bit   | Should read metadata header (present from version 14)
 
  * The B-tree roots, in the order of the sizes, are B-tree node pointers as
    described in the "Node Pointers" section.

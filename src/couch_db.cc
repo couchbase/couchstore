@@ -71,6 +71,7 @@ static int rawHeader2internalHeader(const raw_file_header_v12* source,
     header.purge_ptr = decode_raw48(source->purge_ptr);
     header.timestamp = 0;
     header.prev_header_pos = UNKNOWN_PREV_HEADER_POS;
+    header.have_metadata_header = false;
     seqrootsize = decode_raw16(source->seqrootsize);
     idrootsize = decode_raw16(source->idrootsize);
     localrootsize = decode_raw16(source->localrootsize);
@@ -88,6 +89,7 @@ static int rawHeader2internalHeader(const raw_file_header_v13* source,
     header.purge_ptr = decode_raw48(source->purge_ptr);
     header.timestamp = decode_raw64(source->timestamp);
     header.prev_header_pos = UNKNOWN_PREV_HEADER_POS;
+    header.have_metadata_header = false;
     seqrootsize = decode_raw16(source->seqrootsize);
     idrootsize = decode_raw16(source->idrootsize);
     localrootsize = decode_raw16(source->localrootsize);
@@ -105,6 +107,8 @@ static int rawHeader2internalHeader(const raw_file_header_v14* source,
     header.purge_ptr = decode_raw48(source->purge_ptr);
     header.timestamp = decode_raw64(source->timestamp);
     header.prev_header_pos = decode_raw48(source->prev_header_pos);
+    header.have_metadata_header = header.prev_header_pos & 1;
+    header.prev_header_pos >>= 1;
     seqrootsize = decode_raw16(source->seqrootsize);
     idrootsize = decode_raw16(source->idrootsize);
     localrootsize = decode_raw16(source->localrootsize);
@@ -135,6 +139,9 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
         ScopedFileTag tag(db->file.ops, db->file.handle, FileTag::Empty);
         readsize = db->file.ops->pread(
                 &db->file.lastError, db->file.handle, &diskBlockType, 1, pos);
+    }
+    if (readsize < 0) {
+        error_pass(static_cast<couchstore_error_t>(readsize));
     }
     error_unless(readsize == 1, COUCHSTORE_ERROR_READ);
     if (diskBlockType == DiskBlockType::Data ||
@@ -301,7 +308,11 @@ static couchstore_error_t db_write_header_impl(Db* db) {
     char* root = writebuf.buf;
     if (db->header.disk_version >= COUCH_DISK_VERSION_14) {
         header->timestamp = encode_raw64(db->header.timestamp);
-        encode_raw48(db->header.prev_header_pos, &header->prev_header_pos);
+        uint64_t prev_header_pos = db->header.prev_header_pos << 1;
+        if (db->header.have_metadata_header) {
+            prev_header_pos |= 1;
+        }
+        encode_raw48(prev_header_pos, &header->prev_header_pos);
         root += sizeof(raw_file_header_v14);
     } else if (db->header.disk_version == COUCH_DISK_VERSION_13) {
         header->timestamp = encode_raw64(db->header.timestamp);
@@ -334,6 +345,7 @@ couchstore_error_t db_write_header(Db* db) {
         // FALL THROUGH
     case COUCH_DISK_VERSION_13:
         db->header.prev_header_pos = UNKNOWN_PREV_HEADER_POS;
+        db->header.have_metadata_header = false;
         // FALL THROUGH
     case COUCH_DISK_VERSION_14:
         return db_write_header_impl(db);
@@ -428,26 +440,43 @@ static std::pair<couchstore_error_t, FileMetadata> read_metadata_header(
 static couchstore_error_t read_and_set_encryption_key(
         Db* db, const cb::couchstore::EncryptionKeyGetter& encryptionKeyCB) {
     if (db->file.cipher) {
-        // Should be initialized only once
+        log_last_internal_error(
+                "Couchstore::read_and_set_encryption_key() "
+                "Cipher already initialized");
         return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
-    } else if (db->header.disk_version < COUCH_DISK_VERSION_14) {
-        // Encryption not supported
-        return COUCHSTORE_SUCCESS;
+    }
+    if (db->header.disk_version < COUCH_DISK_VERSION_14) {
+        log_last_internal_error(
+                "Couchstore::read_and_set_encryption_key() "
+                "Encryption not supported in version:%u",
+                static_cast<unsigned>(db->header.disk_version));
+        return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+    }
+    if (!db->header.have_metadata_header) {
+        log_last_internal_error(
+                "Couchstore::read_and_set_encryption_key() "
+                "File header indicates no metadata");
+        return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     }
 
     cb::couchstore::SharedEncryptionKey key;
     std::string encryptedFileKey;
     try {
         auto [err, metadata] = read_metadata_header(&db->file);
-        if (err == COUCHSTORE_ERROR_NO_HEADER) {
-            // Encryption disabled
-            return COUCHSTORE_SUCCESS;
-        } else if (err) {
+        if (err) {
+            if (err == COUCHSTORE_ERROR_NO_HEADER) {
+                log_last_internal_error(
+                        "Couchstore::read_and_set_encryption_key() "
+                        "Metadata header not found");
+                return COUCHSTORE_ERROR_NO_ENCRYPTION_KEY;
+            }
             return err;
-        } else if (metadata.keyId.empty()) {
+        }
+        if (metadata.keyId.empty()) {
             // Encryption disabled
             return COUCHSTORE_SUCCESS;
-        } else if (!encryptionKeyCB) {
+        }
+        if (!encryptionKeyCB) {
             log_last_internal_error(
                     "Couchstore::read_and_set_encryption_key() "
                     "Encrypted file but no encryption key callback provided");
@@ -500,6 +529,7 @@ static couchstore_error_t read_and_set_encryption_key(
  */
 static couchstore_error_t create_metadata_header(
         Db* db, const cb::couchstore::EncryptionKeyGetter& encryptionKeyCB) {
+    db->header.have_metadata_header = false;
     try {
         if (!encryptionKeyCB) {
             // Encryption disabled
@@ -537,6 +567,7 @@ static couchstore_error_t create_metadata_header(
 
         sized_buf buf{meta.data(), meta.size()};
         cs_off_t pos = 0;
+        db->header.have_metadata_header = true;
         return write_header(&db->file, &buf, &pos, DiskBlockType::Meta);
     } catch (const std::bad_alloc&) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
@@ -565,6 +596,7 @@ static couchstore_error_t create_header(Db* db, couchstore_open_flags flags) {
     db->header.position = 0;
     db->header.timestamp = 0;
     db->header.prev_header_pos = NO_PREV_HEADER_POS;
+    // have_metadata_header was set in create_metadata_header()
     if (flags & COUCHSTORE_OPEN_FLAG_NO_COMMIT_AT_CREATE) {
         return COUCHSTORE_SUCCESS;
     }
@@ -865,7 +897,7 @@ couchstore_error_t couchstore_open_db_ex(
         error_pass(static_cast<couchstore_error_t>(db->file.pos));
     }
 
-    if (!db->file.cipher) {
+    if (db->header.have_metadata_header && !db->file.cipher) {
         error_pass(read_and_set_encryption_key(db, encryptionKeyCB));
     }
 

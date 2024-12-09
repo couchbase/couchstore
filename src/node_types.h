@@ -50,7 +50,7 @@ struct raw_file_header_v14 {
     raw_16 idrootsize;
     raw_16 localrootsize;
     raw_64 timestamp;
-    raw_48 prev_header_pos;
+    raw_48 prev_header_pos; // Least significant bit is have_metadata_header
     /* Three variable-size raw_btree_root structures follow */
 };
 static_assert(sizeof(raw_file_header_v14) == 39, "Unexpected file header size");

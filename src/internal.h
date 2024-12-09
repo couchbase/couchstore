@@ -60,9 +60,9 @@
 // Previous header position is not stored in the file header (version < 14)
 // or we don't want to use that offset. The value is not written to disk.
 constexpr uint64_t UNKNOWN_PREV_HEADER_POS = -1;
-// Maximum 48-bit offset (max that can be stored)
+// Maximum 47-bit offset (max that can be stored)
 // which indicates that this is the first header in the file
-constexpr uint64_t NO_PREV_HEADER_POS = (1ULL << 48) - 1;
+constexpr uint64_t NO_PREV_HEADER_POS = (1ULL << 47) - 1;
 
 struct cb_free_deleter {
     void operator()(void* ptr) const {
@@ -147,6 +147,7 @@ struct db_header {
     uint64_t position;
     uint64_t timestamp;
     uint64_t prev_header_pos;
+    bool have_metadata_header;
     void reset() {
         cb_free(by_id_root);
         cb_free(by_seq_root);

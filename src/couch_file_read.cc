@@ -158,7 +158,8 @@ static int pread_encrypted(tree_file* file, cs_off_t pos, char** ret_ptr) {
         return err;
     }
     chunkLen = ntohl(chunkLen);
-    if (chunkLen & high_bit_set) {
+    const size_t macSize = file->cipher->getMacSize();
+    if ((chunkLen & high_bit_set) || (chunkLen < macSize)) {
         log_last_internal_error(
                 "Couchstore::pread_encrypted() "
                 "Invalid chunk length:%u pos:%" PRId64,
@@ -181,15 +182,6 @@ static int pread_encrypted(tree_file* file, cs_off_t pos, char** ret_ptr) {
     }
 
     try {
-        const size_t macSize = file->cipher->getMacSize();
-        if (chunkLen < macSize) {
-            log_last_internal_error(
-                    "Couchstore::pread_encrypted() chunkLen:%u < macSize:%zu",
-                    chunkLen,
-                    macSize);
-            stop_trace();
-            return COUCHSTORE_ERROR_CORRUPT;
-        }
         const size_t msgSize = chunkLen - macSize;
         // Decrypt inplace
         file->cipher->decrypt(nonce,
@@ -200,13 +192,13 @@ static int pread_encrypted(tree_file* file, cs_off_t pos, char** ret_ptr) {
         *ret_ptr = buf.release();
         return gsl::narrow<int>(msgSize);
     } catch (const cb::crypto::MacVerificationError& ex) {
-        log_last_internal_error("Couchstore::pread_encrypted() %s",
-                                ex.what());
+        log_last_internal_error("Couchstore::pread_encrypted() %s", ex.what());
         stop_trace();
-        return COUCHSTORE_ERROR_CORRUPT;
+        return COUCHSTORE_ERROR_CHECKSUM_FAIL;
+    } catch (const std::bad_alloc&) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
     } catch (const std::exception& ex) {
-        log_last_internal_error("Couchstore::pread_encrypted() %s",
-                                ex.what());
+        log_last_internal_error("Couchstore::pread_encrypted() %s", ex.what());
         return COUCHSTORE_ERROR_DECRYPT;
     }
 }
