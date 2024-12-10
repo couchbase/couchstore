@@ -302,8 +302,7 @@ couchstore_error_t PosixFileOps::sync(couchstore_error_info_t* errinfo,
     auto* file = to_file(handle);
 
     // Notes:
-    // 1. Docs for fsync/fdatasync don't report EINTR as possible errno, so no
-    //    need to handle that here
+    // 1. We don't retry on EINTR, as that could be unsafe.
     // 2. We used to call fsync for FreeBSD as fdatasync doesn't guarantee data
     //    on disk before it returns on that platform. FreeBSD is not officially
     //    supported now so just call fdatasync
