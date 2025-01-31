@@ -400,6 +400,10 @@ static void printDocId(const char* prefix, const sized_buf* sb) {
     printf("\n");
 }
 
+static auto getExpiryLabel(bool isDelete) {
+    return isDelete ? "delete_time" : "expiry";
+}
+
 static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
 {
     int *count = (int *) ctx;
@@ -458,12 +462,12 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
             // serialise CAS as a string instead of number to avoid it getting
             // mangled downstream...
             json["cas"] = std::to_string(cas);
-            json["expiry"] = expiry;
+            json[getExpiryLabel(docinfo->deleted)] = expiry;
             json["flags"] = flags;
         } else {
-            printf("     cas: %" PRIu64 ", expiry: %" PRIu32
-                   ", flags: %" PRIu32,
+            printf("     cas: %" PRIu64 ", %s: %" PRIu32 ", flags: %" PRIu32,
                    cas,
+                   getExpiryLabel(docinfo->deleted),
                    expiry,
                    flags);
         }
