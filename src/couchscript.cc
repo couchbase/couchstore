@@ -108,6 +108,19 @@ extern "C" {
             flags = lua_toboolean(ls, 2) ? COUCHSTORE_OPEN_FLAG_CREATE : 0;
         }
 
+        if (lua_gettop(ls) > 2) {
+            if (!lua_isboolean(ls, 3)) {
+                lua_pushstring(ls,
+                               "Third arg must be a boolean, "
+                               "true for recovery mode.");
+                lua_error(ls);
+                return 1;
+            }
+            if (lua_toboolean(ls, 3)) {
+                flags |= COUCHSTORE_OPEN_RECOVERY_MODE;
+            }
+        }
+
         Db* db(nullptr);
 
         couchstore_error_t rc = couchstore_open_db(pathname, flags, &db);
