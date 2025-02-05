@@ -16,7 +16,7 @@ function simpletrunc(dbname)
    db:truncate(-10)
    db:close()
 
-   db = couch.open(dbname)
+   db = couch.open(dbname, false, true)
    testlib.check_doc(db, "k", "original value")
 
    db:save("k", "third value", 1)
@@ -51,7 +51,7 @@ function do_mangle(dbname, offset)
    f:write(corruptWith)
    f:close()
 
-   db = couch.open(dbname)
+   db = couch.open(dbname, false, true)
    testlib.check_doc(db, "k", "original value")
 
    db:save("k", "third value", 1)
