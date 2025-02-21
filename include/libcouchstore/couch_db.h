@@ -164,6 +164,12 @@ extern "C" {
     constexpr couchstore_open_flags COUCHSTORE_OPEN_WITH_MPROTECT = 0x800000000;
 
     /**
+     * Skip over corrupted database headers.
+     */
+    constexpr couchstore_open_flags COUCHSTORE_OPEN_RECOVERY_MODE =
+            0x1000000000;
+
+    /**
      * Encode a periodic sync specified in bytes to the correct
      * couchstore_open_flags encoding.
      * @param fsync period in bytes

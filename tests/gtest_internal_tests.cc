@@ -46,8 +46,9 @@
 
 using namespace testing;
 
-/** corrupt_header Corrupt the trailing header to make sure we go back
- * to a good header.
+/**
+ * Corrupt the trailing header to make sure we can
+ * go back to a good header in recovery mode.
  */
 TEST_F(CouchstoreInternalTest, corrupt_header) {
     couchstore_error_info_t errinfo;
@@ -111,10 +112,14 @@ TEST_F(CouchstoreInternalTest, corrupt_header) {
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
     db = nullptr;
 
-    /* verify that the last version was invalidated and we went back to
-     * the 1st version
-     */
-    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(0));
+    // Normal mode:
+    // Verify that corruption is detected.
+    ASSERT_EQ(COUCHSTORE_ERROR_CHECKSUM_FAIL, open_db(0));
+
+    // Recovery mode:
+    // Verify that the last version was invalidated and we went back to
+    // the 1st version.
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_RECOVERY_MODE));
     documents.resetCounters();
     documents.setDoc(0, "doc1", "oops");
     EXPECT_EQ(COUCHSTORE_SUCCESS,

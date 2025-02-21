@@ -228,28 +228,40 @@ cleanup:
     return errcode;
 }
 
-// Finds the database header by scanning back from the end of the file at 4k boundaries
-static couchstore_error_t find_header(Db *db, int64_t start_pos)
-{
+/**
+ * Finds the database header by scanning back from the end of the file
+ * at 4k boundaries
+ */
+static couchstore_error_t find_header(Db* db,
+                                      int64_t start_pos,
+                                      bool skip_corrupt = false) {
+    if (start_pos < 0) {
+        return COUCHSTORE_ERROR_NO_HEADER;
+    }
     couchstore_error_t last_header_errcode = COUCHSTORE_ERROR_NO_HEADER;
     int64_t pos = start_pos;
     pos -= pos % COUCH_BLOCK_SIZE;
     for (; pos >= 0; pos -= COUCH_BLOCK_SIZE) {
         couchstore_error_t errcode = find_header_at_pos(db, pos);
-        switch(errcode) {
-            case COUCHSTORE_SUCCESS:
-                // Found it!
-                return COUCHSTORE_SUCCESS;
-            case COUCHSTORE_ERROR_NO_HEADER:
-                // No header here, so keep going
-                break;
-            case COUCHSTORE_ERROR_ALLOC_FAIL:
-                // Fatal error
+        switch (errcode) {
+        case COUCHSTORE_SUCCESS:
+            // Found it!
+            return COUCHSTORE_SUCCESS;
+        case COUCHSTORE_ERROR_NO_HEADER:
+            // No header here, so keep going
+            break;
+        case COUCHSTORE_ERROR_CHECKSUM_FAIL:
+        case COUCHSTORE_ERROR_CORRUPT:
+        case COUCHSTORE_ERROR_READ: // Possibly corrupt length or truncated file
+            if (!skip_corrupt) {
                 return errcode;
-            default:
-                // Invalid header; continue, but remember the last error
-                last_header_errcode = errcode;
-                break;
+            }
+            // Recovery mode; continue, but remember the last error
+            last_header_errcode = errcode;
+            break;
+        default:
+            // Error; stop searching
+            return errcode;
         }
     }
     return last_header_errcode;
@@ -880,7 +892,8 @@ couchstore_error_t couchstore_open_db_ex(
             }
         }
     } else if (pos > 0) {
-        error_pass(find_header(db, db->file.pos - 2));
+        error_pass(find_header(
+                db, db->file.pos - 2, (flags & COUCHSTORE_OPEN_RECOVERY_MODE)));
 
         if (db->header.disk_version <= COUCH_DISK_VERSION_11) {
             db->file.crc_mode = CRC32;
