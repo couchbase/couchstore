@@ -31,6 +31,8 @@
 #include <libcouchstore/couch_db.h>
 #include <platform/dirutils.h>
 
+#include <random>
+
 /**
  * Note: below internal Couchstore header files should be located
  *       at the end of all above includes. Otherwise it causes
@@ -240,9 +242,10 @@ TEST_F(CouchstoreInternalTest, buffered_io_options)
     }
 }
 
-/* Test to verify pwrite returning less bytes than passed in
-   is handled for buffered and unbuffered case.
-   return 0 or write 1 byte at a time */
+/**
+ * Test to verify pwrite returning fewer bytes than passed in
+ * is handled for buffered and unbuffered case.
+ */
 typedef ParameterisedFileOpsErrorInjectionTest PwriteReturnTest;
 TEST_P(PwriteReturnTest, CheckLessPwriteReturn) {
     remove(filePath.c_str());
@@ -265,16 +268,26 @@ TEST_P(PwriteReturnTest, CheckLessPwriteReturn) {
                                     COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED,
                                     &ops, &db));
 
-    // make pwrite return 0 some times and write 1 byte other times
-    EXPECT_CALL(ops, pwrite(_, _, _, _, _)).WillRepeatedly(Invoke(
-         [this](couchstore_error_info_t* errinfo, couch_file_handle handle,
-                const void* buf, size_t nbytes, cs_off_t offset) {
-             static int x=0;
-
-             if (x++ % 5 == 0)
-                 return 0;
-             return (int)ops.get_wrapped()->pwrite(errinfo, handle, buf, 1, offset);
-          }));
+    // make pwrite return 0 some times and write a random byte count other times
+    std::minstd_rand rng{1};
+    EXPECT_CALL(ops, pwrite(_, _, _, _, _))
+            .WillRepeatedly(
+                    Invoke([this, &rng](couchstore_error_info_t* errinfo,
+                                        couch_file_handle handle,
+                                        const void* buf,
+                                        size_t nbytes,
+                                        cs_off_t offset) -> ssize_t {
+                        auto rv = rng();
+                        if (nbytes != 0) {
+                            if (rv % 5 == 0) {
+                                nbytes = 0;
+                            } else {
+                                nbytes = rv % nbytes + 1;
+                            }
+                        }
+                        return ops.get_wrapped()->pwrite(
+                                errinfo, handle, buf, nbytes, offset);
+                    }));
 
     // add a doc and commit to trigger pwrite more times
     for (uint32_t ii = 0; ii < docsInTest; ii++) {
