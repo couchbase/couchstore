@@ -246,7 +246,10 @@ couchstore_error_t TreeWriter::write(tree_file* treefile,
         }
         memcpy(v.buf, kv->value.data(), v.size);
 
-        mr_push_item(&k, &v, target_mr);
+        errcode = mr_push_item(&k, &v, target_mr);
+        if (errcode) {
+            return errcode;
+        }
         if (target_mr->count == 0) {
             // No items queued, we must have just flushed.
             // We can safely rewind the transient arena.

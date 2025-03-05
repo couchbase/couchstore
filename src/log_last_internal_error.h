@@ -9,8 +9,6 @@
  */
 #pragma once
 
-#include <libcouchstore/error.h>
 #include <platform/dynamic.h>
 
-couchstore_error_t log_last_internal_error(const char* format, ...)
-        CB_FORMAT_PRINTF(1, 2);
+void log_last_internal_error(const char* format, ...) CB_FORMAT_PRINTF(1, 2);

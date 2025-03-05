@@ -83,7 +83,7 @@ couchstore_error_t tree_file_open(tree_file* file,
     }
 cleanup:
     if (errcode != COUCHSTORE_SUCCESS) {
-        file->close();
+        (void)file->close();
     }
     return errcode;
 }
@@ -106,7 +106,7 @@ couchstore_error_t tree_file::close() {
 }
 
 tree_file::~tree_file() {
-    close();
+    (void)close();
 }
 
 /** Read bytes from the database file, skipping over the header-detection bytes at every block
