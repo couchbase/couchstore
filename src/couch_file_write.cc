@@ -27,11 +27,10 @@
 #include <sys/types.h>
 #include <cstdint>
 
-static ssize_t write_entire_buffer(tree_file *file, const void* buf,
-                                   size_t nbytes, cs_off_t offset) {
-    size_t left_to_write = nbytes;
-    const char* src = reinterpret_cast<const char*>(buf);
-
+static ssize_t write_entire_buffer(tree_file* file,
+                                   const void* buf,
+                                   size_t nbytes,
+                                   cs_off_t offset) {
     /* calculate CRC for the piece written and trace it. */
     if (file->options.tracing_enabled) {
         TRACE_INSTANT2(
@@ -45,10 +44,11 @@ static ssize_t write_entire_buffer(tree_file *file, const void* buf,
                                      nbytes,
                                      CRC32C));
     }
-
-    while (left_to_write) {
-        ssize_t written = file->ops->pwrite(&file->lastError, file->handle,
-                                            src, nbytes, offset);
+    const auto* src = reinterpret_cast<const char*>(buf);
+    auto left_to_write = static_cast<ssize_t>(nbytes);
+    while (left_to_write > 0) {
+        ssize_t written = file->ops->pwrite(
+                &file->lastError, file->handle, src, left_to_write, offset);
         if (written < 0) {
             return written;
         }
@@ -56,7 +56,7 @@ static ssize_t write_entire_buffer(tree_file *file, const void* buf,
         src += written;
         offset += written;
     }
-    return (ssize_t)nbytes;
+    return static_cast<ssize_t>(nbytes);
 }
 
 static ssize_t raw_write(const DiskBlockType diskBlockType,
