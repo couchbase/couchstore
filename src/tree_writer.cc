@@ -171,7 +171,7 @@ couchstore_error_t TreeWriterWrite(TreeWriter* writer,
             error_pass(COUCHSTORE_ERROR_READ);
         }
         //printf("K: '%.*s'\n", k.size, k.buf);
-        mr_push_item(&k, &v, target_mr);
+        error_pass(mr_push_item(&k, &v, target_mr));
         if (target_mr->count == 0) {
             /* No items queued, we must have just flushed. We can safely rewind the transient arena. */
             arena_free_all(transient_arena);

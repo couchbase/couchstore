@@ -415,24 +415,31 @@ static couchstore_error_t maybe_purgekp(couchfile_modify_request *rq, node_point
 
 // private method for invoking the callback provided by
 //   - couchstore_save_documents_and_callback
-static void do_save_callback(couchfile_modify_request* rq,
-                             const sized_buf* key,
-                             const sized_buf* valueOld,
-                             const sized_buf* valueNew,
-                             void* userReq) {
+static couchstore_error_t do_save_callback(couchfile_modify_request* rq,
+                                           const sized_buf* key,
+                                           const sized_buf* valueOld,
+                                           const sized_buf* valueNew,
+                                           void* userReq) {
+    couchstore_error_t errcode;
     DocInfo* infoNew = nullptr;
     DocInfo* infoOld = nullptr;
 
-    (*rq->docinfo_callback)(&infoNew, key, valueNew);
+    error_pass((*rq->docinfo_callback)(&infoNew, key, valueNew));
 
     if (valueOld) {
-        (*rq->docinfo_callback)(&infoOld, key, valueOld);
+        error_pass((*rq->docinfo_callback)(&infoOld, key, valueOld));
     }
 
     (*rq->save_callback)(infoOld, infoNew, rq->save_callback_ctx, userReq);
 
-    couchstore_free_docinfo(infoNew);
-    couchstore_free_docinfo(infoOld);
+cleanup:
+    if (infoNew) {
+        couchstore_free_docinfo(infoNew);
+    }
+    if (infoOld) {
+        couchstore_free_docinfo(infoOld);
+    }
+    return errcode;
 }
 
 static couchstore_error_t modify_node(couchfile_modify_request *rq,
@@ -493,15 +500,16 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                         // Fallthrough to insert
                     case ACTION_INSERT:
                         local_result->modified = 1;
-                        mr_push_item(rq->actions[start].getKey(),
-                                     rq->actions[start].data,
-                                     local_result);
+                        error_pass(mr_push_item(rq->actions[start].getKey(),
+                                                rq->actions[start].data,
+                                                local_result));
                         if (rq->save_callback && rq->docinfo_callback) {
-                            do_save_callback(rq,
-                                             rq->actions[start].getKey(),
-                                             nullptr,
-                                             rq->actions[start].data,
-                                             rq->actions[start].userReq);
+                            error_pass(do_save_callback(
+                                    rq,
+                                    rq->actions[start].getKey(),
+                                    nullptr,
+                                    rq->actions[start].data,
+                                    rq->actions[start].userReq));
                         }
                         break;
 
@@ -533,15 +541,16 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                         // Fallthrough to insert
                     case ACTION_INSERT:
                         local_result->modified = 1;
-                        mr_push_item(rq->actions[start].getKey(),
-                                     rq->actions[start].data,
-                                     local_result);
+                        error_pass(mr_push_item(rq->actions[start].getKey(),
+                                                rq->actions[start].data,
+                                                local_result));
                         if (rq->save_callback && rq->docinfo_callback) {
-                            do_save_callback(rq,
-                                             rq->actions[start].getKey(),
-                                             &val_buf,
-                                             rq->actions[start].data,
-                                             rq->actions[start].userReq);
+                            error_pass(do_save_callback(
+                                    rq,
+                                    rq->actions[start].getKey(),
+                                    &val_buf,
+                                    rq->actions[start].data,
+                                    rq->actions[start].userReq));
                         }
                         break;
 
@@ -578,15 +587,15 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                 // Fallthrough to insert
             case ACTION_INSERT:
                 local_result->modified = 1;
-                mr_push_item(rq->actions[start].getKey(),
-                             rq->actions[start].data,
-                             local_result);
+                error_pass(mr_push_item(rq->actions[start].getKey(),
+                                        rq->actions[start].data,
+                                        local_result));
                 if (rq->save_callback && rq->docinfo_callback) {
-                    do_save_callback(rq,
-                                     rq->actions[start].getKey(),
-                                     nullptr,
-                                     rq->actions[start].data,
-                                     rq->actions[start].userReq);
+                    error_pass(do_save_callback(rq,
+                                                rq->actions[start].getKey(),
+                                                nullptr,
+                                                rq->actions[start].data,
+                                                rq->actions[start].userReq));
                 }
                 break;
 
@@ -678,7 +687,7 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
     error_pass(flush_mr(local_result));
     if (!local_result->modified && nptr != nullptr) {
         //If we didn't do anything, give back the pointer to the original
-        mr_push_pointerinfo(nptr, dst);
+        error_pass(mr_push_pointerinfo(nptr, dst));
     } else {
         //Otherwise, give back the pointers to the nodes we've created.
         dst->modified = 1;
@@ -704,7 +713,10 @@ node_pointer *finish_root(couchfile_modify_request *rq,
     }
     collector->modified = 1;
     collector->node_type = KP_NODE;
-    flush_mr(root_result);
+    *errcode = flush_mr(root_result);
+    if (*errcode < 0) {
+        goto cleanup;
+    }
     while (1) {
         if (root_result->pointers_end == root_result->pointers->next) {
             //The root result split into exactly one kp_node.
