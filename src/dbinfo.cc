@@ -86,6 +86,16 @@ static int process_file(const char* file,
         printf("   crc: warning crc_mode is out of range %" PRIu32 "\n",
                db->file.crc_mode);
     }
+    if (db->header.disk_version >= COUCH_DISK_VERSION_14) {
+        std::string key;
+        if (cb::couchstore::isEncrypted(*db)) {
+            key = cb::couchstore::getEncryptionKeyId(*db);
+        } else {
+            key = cb::crypto::DataEncryptionKey::UnencryptedKeyId;
+        }
+        printf("   Encryption key: %s\n", key.c_str());
+    }
+
     printf("\n");
 
 next_header:
