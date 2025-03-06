@@ -284,12 +284,68 @@ TEST_F(CouchstoreInternalTest, buffered_io_options)
     }
 }
 
+typedef ParameterisedFileOpsErrorInjectionTest PreadPwriteReturnTest;
+
+/**
+ * Test to verify pread returning fewer bytes than passed in
+ * is handled for buffered and unbuffered case.
+ */
+TEST_P(PreadPwriteReturnTest, CheckLessPreadReturn) {
+    const uint32_t docsInTest = 100;
+    open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, docsInTest);
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+    db = nullptr;
+
+    // Open with the requested option
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_open_db_ex(
+                      filePath.c_str(),
+                      (GetParam() ? 0 : COUCHSTORE_OPEN_FLAG_UNBUFFERED) |
+                              COUCHSTORE_OPEN_FLAG_RDONLY,
+                      {},
+                      &ops,
+                      &db));
+
+    // Make pread read a random byte count
+    std::minstd_rand rng{1};
+    EXPECT_CALL(ops, pread(_, _, _, _, _))
+            .WillRepeatedly(
+                    Invoke([this, &rng](couchstore_error_info_t* errinfo,
+                                        couch_file_handle handle,
+                                        void* buf,
+                                        size_t nbytes,
+                                        cs_off_t offset) -> ssize_t {
+                        auto rv = rng();
+                        if (nbytes != 0) {
+                            nbytes = rv % nbytes + 1;
+                        }
+                        return ops.get_wrapped()->pread(
+                                errinfo, handle, buf, nbytes, offset);
+                    }));
+
+    // Check docs
+    documents.resetCounters();
+    std::vector<sized_buf> buf(docsInTest);
+    for (uint32_t ii = 0; ii < docsInTest; ++ii) {
+        buf[ii] = documents.getDoc(ii)->id;
+    }
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        &buf[0],
+                                        docsInTest,
+                                        0,
+                                        &Documents::docIterCheckCallback,
+                                        &documents));
+    EXPECT_EQ(static_cast<int>(docsInTest), documents.getCallbacks());
+}
+
 /**
  * Test to verify pwrite returning fewer bytes than passed in
  * is handled for buffered and unbuffered case.
  */
-typedef ParameterisedFileOpsErrorInjectionTest PwriteReturnTest;
-TEST_P(PwriteReturnTest, CheckLessPwriteReturn) {
+TEST_P(PreadPwriteReturnTest, CheckLessPwriteReturn) {
     remove(filePath.c_str());
 
     const uint32_t docsInTest = 100;
@@ -361,9 +417,10 @@ TEST_P(PwriteReturnTest, CheckLessPwriteReturn) {
               documents.getCallbacks());
 }
 
-INSTANTIATE_TEST_SUITE_P(Parameterised, PwriteReturnTest,
-                       ::testing::Values(true, false),
-                       ::testing::PrintToStringParamName());
+INSTANTIATE_TEST_SUITE_P(Parameterised,
+                         PreadPwriteReturnTest,
+                         ::testing::Values(false, true),
+                         ::testing::PrintToStringParamName());
 /**
  * Test to check whether or not custom B+tree node size passed to
  * open_db() API correctly set internal file options.
