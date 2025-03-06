@@ -443,23 +443,32 @@ static couchstore_error_t load_buffer_from(couchstore_error_info_t* errinfo,
     }
 
     // Read data to extend the buffer to its capacity (if possible):
-    ssize_t bytes_read;
-    {
-        AccessModeGuard guard(*buf, AccessMode::Write);
-        bytes_read = buf->owner.raw_ops->pread(errinfo,
-                                               buf->owner.raw_ops_handle,
-                                               buf->getRawPtr() + buf->length,
-                                               buf->capacity - buf->length,
-                                               buf->offset + buf->length);
-    }
+    do {
+        ssize_t bytes_read;
+        {
+            AccessModeGuard guard(*buf, AccessMode::Write);
+            bytes_read =
+                    buf->owner.raw_ops->pread(errinfo,
+                                              buf->owner.raw_ops_handle,
+                                              buf->getRawPtr() + buf->length,
+                                              buf->capacity - buf->length,
+                                              buf->offset + buf->length);
+        }
 #if defined(LOG_BUFFER)
-    fprintf(stderr, "BUFFER: %p loaded %zd bytes from %zd\n",
-            buf, bytes_read, offset + buf->length);
+        fprintf(stderr,
+                "BUFFER: %p loaded %zd bytes from %zd\n",
+                buf,
+                bytes_read,
+                offset + buf->length);
 #endif
-    if (bytes_read < 0) {
-        return (couchstore_error_t) bytes_read;
-    }
-    buf->length += bytes_read;
+        if (bytes_read <= 0) {
+            if (bytes_read < 0) {
+                return static_cast<couchstore_error_t>(bytes_read);
+            }
+            break;
+        }
+        buf->length += bytes_read;
+    } while (buf->length < buf->capacity);
     return COUCHSTORE_SUCCESS;
 }
 
