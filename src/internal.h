@@ -182,7 +182,13 @@ int pread_header(tree_file* file,
                  char** ret_ptr,
                  uint32_t max_header_size);
 
-couchstore_error_t write_header(tree_file* file, sized_buf* buf, cs_off_t* pos);
+couchstore_error_t write_header(
+        tree_file* file,
+        const sized_buf* buf,
+        cs_off_t* pos,
+        DiskBlockType blockType = DiskBlockType::Header);
+couchstore_error_t db_write_header(
+        Db* db, DiskBlockType block_type = DiskBlockType::Header);
 int db_write_buf(tree_file* file,
                  const sized_buf* buf,
                  cs_off_t* pos,
@@ -197,8 +203,5 @@ couchstore_error_t by_seq_read_docinfo(DocInfo** pInfo,
 couchstore_error_t by_id_read_docinfo(DocInfo** pInfo,
                                       const sized_buf* k,
                                       const sized_buf* v);
-
-couchstore_error_t precommit(Db* db);
-couchstore_error_t db_write_header(Db* db);
 
 extern thread_local char internal_error_string[MAX_ERR_STR_LEN];
