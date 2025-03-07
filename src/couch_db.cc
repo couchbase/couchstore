@@ -300,7 +300,8 @@ static size_t calculate_header_size(Db* db,
     }
 }
 
-static couchstore_error_t db_write_header_impl(Db* db) {
+static couchstore_error_t db_write_header_impl(Db* db,
+                                               DiskBlockType block_type) {
     sized_buf writebuf;
     size_t seqrootsize, idrootsize, localrootsize;
     writebuf.size = calculate_header_size(db, seqrootsize,
@@ -338,7 +339,7 @@ static couchstore_error_t db_write_header_impl(Db* db) {
     root += idrootsize;
     encode_root(root, db->header.local_docs_root);
     cs_off_t pos;
-    couchstore_error_t errcode = write_header(&db->file, &writebuf, &pos);
+    auto errcode = write_header(&db->file, &writebuf, &pos, block_type);
     if (errcode == COUCHSTORE_SUCCESS) {
         db->header.position = pos;
     }
@@ -346,7 +347,7 @@ static couchstore_error_t db_write_header_impl(Db* db) {
     return errcode;
 }
 
-couchstore_error_t db_write_header(Db* db) {
+couchstore_error_t db_write_header(Db* db, DiskBlockType block_type) {
     switch (db->header.disk_version) {
     case COUCH_DISK_VERSION_11:
     case COUCH_DISK_VERSION_12:
@@ -360,7 +361,7 @@ couchstore_error_t db_write_header(Db* db) {
         db->header.have_metadata_header = false;
         // FALL THROUGH
     case COUCH_DISK_VERSION_14:
-        return db_write_header_impl(db);
+        return db_write_header_impl(db, block_type);
     default:
         return COUCHSTORE_ERROR_HEADER_VERSION;
     }
@@ -620,42 +621,6 @@ uint64_t couchstore_get_header_position(Db *db)
     return db->header.position;
 }
 
-/**
- * Precommit should occur before writing a header, it has two
- * purposes. Firstly it ensures data is written before we attempt
- * to write the header. This means it's impossible for the header
- * to be written before the data. This is accomplished through
- * a sync.
- *
- * The second purpose is to extend the file to be large enough
- * to include the subsequently written header. This is done so
- * the fdatasync performed by writing a header doesn't have to
- * do an additional (expensive) modified metadata flush on top
- * of the one we're already doing.
- */
-couchstore_error_t precommit(Db *db)
-{
-    cs_off_t curpos = db->file.pos;
-
-    db->file.pos = align_to_next_block(db->file.pos);
-    sized_buf zerobyte = { const_cast<char*>("\0"), 1};
-
-    size_t seqrootsize, idrootsize, localrootsize;
-    db->file.pos += calculate_header_size(db, seqrootsize,
-                                          idrootsize, localrootsize);
-
-    //Extend file size to where end of header will land before we do first sync
-    couchstore_error_t errcode =
-            db_write_buf(&db->file, &zerobyte, nullptr, nullptr);
-
-    if (errcode == COUCHSTORE_SUCCESS) {
-        errcode = db->file.ops->sync(&db->file.lastError, db->file.handle);
-    }
-    // Move cursor back to where it was
-    db->file.pos = curpos;
-    return errcode;
-}
-
 couchstore_error_t couchstore_commit(Db* db, const SysErrorCallback& callback) {
     return couchstore_commit_ex(
             db,
@@ -670,30 +635,61 @@ couchstore_error_t couchstore_commit_ex(Db* db,
                                         const SysErrorCallback& callback) {
     COLLECT_LATENCY();
 
-    // Extend file to contain the header and sync data to disk
-    auto res = precommit(db);
+    auto res = COUCHSTORE_SUCCESS;
+    auto restore_header = gsl::finally(
+            [&res,
+             db,
+             header_position = db->header.position,
+             header_timestamp = db->header.timestamp,
+             header_prev_header_pos = db->header.prev_header_pos]() {
+                if (res != COUCHSTORE_SUCCESS) {
+                    db->header.position = header_position;
+                    db->header.timestamp = header_timestamp;
+                    db->header.prev_header_pos = header_prev_header_pos;
+                }
+            });
+
+    const auto pre_commit_pos = db->file.pos;
+    db->header.timestamp = timestamp;
+    db->header.prev_header_pos = db->header.position;
+
+    // Write the header with a data block type,
+    // so that the header is not found just yet
+    res = db_write_header(db, DiskBlockType::Data);
     if (res != COUCHSTORE_SUCCESS) {
         return res;
     }
 
+    // Sync data to disk
+    res = db->file.ops->sync(&db->file.lastError, db->file.handle);
+    if (res != COUCHSTORE_SUCCESS) {
+        return res;
+    }
+
+    const auto block_type_pos = align_to_next_block(pre_commit_pos);
+    const auto block_type = DiskBlockType::Header;
+
     // Note: In general after a fsync failure, another call to fsync does not
     // guarantee to sync the dirty blocks from a previous pwrite. That's why
     // here we need to repeat write+sync when fsync fails.
-    while (true) {
-        const auto preflushPos = db->file.pos;
-
-        db->header.timestamp = timestamp;
-        db->header.prev_header_pos = db->header.position;
-
-        // Flush header to kernel buffer
-        res = db_write_header(db);
-        if (res != COUCHSTORE_SUCCESS) {
-            return res;
+    for (;;) {
+        ssize_t written;
+        // Change the block type to header
+        do {
+            written = db->file.ops->pwrite(&db->file.lastError,
+                                           db->file.handle,
+                                           &block_type,
+                                           1,
+                                           block_type_pos);
+        } while (written == 0);
+        if (written != 1) {
+            res = (written < 0) ? static_cast<couchstore_error_t>(written)
+                                : COUCHSTORE_ERROR_WRITE;
+            break;
         }
 
         // Sync header to disk
         res = db->file.ops->sync(&db->file.lastError, db->file.handle);
-
         if (res == COUCHSTORE_SUCCESS) {
             // Success path, all done
             break;
@@ -707,11 +703,8 @@ couchstore_error_t couchstore_commit_ex(Db* db,
                     errno,
                     std::system_category(),
                     "couchstore_commit_ex: Failed to sync header to disk"))) {
-            return res;
+            break;
         }
-
-        // Sync has failed, reset the file pos and re-try write+sync
-        db->file.pos = preflushPos;
     }
 
     // BufferedFileOps allocates read and write buffers so that we can
@@ -720,7 +713,7 @@ couchstore_error_t couchstore_commit_ex(Db* db,
     // and may not be useful for the next Db usage.
     db->file.ops->free_buffers(db->file.handle);
 
-    return COUCHSTORE_SUCCESS;
+    return res;
 }
 
 static tree_file_options get_tree_file_options_from_flags(couchstore_open_flags flags)

@@ -135,49 +135,6 @@ TEST_F(CouchstoreInternalTest, corrupt_header) {
     clean_up();
 }
 
-/**
- * The commit alignment test checks that the file size following
- * these situations are all the same:
- *
- * - Precommit
- * - Write Header
- * - Commit (= Precommit followed by a Write Header)
- *
- * This is done to verify that the precommit has extended the
- * file long enough to encompass the subsequently written header
- * (which avoids a metadata flush when we sync).
- */
-TEST_F(CouchstoreInternalTest, commit_alignment) {
-    couchstore_error_info_t errinfo;
-
-    open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, 100);
-
-    EXPECT_EQ(COUCHSTORE_SUCCESS, precommit(db));
-    cs_off_t precommit_size = db->file.ops->goto_eof(&errinfo, db->file.handle);
-
-    clean_up();
-
-    /* Get the size from actually writing a header without a precommit */
-    open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, 100);
-
-    ASSERT_EQ(COUCHSTORE_SUCCESS, db_write_header(db));
-    ASSERT_EQ(COUCHSTORE_SUCCESS, db->file.ops->sync(&db->file.lastError, db->file.handle));
-
-    /* Compare */
-    EXPECT_EQ(precommit_size,
-              db->file.ops->goto_eof(&errinfo, db->file.handle));
-
-    clean_up();
-
-    /* Get the size from actually doing a full commit */
-    open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, 100);
-
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
-    /* Compare */
-    EXPECT_EQ(precommit_size,
-              db->file.ops->goto_eof(&errinfo, db->file.handle));
-}
-
 TEST_F(CouchstoreInternalTest, rewind_db_header) {
     open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, 200);
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
@@ -1113,13 +1070,26 @@ TEST_P(CommitWrite, fail) {
     {
         InSequence s;
         EXPECT_CALL(ops, pwrite(_, _, _, _, _)).Times(GetParam());
-        EXPECT_CALL(ops, pwrite(_, _, _, _, _)).WillOnce(Return(COUCHSTORE_ERROR_WRITE));
+        EXPECT_CALL(ops, pwrite(_, _, _, _, _))
+                .WillOnce(Return(COUCHSTORE_ERROR_WRITE));
         EXPECT_EQ(COUCHSTORE_ERROR_WRITE, couchstore_commit(db));
     }
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
+    db = nullptr;
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(0));
+    // Expect rollback to empty db
+    EXPECT_EQ(0, cb::couchstore::getHeader(*db).docCount);
+    EXPECT_EQ(COUCHSTORE_ERROR_DOC_NOT_FOUND,
+              couchstore_docinfo_by_id(db,
+                                       documents.getDocInfo(0)->id.buf,
+                                       documents.getDocInfo(0)->id.size,
+                                       &info));
 }
-INSTANTIATE_TEST_SUITE_P(Parameterised, CommitWrite,
-                        ::testing::Range(0, 4),
-                        ::testing::PrintToStringParamName());
+INSTANTIATE_TEST_SUITE_P(Parameterised,
+                         CommitWrite,
+                         ::testing::Range(0, 3),
+                         ::testing::PrintToStringParamName());
 
 typedef ParameterisedFileOpsErrorInjectionTest SaveDocWrite;
 TEST_P(SaveDocWrite, fail) {
