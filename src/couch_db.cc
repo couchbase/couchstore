@@ -1974,7 +1974,8 @@ couchstore_error_t seekFirstHeaderContaining(Db& db,
             const auto prev = header.headerPosition;
             auto status = seek(db, Direction::Forward);
             if (status != COUCHSTORE_SUCCESS) {
-                seek(db, tipOffset);
+                // TODO: Remove this PiTR code?
+                (void)seek(db, tipOffset);
                 return status;
             }
             header = getHeader(db);
@@ -1982,7 +1983,8 @@ couchstore_error_t seekFirstHeaderContaining(Db& db,
                 // this one is too new... jump back
                 status = seek(db, prev);
                 if (status != COUCHSTORE_SUCCESS) {
-                    seek(db, tipOffset);
+                    // TODO: Remove this PiTR code?
+                    (void)seek(db, tipOffset);
                 }
                 return status;
             }

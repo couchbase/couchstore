@@ -114,14 +114,18 @@ ssize_t WindowsFileOps::pread(couchstore_error_info_t* errinfo,
 #endif
     auto* file = to_file(handle);
     BOOL rv;
-    DWORD bytesread;
+    DWORD bytesread = 0;
     OVERLAPPED winoffs;
     memset(&winoffs, 0, sizeof(winoffs));
     winoffs.Offset = offset & 0xFFFFFFFF;
     winoffs.OffsetHigh = (offset >> 32) & 0x7FFFFFFF;
     rv = ReadFile(file->fh, buf, nbyte, &bytesread, &winoffs);
-    if(!rv) {
+    if (!rv) {
         save_windows_error(errinfo);
+        if (errinfo->error == ERROR_HANDLE_EOF) {
+            // POSIX pread doesn't return error
+            return bytesread;
+        }
         return (ssize_t) COUCHSTORE_ERROR_READ;
     }
     return bytesread;

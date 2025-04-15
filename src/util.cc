@@ -134,16 +134,11 @@ cs_off_t align_to_next_block(cs_off_t offset)
     return offset;
 }
 
-couchstore_error_t log_last_internal_error(const char *format, ...)
-{
-
+void log_last_internal_error(const char* format, ...) {
     va_list args;
-
     va_start(args, format);
     vsnprintf(internal_error_string, MAX_ERR_STR_LEN, format, args);
     va_end(args);
-
-    return COUCHSTORE_SUCCESS;
 }
 
 int strncpy_safe(char* d, const char* s, size_t n) {
