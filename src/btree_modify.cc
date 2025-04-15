@@ -416,10 +416,10 @@ static couchstore_error_t maybe_purgekp(couchfile_modify_request *rq, node_point
 // private method for invoking the callback provided by
 //   - couchstore_save_documents_and_callback
 static couchstore_error_t do_save_callback(couchfile_modify_request* rq,
-                             const sized_buf* key,
-                             const sized_buf* valueOld,
-                             const sized_buf* valueNew,
-                             void* userReq) {
+                                           const sized_buf* key,
+                                           const sized_buf* valueOld,
+                                           const sized_buf* valueNew,
+                                           void* userReq) {
     couchstore_error_t errcode;
     DocInfo* infoNew = nullptr;
     DocInfo* infoOld = nullptr;
@@ -508,11 +508,12 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                                                 rq->actions[start].data,
                                                 local_result));
                         if (rq->save_callback && rq->docinfo_callback) {
-                            do_save_callback(rq,
-                                             rq->actions[start].getKey(),
-                                             nullptr,
-                                             rq->actions[start].data,
-                                             rq->actions[start].userReq);
+                            error_pass(do_save_callback(
+                                    rq,
+                                    rq->actions[start].getKey(),
+                                    nullptr,
+                                    rq->actions[start].data,
+                                    rq->actions[start].userReq));
                         }
                         break;
 
@@ -552,11 +553,12 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                                                 rq->actions[start].data,
                                                 local_result));
                         if (rq->save_callback && rq->docinfo_callback) {
-                            do_save_callback(rq,
-                                             rq->actions[start].getKey(),
-                                             &val_buf,
-                                             rq->actions[start].data,
-                                             rq->actions[start].userReq);
+                            error_pass(do_save_callback(
+                                    rq,
+                                    rq->actions[start].getKey(),
+                                    &val_buf,
+                                    rq->actions[start].data,
+                                    rq->actions[start].userReq));
                         }
                         break;
 
