@@ -198,7 +198,27 @@ using ListMember =
 using FileBufferList = boost::intrusive::list<FileBuffer, ListMember>;
 using FileBufferMap = std::unordered_map<size_t, UniqueFileBufferPtr>;
 
-class ReadBufferManager;
+struct BufferedFileHandle;
+
+/**
+ * Class for management of LRU list and hash index for read buffers.
+ * All buffer instances are tracked by using shared pointers.
+ */
+class ReadBufferManager {
+public:
+    ReadBufferManager() = default;
+    ~ReadBufferManager();
+    FileBuffer* findBuffer(BufferedFileHandle* h, cs_off_t offset);
+    void relocateBuffer(cs_off_t old_offset, cs_off_t new_offset);
+
+private:
+    // LRU list for buffers.
+    FileBufferList readLRU;
+    // Map from offset to buffer instance.
+    FileBufferMap readMap;
+    // Number of buffers allocated.
+    size_t nBuffers = 0;
+};
 
 // How I interpret a couch_file_handle:
 struct BufferedFileHandle {
@@ -214,95 +234,82 @@ struct BufferedFileHandle {
     buffered_file_ops_params params;
 };
 
-/**
- * Class for management of LRU list and hash index for read buffers.
- * All buffer instances are tracked by using shared pointers.
- */
-class ReadBufferManager {
-public:
-    ReadBufferManager() = default;
-
-    ~ReadBufferManager() {
-        // Note: all elements in intrusive list MUST be unlinked
-        //       before they are freed (unless it will internally
-        //       invoke an assertion failure).
-        auto itr = readLRU.begin();
-        while (itr != readLRU.end()) {
-            itr = readLRU.erase(itr);
-        }
+ReadBufferManager::~ReadBufferManager() {
+    // Note: all elements in intrusive list MUST be unlinked
+    //       before they are freed (unless it will internally
+    //       invoke an assertion failure).
+    auto itr = readLRU.begin();
+    while (itr != readLRU.end()) {
+        itr = readLRU.erase(itr);
     }
+}
 
-    FileBuffer* findBuffer(BufferedFileHandle* h, cs_off_t offset) {
-        // Align offset.
-        offset = offset - offset % h->params.read_buffer_capacity;
+FileBuffer* ReadBufferManager::findBuffer(BufferedFileHandle* h,
+                                          cs_off_t offset) {
+    // Align offset.
+    offset = offset - offset % h->params.read_buffer_capacity;
 
-        // Find a buffer for this offset,
-        // OR use the last one in LRU list.
-        FileBuffer* buffer = nullptr;
-        auto itr_map = readMap.find(offset);
-        if (itr_map != readMap.end()) {
-            // Matching buffer exists.
-            // Move it to the front of LRU, and return.
-            buffer = itr_map->second.get();
-            readLRU.splice(readLRU.begin(), readLRU, readLRU.iterator_to(*buffer));
-            return buffer;
-        }
-
-        // ==== Otherwise: not found.
-
-        if (nBuffers < h->params.max_read_buffers) {
-            // We can still create another buffer.
-            UniqueFileBufferPtr buffer_unique;
-            buffer_unique = std::make_unique<FileBuffer>(
-                    *h,
-                    h->params.read_buffer_capacity,
-                    h->params.tracing_enabled,
-                    h->params.write_validation_enabled,
-                    h->params.mprotect_enabled);
-            buffer = buffer_unique.get();
-            ++nBuffers;
-            readMap.insert( std::make_pair(buffer->offset,
-                                           std::move(buffer_unique)) );
-            // Locate it at the front of LRU, and return.
-            readLRU.push_front(*buffer);
-            return buffer;
-        }
-
-        // We cannot create a new one.
-        // Recycle the last buffer in the LRU list.
-        auto itr_list = readLRU.rbegin();
-        buffer = &(*itr_list);
-#if defined(LOG_BUFFER)
-        fprintf(stderr, "BUFFER: %p recycled, from %zd to %zd\n",
-                buffer, buffer->offset, offset);
-#endif
-        // Move the buffer to the front of LRU.
-        readLRU.splice(readLRU.begin(), readLRU, itr_list.base());
+    // Find a buffer for this offset,
+    // OR use the last one in LRU list.
+    FileBuffer* buffer = nullptr;
+    auto itr_map = readMap.find(offset);
+    if (itr_map != readMap.end()) {
+        // Matching buffer exists.
+        // Move it to the front of LRU, and return.
+        buffer = itr_map->second.get();
+        readLRU.splice(readLRU.begin(), readLRU, readLRU.iterator_to(*buffer));
         return buffer;
     }
 
-    void relocateBuffer(cs_off_t old_offset, cs_off_t new_offset) {
-        auto itr = readMap.find(old_offset);
-        if (itr == readMap.end()) {
-            return;
-        }
+    // ==== Otherwise: not found.
 
-        UniqueFileBufferPtr tmp = std::move(itr->second);
-        readMap.erase(itr);
-        tmp->offset = new_offset;
-        tmp->length = 0;
-        readMap.insert( std::make_pair(new_offset, std::move(tmp)) );
+    if (nBuffers < h->params.max_read_buffers) {
+        // We can still create another buffer.
+        UniqueFileBufferPtr buffer_unique;
+        buffer_unique =
+                std::make_unique<FileBuffer>(*h,
+                                             h->params.read_buffer_capacity,
+                                             h->params.tracing_enabled,
+                                             h->params.write_validation_enabled,
+                                             h->params.mprotect_enabled);
+        buffer = buffer_unique.get();
+        ++nBuffers;
+        readMap.insert(
+                std::make_pair(buffer->offset, std::move(buffer_unique)));
+        // Locate it at the front of LRU, and return.
+        readLRU.push_front(*buffer);
+        return buffer;
     }
 
-private:
-    // LRU list for buffers.
-    FileBufferList readLRU;
-    // Map from offset to buffer instance.
-    FileBufferMap readMap;
-    // Number of buffers allocated.
-    size_t nBuffers = 0;
-};
+    // We cannot create a new one.
+    // Recycle the last buffer in the LRU list.
+    auto itr_list = readLRU.rbegin();
+    buffer = &(*itr_list);
+#if defined(LOG_BUFFER)
+    fprintf(stderr,
+            "BUFFER: %p recycled, from %zd to %zd\n",
+            buffer,
+            buffer->offset,
+            offset);
+#endif
+    // Move the buffer to the front of LRU.
+    readLRU.splice(readLRU.begin(), readLRU, itr_list.base());
+    return buffer;
+}
 
+void ReadBufferManager::relocateBuffer(cs_off_t old_offset,
+                                       cs_off_t new_offset) {
+    auto itr = readMap.find(old_offset);
+    if (itr == readMap.end()) {
+        return;
+    }
+
+    UniqueFileBufferPtr tmp = std::move(itr->second);
+    readMap.erase(itr);
+    tmp->offset = new_offset;
+    tmp->length = 0;
+    readMap.insert(std::make_pair(new_offset, std::move(tmp)));
+}
 
 //////// BUFFER WRITES:
 
