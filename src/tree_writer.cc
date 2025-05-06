@@ -2,6 +2,7 @@
 #include "couchstore_config.h" // htonl
 
 #include "arena.h"
+#include "exception.h"
 #include "internal.h"
 #include "log_last_internal_error.h"
 #include "merge_sort.h"
@@ -80,6 +81,8 @@ static couchstore_error_t handle_exceptions(const char* caller,
             log_last_internal_error("%s() %s", caller, ex.what());
             throw;
         }
+    } catch (const cb::couchstore::Exception& ex) {
+        return ex.errcode;
     } catch (const cb::crypto::MacVerificationError&) {
         return COUCHSTORE_ERROR_CORRUPT;
     } catch (const cb::crypto::OpenSslError&) {
@@ -315,6 +318,8 @@ std::unique_ptr<StreamHolder> TreeWriter::create_stream(
     auto stream = make_file_stream(path, mode);
     if (cipher) {
         stream = make_encrypted_stream(std::move(stream), cipher);
+    } else {
+        stream = make_checksum_stream(std::move(stream));
     }
     return std::make_unique<StreamHolder>(std::move(stream), std::move(path));
 }

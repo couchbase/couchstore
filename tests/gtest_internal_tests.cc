@@ -1634,7 +1634,7 @@ TEST_F(TreeWriterTest, DecryptNotEncrypted) {
     openCopy();
     MockTreeWriter::rewind(*treeWriter->stream);
     EXPECT_THROW(MockTreeWriter::read_record(*treeWriter->stream),
-                 cb::couchstore::Exception);
+                 cb::crypto::MacVerificationError);
 }
 
 TEST_F(TreeWriterTest, ReadWithWrongKey) {

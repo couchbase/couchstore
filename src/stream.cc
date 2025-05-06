@@ -11,6 +11,7 @@
 #include "stream.h"
 #include "couchstore_config.h" // htonl
 
+#include "crc32.h"
 #include "exception.h"
 #include <cbcrypto/symmetric.h>
 
@@ -40,7 +41,7 @@ public:
         }
     }
 
-    bool read(gsl::span<char> buffer) override;
+    bool read(std::span<char> buffer) override;
 
     void write(std::string_view buffer) override;
 
@@ -55,54 +56,104 @@ private:
 };
 
 /**
+ * Base class for streams which read/write data in chunks to an underlying
+ * stream.
+ */
+class ChunkedStream : public Stream {
+public:
+    ChunkedStream(std::unique_ptr<Stream> underlying, size_t max_write_buffer)
+        : underlying(std::move(underlying)),
+          max_write_buffer(max_write_buffer) {
+        Expects(this->underlying);
+        Expects(max_write_buffer > 0);
+        chunk.reserve(max_write_buffer + 32);
+    }
+
+    bool read(std::span<char> buffer) final;
+
+    void write(std::string_view buffer) final;
+
+    void flush() final;
+
+    void seek_begin() final;
+
+    void seek_end() final;
+
+protected:
+    virtual bool read_chunk() = 0;
+
+    virtual void write_chunk() = 0;
+
+    std::unique_ptr<Stream> underlying;
+    std::string chunk;
+
+private:
+    ssize_t read_pos = 0;
+    const size_t max_write_buffer;
+};
+
+/**
+ * Stream implementation which reads/writes chunks with checksum to an
+ * underlying stream.
+ *
+ * Overwriting data may result in corrupted chunks, hence writes should be done
+ * only to the end of the file.
+ */
+class ChecksumStream final : public ChunkedStream {
+public:
+    ChecksumStream(std::unique_ptr<Stream> underlying, size_t max_write_buffer)
+        : ChunkedStream(std::move(underlying), max_write_buffer) {
+    }
+
+private:
+    struct Header {
+        uint32_t length;
+        uint32_t checksum;
+    };
+
+    bool read_chunk() override;
+
+    void write_chunk() override;
+};
+
+/**
  * Stream implementation which reads/writes encrypted chunks to an underlying
  * stream.
  *
  * Overwriting data may result in corrupted chunks, hence writes should be done
  * only to the end of the file.
  */
-class EncryptedStream : public Stream {
+class EncryptedStream final : public ChunkedStream {
 public:
     EncryptedStream(std::unique_ptr<Stream> underlying,
                     std::shared_ptr<cb::crypto::SymmetricCipher> cipher,
                     size_t max_write_buffer)
-        : underlying(std::move(underlying)),
+        : ChunkedStream(std::move(underlying), max_write_buffer),
           cipher(std::move(cipher)),
-          max_write_buffer(max_write_buffer),
           min_chunk_size(
                   // The ciphertext should encode at least one plaintext byte,
                   // i.e. empty chunks are not allowed.
                   this->cipher->getNonceSize() + this->cipher->getMacSize() +
                   1) {
-        Expects(this->underlying);
-        Expects(this->cipher);
-        Expects(max_write_buffer > 0);
-        write_buffer.reserve(max_write_buffer);
     }
 
-    bool read(gsl::span<char> buffer) override;
-
-    void write(std::string_view buffer) override;
-
-    void flush() override;
-
-    void seek_begin() override;
-
-    void seek_end() override;
-
 private:
-    std::unique_ptr<Stream> underlying;
+    bool read_chunk() override;
+
+    void write_chunk() override;
+
     std::shared_ptr<cb::crypto::SymmetricCipher> cipher;
-    std::string write_buffer;
-    std::string read_buffer;
-    size_t read_buffer_pos = 0;
-    const size_t max_write_buffer;
     const size_t min_chunk_size;
 };
 
 std::unique_ptr<Stream> make_file_stream(const std::filesystem::path& path,
                                          const char* mode) {
     return std::make_unique<FileStream>(path.string().c_str(), mode);
+}
+
+std::unique_ptr<Stream> make_checksum_stream(std::unique_ptr<Stream> underlying,
+                                             size_t buffer_size) {
+    return std::make_unique<ChecksumStream>(std::move(underlying), buffer_size);
 }
 
 std::unique_ptr<Stream> make_encrypted_stream(
@@ -113,7 +164,7 @@ std::unique_ptr<Stream> make_encrypted_stream(
             std::move(underlying), std::move(cipher), buffer_size);
 }
 
-bool FileStream::read(gsl::span<char> buffer) {
+bool FileStream::read(std::span<char> buffer) {
     if (fread(buffer.data(), buffer.size(), 1, file) != 1) {
         if (feof(file)) {
             return false;
@@ -159,84 +210,141 @@ void FileStream::seek_end() {
     }
 }
 
-bool EncryptedStream::read(gsl::span<char> buffer) {
-    // A non-empty write buffer implies that we haven't flushed (or seeked).
-    // Flushing here could overwrite chunks and corrupt the file.
-    // The user would be expected to seek to the beginning of the file before
-    // reading if writes were made (can't read from the end).
-    Expects(write_buffer.empty());
-    std::string buf;
+bool ChunkedStream::read(std::span<char> buffer) {
+    if (read_pos < 0) {
+        // A dirty buffer implies that we haven't flushed (or seeked).
+        // Flushing here could overwrite chunks and corrupt the file.
+        // The user would be expected to seek to the beginning of the file
+        // before reading if writes were made (can't read from the end).
+        throw std::logic_error(
+                "cb::couchstore::ChunkedStream::read with dirty buffer");
+    }
     while (!buffer.empty()) {
-        Expects(read_buffer_pos <= read_buffer.size());
-        auto to_copy =
-                std::min(buffer.size(), read_buffer.size() - read_buffer_pos);
+        Expects(static_cast<size_t>(read_pos) <= chunk.size());
+        auto to_copy = std::min(buffer.size(), chunk.size() - read_pos);
         if (to_copy == 0) {
-            uint32_t cipher_len;
-            if (!underlying->read({reinterpret_cast<char*>(&cipher_len),
-                                   sizeof(cipher_len)})) {
+            if (!read_chunk()) {
                 return false;
             }
-            cipher_len = ntohl(cipher_len);
-            if (cipher_len < min_chunk_size) {
-                throw Exception(COUCHSTORE_ERROR_CORRUPT,
-                                "cb::couchstore::EncryptedStream::read() "
-                                "cipher_len < min_chunk_size");
-            }
-            buf.resize(cipher_len);
-            if (!underlying->read(buf)) {
-                throw Exception(COUCHSTORE_ERROR_READ,
-                                "cb::couchstore::EncryptedStream::read() "
-                                "EOF when reading ciphertext");
-            }
-            read_buffer = cipher->decrypt(buf);
-            read_buffer_pos = 0;
+            read_pos = 0;
             continue;
         }
-        auto begin = read_buffer.data() + read_buffer_pos;
-        std::copy(begin, begin + to_copy, buffer.begin());
+        auto begin = chunk.data() + read_pos;
+        std::copy(begin, begin + to_copy, buffer.data());
         buffer = {buffer.data() + to_copy, buffer.size() - to_copy};
-        read_buffer_pos += to_copy;
+        read_pos += to_copy;
     }
     return true;
 }
 
-void EncryptedStream::write(std::string_view buffer) {
+void ChunkedStream::write(std::string_view buffer) {
+    if (read_pos >= 0) {
+        chunk.clear();
+        read_pos = -1;
+    }
     while (!buffer.empty()) {
-        Expects(write_buffer.size() <= max_write_buffer);
-        auto to_copy =
-                std::min(buffer.size(), max_write_buffer - write_buffer.size());
+        Expects(chunk.size() <= max_write_buffer);
+        auto to_copy = std::min(buffer.size(), max_write_buffer - chunk.size());
         if (to_copy == 0) {
-            flush();
+            write_chunk();
+            chunk.clear();
             continue;
         }
-        write_buffer += std::string_view(buffer.data(), to_copy);
+        chunk.append(buffer.data(), to_copy);
         buffer.remove_prefix(to_copy);
     }
 }
 
-void EncryptedStream::flush() {
-    read_buffer.clear();
-    read_buffer_pos = 0;
-    if (write_buffer.empty()) {
-        return;
+void ChunkedStream::flush() {
+    if (read_pos < 0 && !chunk.empty()) {
+        write_chunk();
     }
-    auto encrypted = cipher->encrypt(write_buffer);
-    uint32_t cipher_len = htonl(encrypted.size());
-    underlying->write(
-            {reinterpret_cast<char*>(&cipher_len), sizeof(cipher_len)});
-    underlying->write(encrypted);
+    chunk.clear();
+    read_pos = 0;
     underlying->flush();
-    write_buffer.clear();
 }
 
-void EncryptedStream::seek_begin() {
+void ChunkedStream::seek_begin() {
     flush();
     underlying->seek_begin();
 }
 
-void EncryptedStream::seek_end() {
+void ChunkedStream::seek_end() {
     flush();
     underlying->seek_end();
+}
+
+bool ChecksumStream::read_chunk() {
+    Header header;
+    if (!underlying->read({reinterpret_cast<char*>(&header), sizeof(header)})) {
+        return false;
+    }
+    header.length = ntohl(header.length);
+    header.checksum = ntohl(header.checksum);
+    if (header.length < sizeof(uint32_t)) {
+        throw Exception(COUCHSTORE_ERROR_CORRUPT,
+                        "cb::couchstore::ChecksumStream::read() "
+                        "Check length too small");
+    }
+    chunk.resize(header.length - sizeof(uint32_t));
+    if (!underlying->read(chunk)) {
+        throw Exception(COUCHSTORE_ERROR_READ,
+                        "cb::couchstore::ChecksumStream::read() "
+                        "EOF when reading chunk");
+    }
+    if (!perform_integrity_check(reinterpret_cast<uint8_t*>(chunk.data()),
+                                 chunk.size(),
+                                 header.checksum,
+                                 CRC32C)) {
+        throw Exception(COUCHSTORE_ERROR_CHECKSUM_FAIL,
+                        "cb::couchstore::ChecksumStream::read() "
+                        "Invalid checksum");
+    }
+    return true;
+}
+
+void ChecksumStream::write_chunk() {
+    Header header;
+    header.length = chunk.size() + sizeof(uint32_t);
+    header.checksum = get_checksum(
+            reinterpret_cast<uint8_t*>(chunk.data()), chunk.size(), CRC32C);
+    header.length = htonl(header.length);
+    header.checksum = htonl(header.checksum);
+    underlying->write({reinterpret_cast<char*>(&header), sizeof(header)});
+    underlying->write(chunk);
+}
+
+bool EncryptedStream::read_chunk() {
+    uint32_t cipher_len;
+    if (!underlying->read(
+                {reinterpret_cast<char*>(&cipher_len), sizeof(cipher_len)})) {
+        return false;
+    }
+    cipher_len = ntohl(cipher_len);
+    if (cipher_len < min_chunk_size) {
+        throw Exception(COUCHSTORE_ERROR_CORRUPT,
+                        "cb::couchstore::EncryptedStream::read() "
+                        "cipher_len < min_chunk_size");
+    }
+    chunk.resize(cipher_len);
+    if (!underlying->read(chunk)) {
+        throw Exception(COUCHSTORE_ERROR_READ,
+                        "cb::couchstore::EncryptedStream::read() "
+                        "EOF when reading ciphertext");
+    }
+    chunk = cipher->decrypt(chunk);
+    return true;
+}
+
+void EncryptedStream::write_chunk() {
+    if (chunk.empty()) {
+        return;
+    }
+    auto encrypted = cipher->encrypt(chunk);
+    uint32_t cipher_len = htonl(encrypted.size());
+    underlying->write(
+            {reinterpret_cast<char*>(&cipher_len), sizeof(cipher_len)});
+    underlying->write(encrypted);
 }
 
 } // namespace cb::couchstore

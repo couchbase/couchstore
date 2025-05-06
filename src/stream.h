@@ -12,6 +12,7 @@
 #include <gsl/gsl-lite.hpp>
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string_view>
 
 namespace cb::crypto {
@@ -29,7 +30,7 @@ public:
      * Reads bytes into the buffer.
      * @return false on EOF
      */
-    virtual bool read(gsl::span<char> buffer) = 0;
+    virtual bool read(std::span<char> buffer) = 0;
 
     /**
      * Writes the contents of the buffer.
@@ -65,6 +66,17 @@ public:
  */
 std::unique_ptr<Stream> make_file_stream(const std::filesystem::path& path,
                                          const char* mode);
+
+/**
+ * Constructs a stream that checksums data and uses an underlying stream.
+ *
+ * Overwriting existing data may produce a corrupted file.
+ *
+ * @param underlying The underlying stream to use
+ * @param max_write_buffer Maximum data to buffer before checksum
+ */
+std::unique_ptr<Stream> make_checksum_stream(std::unique_ptr<Stream> underlying,
+                                             size_t max_write_buffer = 0x10000);
 
 /**
  * Constructs a stream that encrypts data and uses an underlying stream.
