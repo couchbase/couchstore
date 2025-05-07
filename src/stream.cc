@@ -56,6 +56,58 @@ private:
 };
 
 /**
+ * Stream implementation which uses FileOpsInterface to read/write data to a
+ * file.
+ */
+class FileOpsStream final : public Stream {
+public:
+    FileOpsStream(couchstore_error_info_t& errinfo,
+                  FileOpsInterface& ops,
+                  const char* path,
+                  int oflags)
+        : errinfo(errinfo), ops(ops) {
+        handle = ops.constructor(&errinfo);
+        Expects(handle);
+        auto errcode = ops.open(&errinfo, &handle, path, oflags);
+        if (errcode) {
+            if (handle) {
+                ops.destructor(handle);
+                handle = nullptr;
+            }
+            throw Exception(
+                    errcode,
+                    fmt::format("cb::couchstore::FileOpsStream({}) open error",
+                                path));
+        }
+    }
+
+    ~FileOpsStream() override {
+        if (handle) {
+            ops.close(&errinfo, handle);
+            ops.destructor(handle);
+        }
+    }
+
+    bool read(std::span<char> buffer) override;
+
+    void write(std::string_view buffer) override;
+
+    void flush() override {
+        // FileOpsStream doesn't buffer
+    }
+
+    void seek_begin() override;
+
+    void seek_end() override;
+
+private:
+    couchstore_error_info_t& errinfo;
+    FileOpsInterface& ops;
+    couch_file_handle handle = nullptr;
+    cs_off_t pos = 0;
+};
+
+/**
  * Base class for streams which read/write data in chunks to an underlying
  * stream.
  */
@@ -151,6 +203,14 @@ std::unique_ptr<Stream> make_file_stream(const std::filesystem::path& path,
     return std::make_unique<FileStream>(path.string().c_str(), mode);
 }
 
+std::unique_ptr<Stream> make_fileops_stream(const std::filesystem::path& path,
+                                            couchstore_error_info_t& errinfo,
+                                            FileOpsInterface& ops,
+                                            int oflags) {
+    return std::make_unique<FileOpsStream>(
+            errinfo, ops, path.string().c_str(), oflags);
+}
+
 std::unique_ptr<Stream> make_checksum_stream(std::unique_ptr<Stream> underlying,
                                              size_t buffer_size) {
     return std::make_unique<ChecksumStream>(std::move(underlying), buffer_size);
@@ -208,6 +268,53 @@ void FileStream::seek_end() {
                                 std::generic_category(),
                                 "cb::couchstore::FileStream::seek_end");
     }
+}
+
+bool FileOpsStream::read(std::span<char> buffer) {
+    auto* ptr = buffer.data();
+    auto remaining = buffer.size();
+    while (remaining) {
+        auto ret = ops.pread(&errinfo, handle, ptr, remaining, pos);
+        if (ret <= 0) {
+            if (ret == 0) {
+                return false;
+            }
+            throw Exception(static_cast<couchstore_error_t>(ret),
+                            "cb::couchstore::FileOpsStream::read");
+        }
+        pos += ret;
+        ptr += ret;
+        remaining -= ret;
+    }
+    return true;
+}
+
+void FileOpsStream::write(std::string_view buffer) {
+    auto* ptr = buffer.data();
+    auto remaining = buffer.size();
+    while (remaining) {
+        auto ret = ops.pwrite(&errinfo, handle, ptr, remaining, pos);
+        if (ret < 0) {
+            throw Exception(static_cast<couchstore_error_t>(ret),
+                            "cb::couchstore::FileOpsStream::write");
+        }
+        pos += ret;
+        ptr += ret;
+        remaining -= ret;
+    }
+}
+
+void FileOpsStream::seek_begin() {
+    pos = 0;
+}
+
+void FileOpsStream::seek_end() {
+    auto ret = ops.goto_eof(&errinfo, handle);
+    if (ret < 0) {
+        throw Exception(static_cast<couchstore_error_t>(ret),
+                        "cb::couchstore::FileOpsStream::seek_end");
+    }
+    pos = ret;
 }
 
 bool ChunkedStream::read(std::span<char> buffer) {

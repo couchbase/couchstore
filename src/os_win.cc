@@ -179,12 +179,13 @@ couchstore_error_t WindowsFileOps::open(couchstore_error_info_t *errinfo,
         *handle = nullptr;
     }
 
-    int creationflag = OPEN_EXISTING;
-    if(oflag & O_CREAT) {
-        creationflag = OPEN_ALWAYS;
-    }
-    if (oflag & O_EXCL) {
+    DWORD creationflag = OPEN_EXISTING;
+    if (oflag & O_TRUNC) {
+        creationflag = CREATE_ALWAYS;
+    } else if (oflag & O_EXCL) {
         creationflag = CREATE_NEW;
+    } else if (oflag & O_CREAT) {
+        creationflag = OPEN_ALWAYS;
     }
 
     DWORD desiredAccess = GENERIC_READ;

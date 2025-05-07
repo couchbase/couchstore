@@ -51,11 +51,15 @@ public:
      *
      * @param file_path Path to file which may containing a series of key/value
      *                  pairs in TreeWriter format.
+     * @param errinfo Storage for system error code
+     * @param ops FileOpsInterface to use
      * @param open_existing Whether to read/ add to an existing file
      * @param key_compare Callback function that compares two keys.
      * @return Error code or COUCHSTORE_SUCCESS.
      */
     couchstore_error_t open(const char* file_path,
+                            couchstore_error_info_t* errinfo,
+                            FileOpsInterface* ops,
                             bool open_existing,
                             compare_callback key_compare,
                             reduce_fn reduce,
@@ -100,19 +104,19 @@ protected:
      * initial file name. When the StreamHolder is destroyed the underlying
      * file is removed.
      *
-     * @param mode fopen() mode to open the file in
+     * @param oflags File open flags
      */
-    std::unique_ptr<StreamHolder> create_stream(const char* mode);
+    std::unique_ptr<StreamHolder> create_stream(int oflags);
 
     /**
      * Creates a new stream of the given file. When the StreamHolder is
      * destroyed the underlying file is removed.
      *
      * @param path File path
-     * @param mode fopen() mode to open the file in
+     * @param oflags File open flags
      */
     std::unique_ptr<StreamHolder> create_stream(std::filesystem::path path,
-                                                const char* mode);
+                                                int oflags);
 
     /**
      * Reads a key/value pair from a stream.
@@ -137,6 +141,10 @@ protected:
     std::unique_ptr<StreamHolder> stream;
     /// Cipher to be used for encrypting Streams
     std::shared_ptr<cb::crypto::SymmetricCipher> cipher;
+    /// Storage for system error code
+    couchstore_error_info_t* errinfo{nullptr};
+    /// FileOps to use for merge-sort
+    FileOpsInterface* ops{nullptr};
     /// Callback for comparing keys
     compare_callback key_compare{nullptr};
     reduce_fn reduce{nullptr};

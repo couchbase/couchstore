@@ -178,6 +178,8 @@ couchstore_error_t cb::couchstore::compact(
         strcpy(tmpFile.data(), target_filename);
         strcat(tmpFile.data(), ".btree-tmp_0");
         error_pass(ctx.tree_writer.open(tmpFile.data(),
+                                        &source.file.lastError,
+                                        ops,
                                         false,
                                         ebin_cmp,
                                         by_id_reduce,

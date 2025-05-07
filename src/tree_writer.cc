@@ -99,31 +99,43 @@ static couchstore_error_t handle_exceptions(const char* caller,
 }
 
 couchstore_error_t TreeWriter::open(const char* file_path,
+                                    couchstore_error_info_t* errinfo,
+                                    FileOpsInterface* ops,
                                     bool open_existing,
                                     compare_callback key_compare,
                                     reduce_fn reduce,
                                     reduce_fn rereduce,
                                     void* user_reduce_ctx) {
-    if (stream) {
+    if (stream || !(errinfo && ops)) {
         return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     }
+    this->errinfo = errinfo;
+    this->ops = ops;
     auto errcode = handle_exceptions(
             "cb::couchstore::TreeWriter::open",
             COUCHSTORE_ERROR_OPEN_FILE,
             [this, file_path, open_existing]() {
                 tmp_path = file_path;
-                stream = create_stream(tmp_path, open_existing ? "r+b" : "w+b");
+                int oflags = O_RDWR | (open_existing ? 0 : (O_CREAT | O_TRUNC));
+                stream = create_stream(tmp_path, oflags);
             });
     if (errcode) {
+        this->errinfo = nullptr;
+        this->ops = nullptr;
         return errcode;
     }
     if (!stream) {
+        this->errinfo = nullptr;
+        this->ops = nullptr;
         return COUCHSTORE_ERROR_NO_SUCH_FILE;
     }
     errcode = handle_exceptions("cb::couchstore::TreeWriter::open",
                                 COUCHSTORE_ERROR_READ,
                                 [this]() { stream->stream->seek_end(); });
     if (errcode) {
+        this->errinfo = nullptr;
+        this->ops = nullptr;
+        stream.reset();
         return errcode;
     }
     this->key_compare = (key_compare ? key_compare : ebin_cmp);
@@ -136,6 +148,8 @@ couchstore_error_t TreeWriter::open(const char* file_path,
 void TreeWriter::close() {
     if (stream) {
         stream.reset();
+        errinfo = nullptr;
+        ops = nullptr;
         key_compare = nullptr;
         reduce = nullptr;
         rereduce = nullptr;
@@ -167,7 +181,9 @@ couchstore_error_t TreeWriter::sort() {
                 stream = merge_sort<KeyValue>(
                         block_size,
                         std::move(stream),
-                        [this]() { return create_stream("w+b"); },
+                        [this]() {
+                            return create_stream(O_RDWR | O_CREAT | O_TRUNC);
+                        },
                         [](auto& sh) { return TreeWriter::read_record(*sh); },
                         [](auto& sh, const auto& elem) {
                             TreeWriter::write_record(*sh, elem.key, elem.value);
@@ -308,14 +324,15 @@ static std::filesystem::path next_tmp_path(const std::filesystem::path& path) {
     return {std::move(str)};
 }
 
-std::unique_ptr<StreamHolder> TreeWriter::create_stream(const char* mode) {
+std::unique_ptr<StreamHolder> TreeWriter::create_stream(int oflags) {
     tmp_path = next_tmp_path(tmp_path);
-    return create_stream(tmp_path, mode);
+    return create_stream(tmp_path, oflags);
 }
 
 std::unique_ptr<StreamHolder> TreeWriter::create_stream(
-        std::filesystem::path path, const char* mode) {
-    auto stream = make_file_stream(path, mode);
+        std::filesystem::path path, int oflags) {
+    Expects(errinfo && ops);
+    auto stream = make_fileops_stream(path, *errinfo, *ops, oflags);
     if (cipher) {
         stream = make_encrypted_stream(std::move(stream), cipher);
     } else {

@@ -30,6 +30,7 @@
 #include <libcouchstore/couch_db.h>
 #include <platform/dirutils.h>
 
+#include <fmt/format.h>
 #include <queue>
 #include <random>
 
@@ -1362,6 +1363,7 @@ INSTANTIATE_TEST_SUITE_P(Parameterised, LocalDocFileRead,
                         ::testing::PrintToStringParamName());
 
 typedef ParameterisedFileOpsErrorInjectionTest CompactSourceRead;
+
 TEST_P(CompactSourceRead, fail) {
     open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, 1);
     {
@@ -1379,9 +1381,44 @@ TEST_P(CompactSourceRead, fail) {
                                            &ops));
     }
 }
-INSTANTIATE_TEST_SUITE_P(Parameterised, CompactSourceRead,
-                        ::testing::Range(0, 4),
-                        ::testing::PrintToStringParamName());
+
+TEST_P(CompactSourceRead, corrupt) {
+    open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, 1);
+    {
+        InSequence s;
+        EXPECT_CALL(ops, pread(_, _, _, _, _)).Times(GetParam());
+        EXPECT_CALL(ops, pread(_, _, _, _, _))
+                .WillOnce(Invoke([this](couchstore_error_info_t* errinfo,
+                                        couch_file_handle handle,
+                                        void* buf,
+                                        size_t nbytes,
+                                        cs_off_t offset) -> ssize_t {
+                    if (nbytes <= 8) {
+                        // Potential chunk header, so corruption won't be
+                        // detected immediately
+                        return COUCHSTORE_ERROR_CHECKSUM_FAIL;
+                    }
+                    auto ret = ops.get_wrapped()->pread(
+                            errinfo, handle, buf, nbytes, offset);
+                    static_cast<uint8_t*>(buf)[nbytes - 1] ^= 1;
+                    return ret;
+                }));
+        EXPECT_EQ(COUCHSTORE_ERROR_CHECKSUM_FAIL,
+                  couchstore_compact_db_ex(db,
+                                           compactPath.c_str(),
+                                           COUCHSTORE_COMPACT_FLAG_UNBUFFERED,
+                                           {},
+                                           nullptr,
+                                           nullptr,
+                                           nullptr,
+                                           &ops));
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(Parameterised,
+                         CompactSourceRead,
+                         ::testing::Range(0, 10),
+                         ::testing::PrintToStringParamName());
 
 typedef ParameterisedFileOpsErrorInjectionTest CompactTargetWrite;
 TEST_P(CompactTargetWrite, fail) {
@@ -1401,17 +1438,51 @@ TEST_P(CompactTargetWrite, fail) {
                                            &ops));
     }
 }
-INSTANTIATE_TEST_SUITE_P(Parameterised, CompactTargetWrite,
-                        ::testing::Range(0, 6),
-                        ::testing::PrintToStringParamName());
+INSTANTIATE_TEST_SUITE_P(Parameterised,
+                         CompactTargetWrite,
+                         ::testing::Range(0, 13),
+                         ::testing::PrintToStringParamName());
+
+enum class BaseStream { File, FileOps };
+
+static std::string_view format_as(BaseStream value) {
+    return (value == BaseStream::File) ? "File" : "FileOps";
+}
+
+enum class StreamWrapper { None, Checksum, Encryption };
+
+static std::string_view format_as(StreamWrapper value) {
+    switch (value) {
+    case StreamWrapper::None:
+        return "None";
+    case StreamWrapper::Checksum:
+        return "Checksum";
+    case StreamWrapper::Encryption:
+        return "Encryption";
+    }
+    return {};
+}
+
+static std::string format_as(const std::tuple<BaseStream, StreamWrapper>& val) {
+    return fmt::format("{}_{}", std::get<0>(val), std::get<1>(val));
+}
 
 class StreamTest : public ::testing::Test,
-                   public ::testing::WithParamInterface<bool> {
+                   public ::testing::WithParamInterface<
+                           std::tuple<BaseStream, StreamWrapper>> {
 protected:
     void SetUp() override {
-        path = GetParam() ? "encrypted_stream.stream" : "file_stream.stream";
-        stream = cb::couchstore::make_file_stream(path, "w+b");
-        if (GetParam()) {
+        path = fmt::format("{}.stream", GetParam());
+        const auto& [base, wrapper] = GetParam();
+        if (base == BaseStream::File) {
+            stream = cb::couchstore::make_file_stream(path, "w+b");
+        } else {
+            stream = cb::couchstore::make_fileops_stream(
+                    path, errinfo, *ops, O_RDWR | O_CREAT);
+        }
+        if (wrapper == StreamWrapper::Checksum) {
+            stream = cb::couchstore::make_checksum_stream(std::move(stream), 8);
+        } else if (wrapper == StreamWrapper::Encryption) {
             stream = cb::couchstore::make_encrypted_stream(
                     std::move(stream),
                     cb::crypto::SymmetricCipher::create(
@@ -1430,6 +1501,8 @@ protected:
 
     std::unique_ptr<cb::couchstore::Stream> stream;
     std::filesystem::path path;
+    couchstore_error_info_t errinfo;
+    FileOpsInterface* ops = couchstore_get_default_file_ops();
 };
 
 TEST_P(StreamTest, ReadWrite) {
@@ -1458,13 +1531,15 @@ TEST_P(StreamTest, ReadWrite) {
     EXPECT_FALSE(stream->read(buf));
 }
 
-INSTANTIATE_TEST_SUITE_P(Parameterised,
-                         StreamTest,
-                         ::testing::Bool(),
-                         [](const ::testing::TestParamInfo<bool>& testInfo) {
-                             return testInfo.param ? "EncryptedStream"
-                                                   : "FileStream";
-                         });
+INSTANTIATE_TEST_SUITE_P(
+        Parameterised,
+        StreamTest,
+        ::testing::Combine(::testing::Values(BaseStream::File,
+                                             BaseStream::FileOps),
+                           ::testing::Values(StreamWrapper::None,
+                                             StreamWrapper::Checksum,
+                                             StreamWrapper::Encryption)),
+        [](const auto& testInfo) { return format_as(testInfo.param); });
 
 template <typename Element>
 class TestQueue {
@@ -1553,6 +1628,8 @@ protected:
     void open() {
         ASSERT_EQ(COUCHSTORE_SUCCESS,
                   treeWriter->open(filePath,
+                                   &errinfo,
+                                   fileOps,
                                    false,
                                    nullptr,
                                    nullptr,
@@ -1563,6 +1640,8 @@ protected:
     void openCopy() {
         ASSERT_EQ(COUCHSTORE_SUCCESS,
                   treeWriter->open(fileCopyPath,
+                                   &errinfo,
+                                   fileOps,
                                    true,
                                    nullptr,
                                    nullptr,
@@ -1603,6 +1682,8 @@ protected:
     static constexpr auto fileCopyPath = "tree_writer.tmp.copy";
 
     std::unique_ptr<MockTreeWriter> treeWriter;
+    FileOpsInterface* fileOps = couchstore_get_default_file_ops();
+    couchstore_error_info_t errinfo;
 };
 
 TEST_F(TreeWriterTest, Unencrypted) {

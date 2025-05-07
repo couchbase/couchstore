@@ -9,6 +9,8 @@
  */
 #pragma once
 
+#include <libcouchstore/couch_db.h>
+
 #include <gsl/gsl-lite.hpp>
 #include <filesystem>
 #include <memory>
@@ -66,6 +68,19 @@ public:
  */
 std::unique_ptr<Stream> make_file_stream(const std::filesystem::path& path,
                                          const char* mode);
+
+/**
+ * Constructs a stream of a file using FileOpsInterface.
+ *
+ * @param path File path
+ * @param errinfo Storage for system error code
+ * @param ops FileOpsInterface to use
+ * @param oflags File open flags
+ */
+std::unique_ptr<Stream> make_fileops_stream(const std::filesystem::path& path,
+                                            couchstore_error_info_t& errinfo,
+                                            FileOpsInterface& ops,
+                                            int oflags);
 
 /**
  * Constructs a stream that checksums data and uses an underlying stream.
