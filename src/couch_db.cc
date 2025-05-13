@@ -630,6 +630,20 @@ couchstore_error_t couchstore_commit(Db* db, const SysErrorCallback& callback) {
             callback);
 }
 
+static couchstore_error_t write_disk_block_type(tree_file& file,
+                                                cs_off_t pos,
+                                                DiskBlockType block_type) {
+    ssize_t written;
+    do {
+        written = file.ops->pwrite(
+                &file.lastError, file.handle, &block_type, 1, pos);
+        if (written == 1) {
+            return COUCHSTORE_SUCCESS;
+        }
+    } while (written == 0);
+    return static_cast<couchstore_error_t>(written);
+}
+
 couchstore_error_t couchstore_commit_ex(Db* db,
                                         uint64_t timestamp,
                                         const SysErrorCallback& callback) {
@@ -667,24 +681,15 @@ couchstore_error_t couchstore_commit_ex(Db* db,
     }
 
     const auto block_type_pos = align_to_next_block(pre_commit_pos);
-    const auto block_type = DiskBlockType::Header;
 
     // Note: In general after a fsync failure, another call to fsync does not
     // guarantee to sync the dirty blocks from a previous pwrite. That's why
     // here we need to repeat write+sync when fsync fails.
     for (;;) {
-        ssize_t written;
         // Change the block type to header
-        do {
-            written = db->file.ops->pwrite(&db->file.lastError,
-                                           db->file.handle,
-                                           &block_type,
-                                           1,
-                                           block_type_pos);
-        } while (written == 0);
-        if (written != 1) {
-            res = (written < 0) ? static_cast<couchstore_error_t>(written)
-                                : COUCHSTORE_ERROR_WRITE;
+        res = write_disk_block_type(
+                db->file, block_type_pos, DiskBlockType::Header);
+        if (res != COUCHSTORE_SUCCESS) {
             break;
         }
 
@@ -874,13 +879,8 @@ couchstore_error_t couchstore_open_db_ex(
             if (db->file.pos == 0) {
                 // docinfo.bp == 0 signifies "not found",
                 // so ensure data is written at offset 1 onward
-                DiskBlockType magic = DiskBlockType::Data;
-                auto written = db->file.ops->pwrite(
-                        &db->file.lastError, db->file.handle, &magic, 1, 0);
-                if (written < 0) {
-                    error_pass(static_cast<couchstore_error_t>(written));
-                }
-                error_unless(written == 1, COUCHSTORE_ERROR_WRITE);
+                error_pass(write_disk_block_type(
+                        db->file, 0, DiskBlockType::Data));
                 db->file.pos = 1;
             }
         }
