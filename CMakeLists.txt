@@ -131,7 +131,9 @@ target_compile_definitions(couchstore_static PUBLIC LIBCOUCHSTORE_NO_VISIBILITY)
 TARGET_INCLUDE_DIRECTORIES(couchstore_objs PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_INCLUDE_DIRECTORIES(couchstore_view_objs PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_INCLUDE_DIRECTORIES(couchstore PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
-TARGET_INCLUDE_DIRECTORIES(couchstore_static PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
+TARGET_INCLUDE_DIRECTORIES(couchstore_static PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 # libcouchstore_views - core couchstore library + view code and is dependent on
 # v8 and icu libraries
