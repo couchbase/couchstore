@@ -113,10 +113,18 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
         readsize = db->file.ops->pread(
                 &db->file.lastError, db->file.handle, &diskBlockType, 1, pos);
     }
-    error_unless(readsize == 1, COUCHSTORE_ERROR_READ);
+    if (readsize != 1) {
+        return (readsize < 0) ? static_cast<couchstore_error_t>(readsize)
+                              : COUCHSTORE_ERROR_READ;
+    }
     if (diskBlockType == DiskBlockType::Data) {
         return COUCHSTORE_ERROR_NO_HEADER;
-    } else if (diskBlockType != DiskBlockType::Header) {
+    }
+    if (diskBlockType != DiskBlockType::Header) {
+        log_last_internal_error(
+                "find_header_at_pos: unknown block type:%d pos:%" PRId64,
+                static_cast<int>(diskBlockType),
+                pos);
         return COUCHSTORE_ERROR_CORRUPT;
     }
 
@@ -306,6 +314,8 @@ couchstore_error_t db_write_header(Db* db) {
     case COUCH_DISK_VERSION_13:
         return db_write_header_impl(db);
     default:
+        log_last_internal_error("db_write_header: unexpected version:%" PRIu64,
+                                db->header.disk_version);
         return COUCHSTORE_ERROR_HEADER_VERSION;
     }
 }
@@ -543,6 +553,9 @@ couchstore_error_t couchstore_open_db_ex(const char *filename,
     /* Sanity check input parameters */
     if ((flags & COUCHSTORE_OPEN_FLAG_RDONLY) &&
         (flags & COUCHSTORE_OPEN_FLAG_CREATE)) {
+        log_last_internal_error(
+                "couchstore_open_db_ex: COUCHSTORE_OPEN_FLAG_RDONLY and "
+                "COUCHSTORE_OPEN_FLAG_CREATE both set");
         return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     }
 
@@ -718,6 +731,7 @@ couchstore_error_t couchstore_free_db(Db* db)
     }
 
     if(!db->dropped) {
+        log_last_internal_error("couchstore_free_db: not dropped");
         return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     }
 
@@ -878,8 +892,10 @@ static couchstore_error_t bp_to_doc(Doc **pDoc, Db *db, cs_off_t bp, couchstore_
     } else {
         bodylen = pread_bin(&db->file, bp, &docbody);
     }
+    if (bodylen < 0) {
+        error_pass(static_cast<couchstore_error_t>(bodylen));
+    }
 
-    error_unless(bodylen >= 0, static_cast<couchstore_error_t>(bodylen));    // if bodylen is negative it's an error code
     error_unless(docbody || bodylen == 0, COUCHSTORE_ERROR_READ);
 
     error_unless(docbuf = fatbuf_alloc(sizeof(Doc) + bodylen), COUCHSTORE_ERROR_ALLOC_FAIL);
@@ -1723,7 +1739,10 @@ static couchstore_error_t btree_eval_seq_reduce(Db *db,
     int node_type;
     char* nodebuf = nullptr;
     nodebuflen = pread_compressed(&db->file, diskpos, &nodebuf);
-    error_unless(nodebuflen >= 0, (static_cast<couchstore_error_t>(nodebuflen)));  // if negative, it's an error code
+    if (nodebuflen <= 0) {
+        error_pass(static_cast<couchstore_error_t>(nodebuflen));
+        error_unless(nodebuflen > 0, COUCHSTORE_ERROR_CORRUPT);
+    }
 
     node_type = nodebuf[0];
     while(bufpos < nodebuflen) {

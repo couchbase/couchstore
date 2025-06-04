@@ -112,6 +112,11 @@ TEST_F(CouchstoreInternalTest, corrupt_header) {
     // Normal mode:
     // Verify that corruption is detected.
     ASSERT_EQ(COUCHSTORE_ERROR_CHECKSUM_FAIL, open_db(0));
+    std::string_view error = internal_error_string;
+    std::string_view expected =
+            "Couchstore::pread_bin_internal() Checksum fail length:78 crc:";
+    EXPECT_EQ(expected, error.substr(0, expected.size()));
+    EXPECT_EQ(" pos:8193", error.substr(error.size() - 9));
 
     // Recovery mode:
     // Verify that the last version was invalidated and we went back to
@@ -548,6 +553,14 @@ TEST_F(CouchstoreInternalTest, corrupted_btree_node)
     // Without TOLERATE flag: should not retrieve any docs.
     ASSERT_EQ(static_cast<size_t>(0), param.num_called);
 
+    char errbuf[250];
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_last_internal_error(db, errbuf, sizeof(errbuf)));
+    EXPECT_STREQ(
+            "'Couchstore::pread_bin_internal() Checksum fail length:331 "
+            "crc:3812825268 pos:2432'",
+            errbuf);
+
     param.reset();
     // Should fail.
     ASSERT_NE(COUCHSTORE_SUCCESS,
@@ -567,6 +580,46 @@ TEST_F(CouchstoreInternalTest, corrupted_btree_node)
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
 
     db = nullptr;
+}
+
+TEST_F(CouchstoreInternalTest, corrupted_btree_node_empty) {
+    const int count = 20;
+    open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, count);
+
+    std::vector<sized_buf> docs(count);
+    for (int ii = 0; ii < count; ++ii) {
+        docs[ii] = documents.getDoc(ii)->id;
+    }
+
+    corrupted_btree_node_cb_param param;
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        docs.data(),
+                                        count,
+                                        0,
+                                        corrupted_btree_node_cb,
+                                        &param));
+
+    sized_buf buf;
+    db->file.pos = param.last_doc_bp + 18;
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              db_write_buf_compressed(&db->file, &buf, nullptr, nullptr));
+
+    EXPECT_EQ(COUCHSTORE_ERROR_CORRUPT,
+              couchstore_docinfos_by_id(db,
+                                        docs.data(),
+                                        count,
+                                        0,
+                                        corrupted_btree_node_cb,
+                                        &param));
+
+    char errbuf[250];
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_last_internal_error(db, errbuf, sizeof(errbuf)));
+    std::string_view error = errbuf;
+    std::string_view expected =
+            "'btree_lookup_inner: (nodebuflen > 0) check failed on line ";
+    EXPECT_EQ(expected, error.substr(0, expected.size()));
 }
 
 /**
