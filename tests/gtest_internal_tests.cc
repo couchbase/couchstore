@@ -112,6 +112,11 @@ TEST_F(CouchstoreInternalTest, corrupt_header) {
     // Normal mode:
     // Verify that corruption is detected.
     ASSERT_EQ(COUCHSTORE_ERROR_CHECKSUM_FAIL, open_db(0));
+    std::string_view error = internal_error_string;
+    EXPECT_THAT(error,
+                StartsWith("Couchstore::pread_bin_internal() "
+                           "Checksum fail length:78 crc:"));
+    EXPECT_THAT(error, EndsWith(" pos:8193"));
 
     // Recovery mode:
     // Verify that the last version was invalidated and we went back to
@@ -548,6 +553,13 @@ TEST_F(CouchstoreInternalTest, corrupted_btree_node)
     // Without TOLERATE flag: should not retrieve any docs.
     ASSERT_EQ(static_cast<size_t>(0), param.num_called);
 
+    auto error = cb::couchstore::getLastInternalError();
+    EXPECT_THAT(
+            error,
+            StartsWith(
+                    "'Couchstore::pread_bin_internal() Checksum fail length:"));
+    EXPECT_THAT(error, EndsWith(" pos:2432'"));
+
     param.reset();
     // Should fail.
     ASSERT_NE(COUCHSTORE_SUCCESS,
@@ -567,6 +579,42 @@ TEST_F(CouchstoreInternalTest, corrupted_btree_node)
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));
 
     db = nullptr;
+}
+
+TEST_F(CouchstoreInternalTest, corrupted_btree_node_empty) {
+    const int count = 20;
+    open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, count);
+
+    std::vector<sized_buf> docs(count);
+    for (int ii = 0; ii < count; ++ii) {
+        docs[ii] = documents.getDoc(ii)->id;
+    }
+
+    corrupted_btree_node_cb_param param;
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              couchstore_docinfos_by_id(db,
+                                        docs.data(),
+                                        count,
+                                        0,
+                                        corrupted_btree_node_cb,
+                                        &param));
+
+    sized_buf buf;
+    db->file.pos = param.last_doc_bp + 18;
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              db_write_buf_compressed(&db->file, &buf, nullptr, nullptr));
+
+    EXPECT_EQ(COUCHSTORE_ERROR_CORRUPT,
+              couchstore_docinfos_by_id(db,
+                                        docs.data(),
+                                        count,
+                                        0,
+                                        corrupted_btree_node_cb,
+                                        &param));
+
+    EXPECT_THAT(cb::couchstore::getLastInternalError(),
+                StartsWith("'btree_lookup_inner: (nodebuflen > 0) "
+                           "check failed on line "));
 }
 
 /**

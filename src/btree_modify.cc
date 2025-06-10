@@ -459,8 +459,10 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
     }
 
     if (nptr) {
-        if ((nodebuflen = pread_compressed(rq->file, nptr->pointer, (char **) &nodebuf)) < 0) {
+        nodebuflen = pread_compressed(rq->file, nptr->pointer, &nodebuf);
+        if (nodebuflen <= 0) {
             error_pass(static_cast<couchstore_error_t>(nodebuflen));
+            error_unless(nodebuflen > 0, COUCHSTORE_ERROR_CORRUPT);
         }
     }
 
@@ -883,8 +885,10 @@ static couchstore_error_t purge_node(couchfile_modify_request *rq,
         return mr_push_pointerinfo(nptr, dst);
     }
 
-    if ((nodebuflen = pread_compressed(rq->file, nptr->pointer, (char **) &nodebuf)) < 0) {
+    nodebuflen = pread_compressed(rq->file, nptr->pointer, &nodebuf);
+    if (nodebuflen <= 0) {
         error_pass(static_cast<couchstore_error_t>(nodebuflen));
+        error_unless(nodebuflen > 0, COUCHSTORE_ERROR_CORRUPT);
     }
 
     local_result = make_modres(dst->arena, rq);

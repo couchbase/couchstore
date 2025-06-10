@@ -129,6 +129,15 @@ static couchstore_error_t read_skipping_prefixes(tree_file *file,
     return COUCHSTORE_SUCCESS;
 }
 
+/**
+ * uint32_t value with only its highest bit set
+ *
+ * Used to set/test/mask that bit when dealing with chunk lengths.
+ * Data chunk lengths should have the highest bit set,
+ * to differentiate them from header chunks.
+ */
+constexpr uint32_t high_bit_set = 0x80000000;
+
 /*
  * Common subroutine of pread_bin, pread_compressed and pread_header.
  * Parameters and return value are the same as for pread_bin,
@@ -140,6 +149,7 @@ static int pread_bin_internal(tree_file *file,
                               char **ret_ptr,
                               uint32_t max_header_size)
 {
+    const auto init_pos = pos;
     struct {
         uint32_t chunk_len;
         uint32_t crc32;
@@ -150,16 +160,32 @@ static int pread_bin_internal(tree_file *file,
         return err;
     }
 
-    info.chunk_len = ntohl(info.chunk_len) & ~0x80000000;
+    info.chunk_len = ntohl(info.chunk_len);
+    if ((max_header_size != 0) != !(info.chunk_len & high_bit_set)) {
+        // High bit must not be set for header chunks
+        // and must be set for data chunks
+        log_last_internal_error(
+                "Couchstore::pread_bin_internal() "
+                "Invalid chunk length:%u max_header_size:%u pos:%" PRId64,
+                info.chunk_len,
+                max_header_size,
+                init_pos);
+        stop_trace();
+        return COUCHSTORE_ERROR_CORRUPT;
+    }
+    info.chunk_len &= ~high_bit_set;
     if (max_header_size) {
-        if (info.chunk_len < 4 || info.chunk_len > max_header_size  ) {
-            log_last_internal_error("Couchstore::pread_bin_internal() "
-                     "Invalid header length:%d max_header_size:%d pos:%" PRId64,
-                     info.chunk_len,  max_header_size, pos);
+        if (info.chunk_len < 4 || info.chunk_len > max_header_size) {
+            log_last_internal_error(
+                    "Couchstore::pread_bin_internal() "
+                    "Invalid header length:%u max_header_size:%u pos:%" PRId64,
+                    info.chunk_len,
+                    max_header_size,
+                    init_pos);
             stop_trace();
             return COUCHSTORE_ERROR_CORRUPT;
         }
-        info.chunk_len -= 4;    //Header len includes CRC len.
+        info.chunk_len -= 4; // Header len includes CRC len.
     }
     info.crc32 = ntohl(info.crc32);
 
@@ -169,10 +195,14 @@ static int pread_bin_internal(tree_file *file,
     }
     err = read_skipping_prefixes(file, &pos, info.chunk_len, buf);
 
-    if (!err && !perform_integrity_check(buf, info.chunk_len, info.crc32, file->crc_mode)) {
-        log_last_internal_error("Couchstore::pread_bin_internal() "
-                                "Invalid header length:%d crc:%d pos:%" PRId64,
-                                info.chunk_len, info.crc32, pos);
+    if (!err && !perform_integrity_check(
+                        buf, info.chunk_len, info.crc32, file->crc_mode)) {
+        log_last_internal_error(
+                "Couchstore::pread_bin_internal() "
+                "Checksum fail length:%u crc:%u pos:%" PRId64,
+                info.chunk_len,
+                info.crc32,
+                init_pos);
         stop_trace();
         err = COUCHSTORE_ERROR_CHECKSUM_FAIL;
     }
