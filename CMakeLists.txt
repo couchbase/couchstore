@@ -175,6 +175,11 @@ TARGET_LINK_LIBRARIES(couch_dbdump
                       ep-engine_storage_common
                       ${COUCHSTORE_VIEW_LIBS} gsl::gsl-lite)
 
+ADD_EXECUTABLE(couch_check
+               src/check.cc)
+
+TARGET_LINK_LIBRARIES(couch_check couchstore platform)
+
 ADD_EXECUTABLE(couch_dbck src/dbck.cc)
 TARGET_LINK_LIBRARIES(couch_dbck couchstore platform couchstore_program_utilities)
 
@@ -222,6 +227,7 @@ INSTALL(TARGETS
                 couch_dbinfo
                 couch_dbck
                 couch_compact
+                couch_check
                 couch_view_file_merger
                 couch_view_index_builder
                 couch_view_group_cleanup

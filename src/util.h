@@ -1,10 +1,10 @@
 #pragma once
 
-#include "internal.h"
-#include "fatbuf.h"
 #include "arena.h"
+#include "fatbuf.h"
+#include "internal.h"
+#include "log_last_internal_error.h"
 
-#include <libcouchstore/couch_db.h>
 #include <csignal>
 #include <cstring>
 
@@ -68,15 +68,15 @@ int strncpy_safe(char* d, const char* s, size_t n);
         } while (0)
 #endif
 
-/* If the condition C evaluates to false/zero, sets errcode to E and jumps to the cleanup: label. */
-#define error_unless(C, E) \
-    do { \
-        if(!(C)) { error_pass(E); } \
+/* If the condition C evaluates to false/zero, sets errcode to E and jumps
+ * to the cleanup: label. */
+#define error_unless(C, E)                                              \
+    do {                                                                \
+        if (!(C)) {                                                     \
+            log_last_internal_error("%s: (%s) check failed on line %d", \
+                                    __func__,                           \
+                                    #C,                                 \
+                                    __LINE__);                          \
+            error_pass(E);                                              \
+        }                                                               \
     } while (0)
-
-/* If the parameter C is nonzero, sets errcode to E and jumps to the cleanup: label. */
-#define error_nonzero(C, E) \
-    do { \
-        if((C) != 0) { error_pass(E); } \
-    } while (0)
-

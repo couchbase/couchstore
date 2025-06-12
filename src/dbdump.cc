@@ -1065,12 +1065,14 @@ static couchstore_error_t find_view_header_at_pos(view_group_info_t *info,
     ssize_t readsize = info->file.ops->pread(&info->file.lastError,
                                             info->file.handle,
                                             &buf, 1, pos);
-    error_unless(readsize == 1, static_cast<couchstore_error_t>(readsize));
+    if (readsize != 1) {
+        error_pass(static_cast<couchstore_error_t>(readsize));
+        error_unless(readsize == 1, COUCHSTORE_ERROR_READ);
+    }
     if (buf == 0) {
         return COUCHSTORE_ERROR_NO_HEADER;
-    } else if (buf != 1) {
-        return COUCHSTORE_ERROR_CORRUPT;
     }
+    error_unless(buf == 1, COUCHSTORE_ERROR_CORRUPT);
 
     info->header_pos = pos;
 

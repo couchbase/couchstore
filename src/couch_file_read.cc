@@ -150,7 +150,7 @@ static couchstore_error_t read_skipping_prefixes(tree_file *file,
 constexpr uint32_t high_bit_set = 0x80000000;
 
 static int pread_encrypted(tree_file* file, cs_off_t pos, char** ret_ptr) {
-    const auto nonce = offset2nonce(pos);
+    const auto initPos = pos;
 
     uint32_t chunkLen;
     auto err = read_skipping_prefixes(file, &pos, sizeof(chunkLen), &chunkLen);
@@ -164,7 +164,7 @@ static int pread_encrypted(tree_file* file, cs_off_t pos, char** ret_ptr) {
                 "Couchstore::pread_encrypted() "
                 "Invalid chunk length:%u pos:%" PRId64,
                 chunkLen,
-                pos);
+                initPos);
         stop_trace();
         return COUCHSTORE_ERROR_CORRUPT;
     }
@@ -184,7 +184,7 @@ static int pread_encrypted(tree_file* file, cs_off_t pos, char** ret_ptr) {
     try {
         const size_t msgSize = chunkLen - macSize;
         // Decrypt inplace
-        file->cipher->decrypt(nonce,
+        file->cipher->decrypt(offset2nonce(initPos),
                               {buf.get(), msgSize},
                               {buf.get() + msgSize, macSize},
                               {buf.get(), msgSize});
@@ -192,13 +192,19 @@ static int pread_encrypted(tree_file* file, cs_off_t pos, char** ret_ptr) {
         *ret_ptr = buf.release();
         return gsl::narrow<int>(msgSize);
     } catch (const cb::crypto::MacVerificationError& ex) {
-        log_last_internal_error("Couchstore::pread_encrypted() %s", ex.what());
+        log_last_internal_error("Couchstore::pread_encrypted() pos:%" PRId64
+                                " %s",
+                                initPos,
+                                ex.what());
         stop_trace();
         return COUCHSTORE_ERROR_CHECKSUM_FAIL;
     } catch (const std::bad_alloc&) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     } catch (const std::exception& ex) {
-        log_last_internal_error("Couchstore::pread_encrypted() %s", ex.what());
+        log_last_internal_error("Couchstore::pread_encrypted() pos:%" PRId64
+                                " %s",
+                                initPos,
+                                ex.what());
         return COUCHSTORE_ERROR_DECRYPT;
     }
 }
@@ -218,6 +224,7 @@ static int pread_bin_internal(tree_file *file,
         return pread_encrypted(file, pos, ret_ptr);
     }
 
+    const auto init_pos = pos;
     struct {
         uint32_t chunk_len;
         uint32_t crc32;
@@ -237,20 +244,23 @@ static int pread_bin_internal(tree_file *file,
                 "Invalid chunk length:%u max_header_size:%u pos:%" PRId64,
                 info.chunk_len,
                 max_header_size,
-                pos);
+                init_pos);
         stop_trace();
         return COUCHSTORE_ERROR_CORRUPT;
     }
     info.chunk_len &= ~high_bit_set;
     if (max_header_size) {
-        if (info.chunk_len < 4 || info.chunk_len > max_header_size  ) {
-            log_last_internal_error("Couchstore::pread_bin_internal() "
-                     "Invalid header length:%d max_header_size:%d pos:%" PRId64,
-                     info.chunk_len,  max_header_size, pos);
+        if (info.chunk_len < 4 || info.chunk_len > max_header_size) {
+            log_last_internal_error(
+                    "Couchstore::pread_bin_internal() "
+                    "Invalid header length:%u max_header_size:%u pos:%" PRId64,
+                    info.chunk_len,
+                    max_header_size,
+                    init_pos);
             stop_trace();
             return COUCHSTORE_ERROR_CORRUPT;
         }
-        info.chunk_len -= 4;    //Header len includes CRC len.
+        info.chunk_len -= 4; // Header len includes CRC len.
     }
     info.crc32 = ntohl(info.crc32);
 
@@ -260,10 +270,14 @@ static int pread_bin_internal(tree_file *file,
     }
     err = read_skipping_prefixes(file, &pos, info.chunk_len, buf);
 
-    if (!err && !perform_integrity_check(buf, info.chunk_len, info.crc32, file->crc_mode)) {
-        log_last_internal_error("Couchstore::pread_bin_internal() "
-                                "Invalid header length:%d crc:%d pos:%" PRId64,
-                                info.chunk_len, info.crc32, pos);
+    if (!err && !perform_integrity_check(
+                        buf, info.chunk_len, info.crc32, file->crc_mode)) {
+        log_last_internal_error(
+                "Couchstore::pread_bin_internal() "
+                "Checksum fail length:%u crc:%u pos:%" PRId64,
+                info.chunk_len,
+                info.crc32,
+                init_pos);
         stop_trace();
         err = COUCHSTORE_ERROR_CHECKSUM_FAIL;
     }
