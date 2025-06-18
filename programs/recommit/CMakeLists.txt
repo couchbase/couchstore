@@ -1,0 +1,2 @@
+ADD_EXECUTABLE(couch_recommit recommit.cc)
+TARGET_LINK_LIBRARIES(couch_recommit couchstore)
