@@ -1228,7 +1228,7 @@ int main(int argc, char **argv)
         usage();
     }
 
-    while (ii < argc && strncmp(argv[ii], "-", 1) == 0) {
+    while (ii < argc && argv[ii][0] == '-') {
         std::string_view command{argv[ii]};
         if (command == "--view") {
             decodeIndex = true;
@@ -1249,55 +1249,49 @@ int main(int argc, char **argv)
         } else if (command == "--no-namespace") {
             decodeNamespace = false;
         } else if (command == "--key") {
-            if (argc < (ii + 1)) {
+            if (++ii >= argc) {
                 usage();
             }
             oneKey = true;
-            dumpKey = argv[ii + 1];
+            dumpKey = argv[ii];
             if (mode == DumpBySequence) {
                 mode = DumpByID;
             }
-            ii++;
         } else if (command == "--collection") {
             // Append collection namespace prefix to key
-            if (argc < (ii + 1)) {
+            if (++ii >= argc) {
                 usage();
             }
-            dumpCollection = argv[ii + 1];
-            ii++;
+            dumpCollection = argv[ii];
         } else if (command == "--prepare") {
             dumpNamespace = prepareNamespace;
         } else if (command == "--system") {
             dumpNamespace = systemNamespace;
         } else if (command == "--namespace") {
             // Append collection namespace prefix to key
-            if (argc < (ii + 1)) {
+            if (++ii >= argc) {
                 usage();
             }
-            dumpNamespace = std::stoull(argv[ii + 1]);
-            ii++;
+            dumpNamespace = std::stoull(argv[ii]);
         } else if (command == "--local") {
             mode = DumpLocals;
         } else if (command == "--map") {
             mode = DumpFileMap;
         } else if (command == "--with-dump-keys") {
-            if (argc < (ii + 1)) {
+            if (++ii >= argc) {
                 usage();
             }
-            dump_keys_executable = argv[ii + 1];
-            ++ii;
+            dump_keys_executable = argv[ii];
         } else if (command == "--with-gosecrets") {
-            if (argc < (ii + 1)) {
+            if (++ii >= argc) {
                 usage();
             }
-            gosecrets = argv[ii + 1];
-            ++ii;
+            gosecrets = argv[ii];
         } else if (command == "--password") {
-            if (argc < (ii + 1)) {
+            if (++ii >= argc) {
                 usage();
             }
-            password = argv[ii + 1];
-            ++ii;
+            password = argv[ii];
             if (password == "-") {
                 password = cb::getpass();
             }
@@ -1307,16 +1301,15 @@ int main(int argc, char **argv)
             dumpHeaders = true;
         } else if (command == "--header-offset") {
             // read the header offset
-            if (argc < (ii + 1)) {
+            if (++ii >= argc) {
                 usage();
             }
-            const std::string number{argv[ii + 1]};
+            const std::string number{argv[ii]};
             if (number.find("0x") == 0) {
                 headerOffset = cb::from_hex(number);
             } else {
                 headerOffset = std::stoull(number);
             }
-            ii++;
         } else {
             usage();
         }
