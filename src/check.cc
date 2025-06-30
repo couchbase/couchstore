@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
     int id_count = 0;
 
     err = couchstore_walk_local_tree(
-            db, nullptr, callback_and_access_local_document, nullptr);
+            db, nullptr, 0, callback_and_access_local_document, nullptr);
     if (err != COUCHSTORE_SUCCESS) {
         print_error(db, err, "couchstore_walk_local_tree returned error");
         return 1;

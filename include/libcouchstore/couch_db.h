@@ -818,7 +818,9 @@ extern "C" {
      * applications will need to use it.
      *
      * @param db the database to iterate through
-     * @param startLocalID  The key to start at, or NULL to start from the beginning
+     * @param startLocalID The key to start at, or NULL to start from the
+     *                     beginning
+     * @param options COUCHSTORE_TOLERATE_CORRUPTION is supported
      * @param callback the callback function used to iterate over all documents
      * @param ctx client context (passed to the callback)
      * @return COUCHSTORE_SUCCESS upon success
@@ -827,6 +829,7 @@ extern "C" {
     couchstore_error_t couchstore_walk_local_tree(
             Db* db,
             const sized_buf* startLocalID,
+            couchstore_docinfos_options options,
             couchstore_walk_tree_callback_fn callback,
             void* ctx);
 
@@ -1418,7 +1421,13 @@ std::string getLastOsError(const Db& db);
 LIBCOUCHSTORE_API
 std::string getLastInternalError();
 
-
+/**
+ * Set function to call when recording an internal error.
+ *
+ * @handler may be null
+ */
+LIBCOUCHSTORE_API
+void setOnInternalError(std::function<void(std::string_view)> handler);
 
 } // namespace couchstore
 } // namespace cb

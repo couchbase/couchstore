@@ -855,6 +855,7 @@ static couchstore_error_t couchstore_print_local_docs(
     rq.fetch_callback = fetch_cb;
     rq.node_callback = nullptr;
     rq.fold = 1;
+    rq.tolerate_corruption = 1;
 
     if (oneKey) {
         rq.fold = 0;
@@ -962,8 +963,11 @@ next_header:
         break;
     case DumpLocals:
         if (dumpTree) {
-            errcode =
-                    couchstore_walk_local_tree(db, nullptr, visit_node, &count);
+            errcode = couchstore_walk_local_tree(db,
+                                                 nullptr,
+                                                 COUCHSTORE_TOLERATE_CORRUPTION,
+                                                 visit_node,
+                                                 &count);
         } else if (dumpJson) {
             errcode = couchstore_print_local_docs(
                     db, local_doc_print_json, &count);
@@ -1203,18 +1207,20 @@ static void usage() {
     printf("    --iterate-headers  Iterate through all headers\n");
     printf("    --dump-headers  Dump the file header structure\n");
     printf("    --header-offset <offset> Use the header at file offset\n");
-    printf("\nAlternate modes:\n");
-    printf("    --tree       show file b-tree structure instead of data\n");
-    printf("    --local      dump local documents. Can be used in conjunction with --tree\n");
-    printf("    --map        dump block map \n");
-    printf("    --password password Use the provided password to decrypt "
+    printf("    --verbose    print internal errors as they are encountered\n");
+    printf("    --password <password>  Use the provided password to decrypt "
            "encryption keys (Use '-' to read from stdin)\n");
-    printf("    --with-dump-keys /path/to/dump-keys Use an alternative "
+    printf("    --with-dump-keys /path/to/dump-keys  Use an alternative "
            "dump-keys binary (Default: %s)\n",
            dump_keys_executable.c_str());
-    printf("    --with-gosecrets /path/to/gosecrets.cfg Use an aternative "
+    printf("    --with-gosecrets /path/to/gosecrets.cfg  Use an aternative "
            "configuration file (Default: %s)\n",
            gosecrets.c_str());
+    printf("\nAlternate modes:\n");
+    printf("    --tree       show file b-tree structure instead of data\n");
+    printf("    --local      dump local documents. Can be used in conjunction "
+           "with --tree\n");
+    printf("    --map        dump block map \n");
     exit(EXIT_FAILURE);
 }
 
@@ -1273,6 +1279,10 @@ int main(int argc, char **argv)
                 usage();
             }
             dumpNamespace = std::stoull(argv[ii]);
+        } else if (command == "--verbose") {
+            cb::couchstore::setOnInternalError([](std::string_view message) {
+                std::cout << "ERROR " << message << std::endl;
+            });
         } else if (command == "--local") {
             mode = DumpLocals;
         } else if (command == "--map") {

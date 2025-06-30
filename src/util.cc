@@ -12,6 +12,8 @@
 #include <stdio.h>
 #endif
 
+static std::function<void(std::string_view)> onInternalError;
+
 int ebin_cmp(const sized_buf *e1, const sized_buf *e2)
 {
     size_t size;
@@ -134,11 +136,19 @@ cs_off_t align_to_next_block(cs_off_t offset)
     return offset;
 }
 
+void cb::couchstore::setOnInternalError(
+        std::function<void(std::string_view)> handler) {
+    onInternalError = std::move(handler);
+}
+
 void log_last_internal_error(const char* format, ...) {
     va_list args;
     va_start(args, format);
     vsnprintf(internal_error_string, MAX_ERR_STR_LEN, format, args);
     va_end(args);
+    if (onInternalError) {
+        onInternalError(internal_error_string);
+    }
 }
 
 int strncpy_safe(char* d, const char* s, size_t n) {

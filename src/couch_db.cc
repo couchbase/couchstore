@@ -1650,6 +1650,7 @@ couchstore_error_t couchstore_walk_seq_tree(Db *db,
 couchstore_error_t couchstore_walk_local_tree(
         Db* db,
         const sized_buf* startLocalID,
+        couchstore_docinfos_options options,
         couchstore_walk_tree_callback_fn callback,
         void* ctx) {
     COLLECT_LATENCY();
@@ -1658,7 +1659,7 @@ couchstore_error_t couchstore_walk_local_tree(
                                 lookup_context::Tree::Local,
                                 db->header.local_docs_root,
                                 startLocalID,
-                                {},
+                                options,
                                 ebin_cmp,
                                 callback,
                                 ctx);
