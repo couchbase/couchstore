@@ -127,6 +127,18 @@ GENERATE_EXPORT_HEADER(couchstore
 ADD_LIBRARY(couchstore_static STATIC $<TARGET_OBJECTS:couchstore_objs>)
 TARGET_LINK_LIBRARIES(couchstore_static ${COUCHSTORE_LIBS})
 target_compile_definitions(couchstore_static PUBLIC LIBCOUCHSTORE_NO_VISIBILITY)
+if (WIN32)
+    # Set Compiler warning level to /W4
+    target_compile_options(couchstore_static PRIVATE /W4)
+    #if (COUCHBASE_KV_COMMIT_VALIDATION)
+    # Enable warnings as errors when building under CV
+    #add_compile_definitions(/WX)
+    #endif ()
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(couchstore_static PRIVATE
+            -Werror=shorten-64-to-32
+            -Werror=implicit-int-conversion)
+endif ()
 
 TARGET_INCLUDE_DIRECTORIES(couchstore_objs PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_INCLUDE_DIRECTORIES(couchstore_view_objs PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
