@@ -383,11 +383,12 @@ extern "C" {
      * @return COUCHSTORE_SUCCESS upon success
      */
     LIBCOUCHSTORE_API
-    couchstore_error_t couchstore_save_documents(Db *db,
-                                                 Doc* const docs[],
-                                                 DocInfo *infos[],
-                                                 unsigned numDocs,
-                                                 couchstore_save_options options);
+    couchstore_error_t couchstore_save_documents(
+            Db* db,
+            Doc* const docs[],
+            DocInfo* infos[],
+            size_t numDocs,
+            couchstore_save_options options);
 
     /**
      * Callback type for couchstore_save_documents_and_callback.
@@ -433,7 +434,7 @@ extern "C" {
             const Doc* const docs[],
             DocInfo* const infos[],
             void* const userReqs[],
-            unsigned numDocs,
+            size_t numDocs,
             couchstore_save_options options,
             save_callback_fn save_cb,
             void* save_cb_ctx);
@@ -721,12 +722,13 @@ extern "C" {
      * @return COUCHSTORE_SUCCESS on success.
      */
     LIBCOUCHSTORE_API
-    couchstore_error_t couchstore_docinfos_by_id(Db *db,
-                                                 const sized_buf ids[],
-                                                 unsigned numDocs,
-                                                 couchstore_docinfos_options options,
-                                                 couchstore_changes_callback_fn callback,
-                                                 void *ctx);
+    couchstore_error_t couchstore_docinfos_by_id(
+            Db* db,
+            const sized_buf ids[],
+            size_t numDocs,
+            couchstore_docinfos_options options,
+            couchstore_changes_callback_fn callback,
+            void* ctx);
 
     /*////////////////////  ITERATING TREES: */
 

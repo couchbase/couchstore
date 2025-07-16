@@ -33,7 +33,7 @@
     struct couchfile_lookup_request {
         compare_info cmp = {};
         tree_file* file = nullptr;
-        int num_keys = 0;
+        size_t num_keys = 0;
         /**
          * If nonzero, calls fetch_callback for all keys between and
          * including key 0 and key 1 in the keys array, or all keys after
@@ -86,7 +86,7 @@
 
     typedef struct couchfile_modify_action {
         uint8_t getType() const {
-            return packedKeyPtr.extra();
+            return gsl::narrow_cast<uint8_t>(packedKeyPtr.extra());
         }
         sized_buf* getKey() const {
             return packedKeyPtr.get();
@@ -123,7 +123,7 @@
     typedef struct couchfile_modify_request {
         compare_info cmp = {};
         tree_file* file = nullptr;
-        int num_actions = 0;
+        size_t num_actions = 0;
         couchfile_modify_action* actions = nullptr;
         couchstore_error_t (*fetch_callback)(
                 struct couchfile_modify_request* rq,

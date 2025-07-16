@@ -76,7 +76,7 @@ mapreduce_error_t mapreduce_map(void *context,
         return MAPREDUCE_ALLOC_ERROR;
     }
 
-    int num_funs = ctx->functions->size();
+    auto num_funs = ctx->functions->size();
     size_t sz = sizeof(mapreduce_map_result_t) * num_funs;
     (*result)->list = (mapreduce_map_result_t *) cb_malloc(sz);
 
@@ -259,7 +259,7 @@ void mapreduce_free_map_result_list(mapreduce_map_result_list_t *list)
         return;
     }
 
-    for (int i = 0; i < list->length; ++i) {
+    for (size_t i = 0; i < list->length; ++i) {
         mapreduce_map_result_t mr = list->list[i];
 
         switch (mr.error) {

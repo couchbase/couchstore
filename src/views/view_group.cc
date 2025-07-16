@@ -1190,8 +1190,8 @@ static couchstore_error_t update_btree(const char *source_file,
     size_t bufsize = 0;
     int last_record = 0;
     bitmap_t empty_bm;
-    int max_actions = MAX_ACTIONS_SIZE /
-                (sizeof(couchfile_modify_action) + 2 * sizeof(sized_buf));
+    size_t max_actions = MAX_ACTIONS_SIZE / (sizeof(couchfile_modify_action) +
+                                             2 * sizeof(sized_buf));
 
     if (transient_arena == nullptr) {
         ret = COUCHSTORE_ERROR_ALLOC_FAIL;

@@ -124,8 +124,8 @@ struct index_update_ctx {
         : seqacts(seqacts), deltermbuf(deltermbuf) {
     }
     couchfile_modify_action* seqacts = nullptr;
-    int actpos = 0;
-    int valpos = 0;
+    size_t actpos = 0;
+    size_t valpos = 0;
     fatbuf& deltermbuf;
 };
 
@@ -166,7 +166,7 @@ static couchstore_error_t update_indexes(Db* db,
                                          sized_buf* seqvals,
                                          sized_buf* ids,
                                          sized_buf* idvals,
-                                         int numdocs,
+                                         size_t numdocs,
                                          save_callback_fn save_callback,
                                          void* save_callback_ctx,
                                          void* const userReqs[]) {
@@ -201,13 +201,13 @@ static couchstore_error_t update_indexes(Db* db,
     // Sort the array indexes of ids[] by ascending id. Since we can't pass context info to qsort,
     // actually sort an array of pointers to the elements of ids[], rather than the array indexes.
     std::vector<sized_buf*> sorted_ids(numdocs);
-    for (int ii = 0; ii < numdocs; ++ii) {
+    for (size_t ii = 0; ii < numdocs; ++ii) {
         sorted_ids[ii] = &ids[ii];
     }
     qsort(sorted_ids.data(), numdocs, sizeof(sorted_ids[0]), &ebin_ptr_compare);
 
     // Assemble idacts[] array, in sorted order by id:
-    for (int ii = 0; ii < numdocs; ii++) {
+    for (size_t ii = 0; ii < numdocs; ii++) {
         ptrdiff_t isorted = sorted_ids[ii] - ids;   // recover index of ii'th id in sort order
 
         idacts[ii].setType(ACTION_FETCH_INSERT);
@@ -350,7 +350,7 @@ couchstore_error_t couchstore_save_documents_and_callback(
         const Doc* const docs[],
         DocInfo* const infos[],
         void* const userReqs[],
-        unsigned numdocs,
+        size_t numdocs,
         couchstore_save_options options,
         save_callback_fn save_cb,
         void* save_cb_ctx) {
@@ -438,7 +438,7 @@ couchstore_error_t couchstore_save_documents_and_callback(
 couchstore_error_t couchstore_save_documents(Db* db,
                                              Doc* const docs[],
                                              DocInfo* infos[],
-                                             unsigned numDocs,
+                                             size_t numDocs,
                                              couchstore_save_options options) {
     return couchstore_save_documents_and_callback(
             db, docs, infos, nullptr, numDocs, options, nullptr, nullptr);

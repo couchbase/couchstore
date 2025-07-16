@@ -35,15 +35,15 @@
 class Documents {
 
 public:
-    Documents(int n_docs);
+    Documents(size_t n_docs);
 
     /**
         Set document at index with id and data.
         Note: null terminator of both id/data strings is not stored.
     **/
-    void setDoc(int index, const std::string& id, const std::string& data);
+    void setDoc(size_t index, const std::string& id, const std::string& data);
 
-    void delDoc(int index);
+    void delDoc(size_t index);
 
     /**
         shuffle the documents so they're no longer in the order setDoc indicated.
@@ -75,7 +75,7 @@ public:
                             std::string keyPrefix = "doc",
                             std::string keySuffix = "doc");
 
-    void setContentMeta(int index, int flag);
+    void setContentMeta(size_t index, uint8_t flag);
 
     Doc** getDocs();
 
@@ -83,21 +83,21 @@ public:
 
     void** getUserReqs();
 
-    Doc* getDoc(int index);
+    Doc* getDoc(size_t index);
 
-    std::string_view getKey(int index) const;
+    std::string_view getKey(size_t index) const;
 
-    DocInfo* getDocInfo(int index);
+    DocInfo* getDocInfo(size_t index);
 
-    int getDocsCount() const;
+    size_t getDocsCount() const;
 
-    int getDocInfosCount() const;
+    size_t getDocInfosCount() const;
 
     int getDeleted() const;
 
     int getCallbacks() const;
 
-    int getPosition() const;
+    size_t getPosition() const;
 
     void resetCounters();
 
@@ -170,7 +170,7 @@ private:
         /* Init a document with default 'zero' meta */
         void init(const std::string& id, const std::string& data);
 
-        void setContentMeta(int flag);
+        void setContentMeta(uint8_t flag);
 
     private:
         friend Documents;
@@ -197,7 +197,7 @@ private:
     // Counters for the callbacks
     int deleted;
     int callbacks;
-    int position;
+    size_t position;
 
     // data for inRangeAndCountCallback
     std::string start;

@@ -368,7 +368,7 @@ couchstore_error_t db_write_header(Db* db, DiskBlockType block_type) {
     case COUCH_DISK_VERSION_14:
         return db_write_header_impl(db, block_type);
     default:
-        log_last_internal_error("db_write_header: unexpected version:%" PRIu64,
+        log_last_internal_error("db_write_header: unexpected version:%" PRIu8,
                                 db->header.disk_version);
         return COUCHSTORE_ERROR_HEADER_VERSION;
     }
@@ -1680,17 +1680,17 @@ static int seq_ptr_cmp(const void *a, const void *b)
 }
 
 // Common subroutine of couchstore_docinfos_by_{ids, sequence}
-static couchstore_error_t iterate_docinfos(Db *db,
-                                           const sized_buf keys[],
-                                           unsigned numDocs,
-                                           node_pointer *tree,
-                                           int (*key_ptr_compare)(const void *, const void *),
-                                           int (*key_compare)(const sized_buf *k1, const sized_buf *k2),
-                                           couchstore_changes_callback_fn callback,
-                                           int fold,
-                                           int tolerate_corruption,
-                                           void *ctx)
-{
+static couchstore_error_t iterate_docinfos(
+        Db* db,
+        const sized_buf* keys,
+        size_t numDocs,
+        node_pointer* tree,
+        int (*key_ptr_compare)(const void*, const void*),
+        int (*key_compare)(const sized_buf* k1, const sized_buf* k2),
+        couchstore_changes_callback_fn callback,
+        int fold,
+        int tolerate_corruption,
+        void* ctx) {
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
     const sized_buf** keyptrs = nullptr;
     error_unless(!db->dropped, COUCHSTORE_ERROR_FILE_CLOSED);
@@ -1741,13 +1741,13 @@ cleanup:
     return errcode;
 }
 
-couchstore_error_t couchstore_docinfos_by_id(Db *db,
-                                             const sized_buf ids[],
-                                             unsigned numDocs,
-                                             couchstore_docinfos_options options,
-                                             couchstore_changes_callback_fn callback,
-                                             void *ctx)
-{
+couchstore_error_t couchstore_docinfos_by_id(
+        Db* db,
+        const sized_buf ids[],
+        size_t numDocs,
+        couchstore_docinfos_options options,
+        couchstore_changes_callback_fn callback,
+        void* ctx) {
     COLLECT_LATENCY();
 
     return iterate_docinfos(db, ids, numDocs,

@@ -147,7 +147,7 @@ static file_sorter_error_t parallel_sorter_wait(parallel_sorter_t *s, size_t n);
 
 static file_sorter_error_t parallel_sorter_finish(parallel_sorter_t *s);
 
-static int sorter_random_name(char *tmpl, int totlen, int suffixlen);
+static int sorter_random_name(char* tmpl, size_t totlen, size_t suffixlen);
 
 static char *sorter_tmp_file_path(const char *tmp_dir, const char *prefix);
 
@@ -824,12 +824,12 @@ cleanup:
     return (file_sorter_error_t) ret;
 }
 
-static int sorter_random_name(char *tmpl, int totlen, int suffixlen) {
+static int sorter_random_name(char* tmpl, size_t totlen, size_t suffixlen) {
     static unsigned int value = 0;
     tmpl = tmpl + totlen - suffixlen;
 
     int nw = snprintf(tmpl, suffixlen, ".%d", value);
-    if (nw < 0 || nw >= suffixlen) {
+    if (nw < 0 || size_t(nw) >= suffixlen) {
         return -1;
     }
 

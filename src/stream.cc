@@ -412,7 +412,8 @@ bool ChecksumStream::read_chunk() {
 
 void ChecksumStream::write_chunk() {
     Header header;
-    header.length = chunk.size() + sizeof(uint32_t);
+    // chunk.size checked to be <= max_write_buffer
+    header.length = gsl::narrow_cast<uint32_t>(chunk.size() + sizeof(uint32_t));
     header.checksum = get_checksum(
             reinterpret_cast<uint8_t*>(chunk.data()), chunk.size(), CRC32C);
     header.length = htonl(header.length);

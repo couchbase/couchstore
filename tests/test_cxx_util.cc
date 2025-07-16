@@ -131,7 +131,7 @@ TEST_F(CouchstoreCxxTest, seekDirections) {
     auto db = openDb();
 
     // Verify that we can rewind back to the first header in the file
-    for (int idx = headers.size() - 2; idx >= 0; --idx) {
+    for (int idx = gsl::narrow_cast<int>(headers.size() - 2); idx >= 0; --idx) {
         ASSERT_EQ(COUCHSTORE_SUCCESS,
                   cb::couchstore::seek(*db, Direction::Backward));
         EXPECT_EQ(headers[idx], couchstore_get_header_position(db.get()));

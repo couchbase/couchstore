@@ -27,7 +27,7 @@ std::string to_string(sized_buf buf) {
     return std::string(buf.buf, buf.size);
 }
 
-Documents::Documents(int n_docs)
+Documents::Documents(size_t n_docs)
     : docs(n_docs),
       docInfos(n_docs),
       userReqs(n_docs),
@@ -37,13 +37,15 @@ Documents::Documents(int n_docs)
       position(0) {
 }
 
-void Documents::setDoc(int index, const std::string& id, const std::string& data) {
+void Documents::setDoc(size_t index,
+                       const std::string& id,
+                       const std::string& data) {
     documents[index].init(id, data);
     docs[index] = documents[index].getDocPointer();
     docInfos[index] = documents[index].getDocInfoPointer();
 }
 
-void Documents::delDoc(int index) {
+void Documents::delDoc(size_t index) {
     // delete docs[index];
     docs[index] = nullptr;
     docInfos[index]->deleted = 1;
@@ -90,7 +92,8 @@ void Documents::generateRandomDocs(int seed,
     std::mt19937 twister1(seed);
     const std::string characters =
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    std::uniform_int_distribution<int> distribution(0, characters.size() - 1);
+    std::uniform_int_distribution<int> distribution(
+            0, gsl::narrow_cast<int>(characters.size() - 1));
     for (size_t ii = 0; ii < documents.size(); ii++) {
         std::string randKey;
         std::generate_n(std::back_inserter(randKey), 10, [&]() {
@@ -102,7 +105,7 @@ void Documents::generateRandomDocs(int seed,
     }
 }
 
-void Documents::setContentMeta(int index, int flag) {
+void Documents::setContentMeta(size_t index, uint8_t flag) {
     documents[index].setContentMeta(flag);
 }
 
@@ -118,23 +121,23 @@ void** Documents::getUserReqs() {
     return userReqs.data();
 }
 
-Doc* Documents::getDoc(int index) {
+Doc* Documents::getDoc(size_t index) {
     return docs[index];
 }
 
-std::string_view Documents::getKey(int index) const {
+std::string_view Documents::getKey(size_t index) const {
     return std::string_view(docs.at(index)->id.buf, docs.at(index)->id.size);
 }
 
-DocInfo* Documents::getDocInfo(int index) {
+DocInfo* Documents::getDocInfo(size_t index) {
     return docInfos[index];
 }
 
-int Documents::getDocsCount() const {
+size_t Documents::getDocsCount() const {
     return docs.size();
 }
 
-int Documents::getDocInfosCount() const {
+size_t Documents::getDocInfosCount() const {
     return docInfos.size();
 }
 
@@ -158,7 +161,7 @@ void Documents::incrementPosition() {
     position++;
 }
 
-int Documents::getPosition() const {
+size_t Documents::getPosition() const {
     return position;
 }
 
@@ -306,7 +309,7 @@ void Documents::Document::init(const std::string& id, const std::string& data) {
     init(id, data, zeroMeta);
 }
 
-void Documents::Document::setContentMeta(int flag) {
+void Documents::Document::setContentMeta(uint8_t flag) {
     docInfo.content_meta = flag;
 }
 

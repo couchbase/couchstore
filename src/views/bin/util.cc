@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <system_error>
 #include <thread>
 
@@ -42,7 +43,7 @@ static void do_exit(int ret, int uses_v8)
 
 static void exit_thread_helper(int uses_v8) {
     char buf[4];
-    int len = fread(buf, 1, 4, stdin);
+    auto len = fread(buf, 1, 4, stdin);
 
     /* If the other end closed the pipe */
     if (len == 0) {
@@ -50,7 +51,8 @@ static void exit_thread_helper(int uses_v8) {
     } else if (len == 4 && !strncmp(buf, "exit", 4)) {
         do_exit(1, uses_v8);
     } else {
-        fprintf(stderr, "Error occured waiting for exit message (%d)\n", len);
+        std::cerr << "Error occured waiting for exit message " << len
+                  << std::endl;
         do_exit(2, uses_v8);
     }
 }

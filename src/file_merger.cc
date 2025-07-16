@@ -70,9 +70,10 @@ static void sorted_vector_pop(sorted_vector_t *sorted_vector,
 static int  sorted_vector_add(sorted_vector_t *sorted_vector, record_t *record);
 
 static file_merger_error_t do_merge_files(file_merger_ctx_t *ctx);
-static void free_all_records(file_merger_ctx_t *ctx, record_t **records,
-                             int offset, int num);
-
+static void free_all_records(file_merger_ctx_t* ctx,
+                             record_t** records,
+                             size_t offset,
+                             size_t num);
 
 file_merger_error_t merge_files(const char *source_files[],
                                 unsigned num_files,
@@ -162,7 +163,7 @@ file_merger_error_t merge_files(const char *source_files[],
 
 static file_merger_error_t do_merge_files(file_merger_ctx_t *ctx)
 {
-    for (size_t i = 0; i < ctx->num_files; ++i) {
+    for (unsigned int i = 0; i < ctx->num_files; ++i) {
         FILE *f = ctx->files[i];
         int record_len;
         void *record_data;
@@ -256,15 +257,15 @@ static file_merger_error_t do_merge_files(file_merger_ctx_t *ctx)
     return FILE_MERGER_SUCCESS;
 }
 
-
-static void free_all_records(file_merger_ctx_t *ctx, record_t **records,
-                             int offset, int num) {
+static void free_all_records(file_merger_ctx_t* ctx,
+                             record_t** records,
+                             size_t offset,
+                             size_t num) {
     for (; offset < num; offset++) {
         FREE_RECORD(ctx, records[offset]);
     }
     cb_free(records);
 }
-
 
 static int init_sorted_vector(sorted_vector_t *sorted_vector,
                               unsigned max_elements,

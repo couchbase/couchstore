@@ -137,7 +137,7 @@ struct node_pointer {
 };
 
 struct db_header {
-    uint64_t disk_version;
+    uint8_t disk_version;
     uint64_t update_seq;
     node_pointer* by_id_root;
     node_pointer* by_seq_root;

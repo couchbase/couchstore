@@ -867,8 +867,7 @@ static couchstore_error_t couchstore_print_local_docs(
     return errcode;
 }
 
-static int process_vbucket_file(const char *file, int *total)
-{
+static int process_vbucket_file(const char* file, size_t* total) {
     Db *db;
     couchstore_error_t errcode;
     int count = 0;
@@ -1113,8 +1112,7 @@ static couchstore_error_t find_view_header(view_group_info_t *info,
     return last_header_errcode;
 }
 
-static int process_view_file(const char *file, int *total)
-{
+static int process_view_file(const char* file, size_t* total) {
     view_group_info_t *info;
     couchstore_error_t errcode;
     index_header_t* header = nullptr;
@@ -1227,7 +1225,7 @@ static void usage() {
 int main(int argc, char **argv)
 {
     int error = 0;
-    int count = 0;
+    size_t count = 0;
     int ii = 1;
 
     if (argc < 2) {
@@ -1278,7 +1276,15 @@ int main(int argc, char **argv)
             if (++ii >= argc) {
                 usage();
             }
-            dumpNamespace = std::stoull(argv[ii]);
+            auto ns = std::stoull(argv[ii]);
+            if (ns >= std::numeric_limits<uint32_t>::max()) {
+                std::cerr << "\"--namespace " << argv[ii]
+                          << "\" converts to a value too large for 32-bit "
+                             "storage."
+                          << std::endl;
+                usage();
+            }
+            dumpNamespace = gsl::narrow_cast<uint32_t>(ns);
         } else if (command == "--verbose") {
             cb::couchstore::setOnInternalError([](std::string_view message) {
                 std::cout << "ERROR " << message << std::endl;
@@ -1346,7 +1352,7 @@ int main(int argc, char **argv)
     }
 
     if (!dumpJson) {
-        printf("\nTotal docs: %d\n", count);
+        std::cout << "\nTotal docs: " << count << std::endl;
     }
     if (error) {
         exit(EXIT_FAILURE);

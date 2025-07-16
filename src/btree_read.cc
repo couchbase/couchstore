@@ -22,11 +22,10 @@ static int lookup_compare(couchfile_lookup_request *rq,
     return rq->cmp.compare(key1, key2);
 }
 
-static couchstore_error_t btree_lookup_inner(couchfile_lookup_request *rq,
+static couchstore_error_t btree_lookup_inner(couchfile_lookup_request* rq,
                                              uint64_t diskpos,
-                                             int current,
-                                             int end)
-{
+                                             size_t current,
+                                             size_t end) {
     int bufpos = 1, nodebuflen = 0;
 
     if (current == end) {
@@ -56,7 +55,7 @@ static couchstore_error_t btree_lookup_inner(couchfile_lookup_request *rq,
                 }
 
                 uint64_t pointer = 0;
-                int last_item = current;
+                auto last_item = current;
                 //Descend into the pointed to node.
                 //with all keys < item key.
                 do {

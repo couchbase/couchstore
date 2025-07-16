@@ -100,7 +100,7 @@ static int process_file(const char* file,
 
 next_header:
     printf("Header at file offset %" PRIu64 "\n", db->header.position);
-    printf("   file format version: %" PRIu64 "\n", db->header.disk_version);
+    printf("   file format version: %" PRIu8 "\n", db->header.disk_version);
     printf("   update_seq: %" PRIu64 "\n", db->header.update_seq);
     printf("   purge_seq: %" PRIu64 "\n", db->header.purge_seq);
 

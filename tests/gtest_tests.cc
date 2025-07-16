@@ -347,7 +347,9 @@ TEST_P(CouchstoreTest, compressed_doc_body)
     Documents documents(2);
     documents.setDoc(0, "doc1", "{\"test_doc_index\":1, \"val\":\"blah blah blah blah blah blah\"}");
     documents.setDoc(1, "doc2", "{\"test_doc_index\":2, \"val\":\"blah blah blah blah blah blah\"}");
-    documents.setContentMeta(1, COUCH_DOC_IS_COMPRESSED);/* Mark doc2 as to be snappied. */
+    documents.setContentMeta(
+            1, uint8_t(COUCH_DOC_IS_COMPRESSED)); /* Mark doc2 as to be
+                                                     snappied. */
 
     ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_save_documents(db,
@@ -1776,7 +1778,7 @@ TEST_F(CouchstoreBaseTest, MB_52010) {
 }
 
 class RangeScanTest : public CouchstoreBaseTest,
-                      public ::testing::WithParamInterface<int> {
+                      public ::testing::WithParamInterface<size_t> {
 public:
     void SetUp() override {
         documents.generateLexicographicalSequence();
@@ -1935,7 +1937,7 @@ public:
     }
 
     ::testing::AssertionResult checkAddedSeqnos(Documents& documents) {
-        for (int ii = 0; ii < documents.getDocsCount(); ii++) {
+        for (size_t ii = 0; ii < documents.getDocsCount(); ii++) {
             auto* info = documents.getDocInfo(ii);
             if (addedKeys.count({info->id.buf, info->id.size}) == 0) {
                 return ::testing::AssertionFailure()
@@ -2227,7 +2229,7 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(RangeScanTest,
                          RangeScanTest,
                          ::testing::Values(4, 69, 666),
-                         [](const ::testing::TestParamInfo<int>& testInfo) {
+                         [](const ::testing::TestParamInfo<size_t>& testInfo) {
                              std::stringstream fmt;
                              fmt << "x" << testInfo.param;
                              return fmt.str();

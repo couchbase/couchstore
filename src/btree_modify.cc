@@ -12,7 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-static couchstore_error_t flush_mr_partial(couchfile_modify_result *res, int mr_quota);
+static couchstore_error_t flush_mr_partial(couchfile_modify_result* res,
+                                           size_t mr_quota);
 static couchstore_error_t flush_mr(couchfile_modify_result *res);
 static couchstore_error_t purge_node(couchfile_modify_request *rq,
                                       node_pointer *nptr,
@@ -201,8 +202,8 @@ static couchstore_error_t flush_mr(couchfile_modify_result *res)
 
 //Write a node using enough items from the values list to create a node
 //with uncompressed size of at least mr_quota
-static couchstore_error_t flush_mr_partial(couchfile_modify_result *res, int mr_quota)
-{
+static couchstore_error_t flush_mr_partial(couchfile_modify_result* res,
+                                           size_t mr_quota) {
     char *dst;
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
     int itmcount = 0;
@@ -442,11 +443,11 @@ cleanup:
     return errcode;
 }
 
-static couchstore_error_t modify_node(couchfile_modify_request *rq,
-                                      node_pointer *nptr,
-                                      int start, int end,
-                                      couchfile_modify_result *dst)
-{
+static couchstore_error_t modify_node(couchfile_modify_request* rq,
+                                      node_pointer* nptr,
+                                      size_t start,
+                                      size_t end,
+                                      couchfile_modify_result* dst) {
     char* nodebuf =
             nullptr; // FYI, nodebuf is a malloced block, not in the arena
     int bufpos = 1;
@@ -656,7 +657,7 @@ static couchstore_error_t modify_node(couchfile_modify_request *rq,
                 //Found a key in the node greater than the one in the current
                 //action. Descend into the pointed node with as many actions as
                 //are less than the key here.
-                int range_end = start;
+                auto range_end = start;
                 while (range_end < end &&
                        rq->cmp.compare(rq->actions[range_end].getKey(),
                                        &cmp_key) <= 0) {

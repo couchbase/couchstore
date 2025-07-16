@@ -66,7 +66,7 @@ struct mapreduce_map_result_t {
 
 struct mapreduce_map_result_list_t {
     mapreduce_map_result_t* list;
-    int length;
+    size_t length;
 };
 
 /**

@@ -381,7 +381,7 @@ std::string TrackingFileOps::File::BlockInfo::to_string() {
         break;
     }
     if (isFull()) {
-        symbol = std::toupper(symbol);
+        symbol = static_cast<char>(std::toupper(symbol));
     }
 
     return color + symbol + ANSI_COLOR_RESET;
