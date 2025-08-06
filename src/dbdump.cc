@@ -587,7 +587,9 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
                 !(docinfo->content_meta & COUCH_DOC_IS_COMPRESSED)) {
                 // Inflate the entire document so we can work with it
                 if (!cb::compression::inflateSnappy(
-                            {doc->data.buf, doc->data.size}, inflated)) {
+                            {doc->data.buf, doc->data.size},
+                            inflated,
+                            std::numeric_limits<size_t>::max())) {
                     if (dumpJson) {
                         json["body"] = nullptr;
                     } else {

@@ -317,8 +317,10 @@ int pread_compressed(tree_file *file, cs_off_t pos, char **ret_ptr)
 
     cb::compression::Buffer buffer(allocator);
     try {
-        if (!cb::compression::inflateSnappy({compressed_buf, size_t(len)},
-                                            buffer)) {
+        if (!cb::compression::inflateSnappy(
+                    {compressed_buf, size_t(len)},
+                    buffer,
+                    std::numeric_limits<size_t>::max())) {
             cb_free(compressed_buf);
             log_last_internal_error("Couchstore::pread_compressed() "
                      "Invalid compressed buffer length:%d pos:%" PRId64, len, pos);

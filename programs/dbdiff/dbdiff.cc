@@ -256,8 +256,10 @@ static void compare_documents(compare_context* ctx,
 
         // If the documents are compressed; compare uncompressed data / size.
         if (compressed) {
-            if (!cb::compression::inflateSnappy({d1->data.buf, d1->data.size},
-                                                d1_uncompressed)) {
+            if (!cb::compression::inflateSnappy(
+                        {d1->data.buf, d1->data.size},
+                        d1_uncompressed,
+                        std::numeric_limits<size_t>::max())) {
                 fprintf(stderr,
                         "Failed to uncompress Snappy-compressed document \"");
                 print_key(d1->id, stderr);
@@ -266,8 +268,10 @@ static void compare_documents(compare_context* ctx,
             }
             d1_val = {d1_uncompressed.data(), d1_uncompressed.size()};
 
-            if (!cb::compression::inflateSnappy({d2->data.buf, d2->data.size},
-                                                d2_uncompressed)) {
+            if (!cb::compression::inflateSnappy(
+                        {d2->data.buf, d2->data.size},
+                        d2_uncompressed,
+                        std::numeric_limits<size_t>::max())) {
                 fprintf(stderr,
                         "Failed to uncompress Snappy-compressed document \"");
                 print_key(d1->id, stderr);
