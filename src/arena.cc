@@ -112,8 +112,15 @@ void delete_arena(arena* a)
 void* arena_alloc_unaligned(arena* a, size_t size)
 {
     void* result = a->next_block;
-    a->next_block += size;
-    if (a->next_block > a->end || size > a->chunk_size) {
+    if (a->next_block) {
+        // check to see if there is room in the current chunk or
+        // if we need to allocate a new chunk
+        a->next_block += size;
+        if (a->next_block > a->end || size > a->chunk_size) {
+            result = add_chunk(a, size);
+        }
+    } else {
+        // no block; must allocate
         result = add_chunk(a, size);
     }
 #ifdef DEBUG
