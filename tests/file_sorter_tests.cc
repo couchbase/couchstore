@@ -24,9 +24,9 @@
 #include "macros.h"
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstring>
+#include <filesystem>
+#include <string>
 
 #define UNSORTED_FILE_PATH "unsorted_file.data"
 #define SORT_TMP_DIR "."
@@ -292,6 +292,20 @@ static int int_cmp(const void* a, const void* b) {
     return *((const int*)a) - *((const int*)b);
 }
 
+static void delete_files(const std::string& dir_path,
+                         const std::string& base_path) {
+    namespace fs = std::filesystem;
+    for (const auto& entry : fs::directory_iterator(dir_path)) {
+        if (!entry.is_regular_file()) {
+            continue;
+        }
+        const std::string filename = entry.path().filename().string();
+        if (filename.starts_with(base_path)) { // starts with base_path
+            fs::remove(entry.path());
+        }
+    }
+}
+
 int main(void) {
     const unsigned temp_files[] = {2, 3, 4, 5, 6, 7, 8, 9, 10};
     const unsigned buffer_sizes[] = {sizeof(int) * 2,
@@ -305,6 +319,10 @@ int main(void) {
 
     unsigned i, j;
     unsigned long nrecords = (unsigned long)(sizeof(data) / sizeof(int));
+
+    // Delete any files which may have been left behind from an interupted job
+    // e.g. the temp files like unsorted_file.data.1234
+    delete_files(SORT_TMP_DIR, UNSORTED_FILE_PATH);
 
     fprintf(stderr, "Running file sorter tests...\n");
 
