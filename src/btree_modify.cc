@@ -221,8 +221,10 @@ static couchstore_error_t flush_mr_partial(couchfile_modify_result* res,
         return COUCHSTORE_SUCCESS;
     }
 
-    // nodebuf/writebuf is very short-lived and can be large, so use regular malloc heap for it:
-    nodebuf = static_cast<char*>(cb_malloc(res->node_len + 1));
+    const auto nodebuf_size = gsl::narrow<size_t>(res->node_len + 1);
+    // nodebuf/writebuf is very short-lived and can be large, so use regular
+    // malloc heap for it:
+    nodebuf = static_cast<char*>(cb_malloc(nodebuf_size));
     if (!nodebuf) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     }
@@ -234,15 +236,29 @@ static couchstore_error_t flush_mr_partial(couchfile_modify_result* res,
 
     nodelist *i = res->values->next;
     final_key = i->key;
-    //We don't care that we've reached mr_quota if we haven't written out
-    //at least two items and we're not writing a leaf node.
-    while (i != nullptr &&
-           (mr_quota > 0 || (itmcount < 2 && res->node_type == KP_NODE))) {
+
+    size_t used_quota = 0;
+    // We don't care that we've reached mr_quota if we haven't written out
+    // at least two items and we're not writing a leaf node.
+    while (i != nullptr && (used_quota < mr_quota ||
+                            (itmcount < 2 && res->node_type == KP_NODE))) {
+        const auto kv_size = i->key.size + i->data.size + sizeof(raw_kv_length);
+        const size_t nodebuf_len = dst - nodebuf;
+        if (nodebuf_len + kv_size > nodebuf_size) {
+            cb_free(nodebuf);
+            log_last_internal_error(
+                    "flush_mr_partial: write_kv would exceed buffer size:%zu "
+                    "before:%zu after:%zu",
+                    nodebuf_size,
+                    nodebuf_len,
+                    nodebuf_len + kv_size);
+            return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+        }
         dst = static_cast<char*>(write_kv(dst, i->key, i->data));
         if (i->pointer) {
             subtreesize += i->pointer->subtreesize;
         }
-        mr_quota -= i->key.size + i->data.size + sizeof(raw_kv_length);
+        used_quota += kv_size;
         final_key = i->key;
         i = i->next;
         res->count--;
