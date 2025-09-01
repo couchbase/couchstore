@@ -247,6 +247,45 @@ TEST_F(CouchstoreInternalTest, buffered_io_options)
     }
 }
 
+static int node_size_callback(Db* db,
+                              int depth,
+                              const DocInfo* docinfo,
+                              uint64_t subtreeSize,
+                              const sized_buf* reduceValue,
+                              void* ctx) {
+    auto& counts = *static_cast<std::vector<size_t>*>(ctx);
+    const auto idx = gsl::narrow<size_t>(depth);
+    while (counts.size() <= idx) {
+        counts.push_back(0);
+    }
+    if (idx + 1 < counts.size()) {
+        counts[idx + 1] = 0;
+    }
+    const auto count = ++counts[idx];
+    // We may require more than 3 items for splitting
+    EXPECT_LE(count, 3) << "depth: " << depth;
+    return 0;
+}
+
+TEST_F(CouchstoreInternalTest, node_splitting) {
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
+    std::string key(2000, 'a');
+    LocalDoc doc;
+    doc.id.buf = key.data();
+    doc.id.size = key.size();
+    doc.json.buf = key.data(); // Non-null needed for memcpy
+    doc.json.size = 0;
+    doc.deleted = 0;
+    for (int ii = 12; ii--;) {
+        ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_save_local_document(db, &doc));
+        key.front()++;
+        std::vector<size_t> ctx;
+        ASSERT_EQ(COUCHSTORE_SUCCESS,
+                  couchstore_walk_local_tree(
+                          db, nullptr, 0, node_size_callback, &ctx));
+    }
+}
+
 typedef ParameterisedFileOpsErrorInjectionTest PreadPwriteReturnTest;
 
 /**
