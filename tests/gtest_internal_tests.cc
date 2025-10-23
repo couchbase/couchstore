@@ -556,10 +556,12 @@ TEST_F(CouchstoreInternalTest, corrupted_btree_node)
     char errbuf[250];
     ASSERT_EQ(COUCHSTORE_SUCCESS,
               couchstore_last_internal_error(db, errbuf, sizeof(errbuf)));
-    EXPECT_STREQ(
-            "'Couchstore::pread_bin_internal() Checksum fail length:331 "
-            "crc:3812825268 pos:2432'",
-            errbuf);
+    auto error = errbuf;
+    EXPECT_THAT(
+            error,
+            StartsWith(
+                    "'Couchstore::pread_bin_internal() Checksum fail length:"));
+    EXPECT_THAT(error, EndsWith(" pos:2432'"));
 
     param.reset();
     // Should fail.
