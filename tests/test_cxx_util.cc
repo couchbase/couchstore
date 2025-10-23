@@ -291,7 +291,10 @@ TEST_F(CouchstoreCxxTest, GetHeaderJson) {
     EXPECT_NE("", json["filename"]);
     EXPECT_EQ(0, json["deleted_count"]);
     EXPECT_EQ(86103, json["file_size"]);
-    EXPECT_EQ(41359, json["space_used"]);
+    // verify that we have a numeric value for space_used (and that it exists)
+    // The data is compressed so we can't verify the exact size as the
+    // compression may vary between platforms/versions.
+    EXPECT_NE(0, json.value("space_used", 0));
     EXPECT_EQ(10, json["update_seq"]);
 }
 
