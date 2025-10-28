@@ -281,9 +281,7 @@ FUNCTION(M_ADD_PYTHON_TEST name pyfile)
     # Python tests don't work under UBSan - it reports missing symbols when
     # loading libcouchstore.so and it's dependancies:
     #     OSError: libphosphor.so: undefined symbol: __ubsan_vptr_type_cache
-    # Python tests also don't work under TSan and the tests are single-threaded.
-    # For now skip if running under UBSan and TSan.
-    IF (CB_UNDEFINEDSANITIZER OR CB_THREADSANITIZER)
+    IF (CB_UNDEFINEDSANITIZER)
         RETURN()
     ENDIF()
 
@@ -291,6 +289,20 @@ FUNCTION(M_ADD_PYTHON_TEST name pyfile)
     SET_PROPERTY(TEST ${name} PROPERTY ENVIRONMENT
                  "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/python"
                  "LD_LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}:${CMAKE_INSTALL_PREFIX}/lib")
+
+    # If building with TSan, we need to explicitly load the TSan
+    # runtime library via LD_PRELOAD, as while libcouchstore.so does
+    # link to it, the tsan runtime lib needs to be loaded at process
+    # startup - it's too late if we wait until libcouchstore.co is
+    # dlopen()'d.
+    IF (CB_THREADSANITIZER)
+        LIST(APPEND ld_preload libtsan.so.2)
+    ENDIF()
+    IF (ld_preload AND UNIX AND NOT APPLE)
+        string (REPLACE ";" " " ld_preload_str "${ld_preload}")
+        SET_PROPERTY(TEST ${name} APPEND PROPERTY ENVIRONMENT
+                     "LD_PRELOAD=${ld_preload_str}")
+    ENDIF()
 ENDFUNCTION()
 
 M_ADD_PYTHON_TEST(couchstore-purge ${CMAKE_CURRENT_SOURCE_DIR}/tests/purge.py)
@@ -429,15 +441,18 @@ TARGET_INCLUDE_DIRECTORIES(couchstore_test_fileops
                            ${CMAKE_CURRENT_BINARY_DIR}/include)
 TARGET_LINK_LIBRARIES(couchstore_test_fileops GTest::gmock cbcrypto platform)
 
-ADD_TEST(couchstore-file-deduper-test couchstore_file-deduper-test)
-ADD_TEST(couchstore-file-merge-test couchstore_file-merger-test)
-ADD_TEST(couchstore-file-sorter-test couchstore_file-sorter-test)
+if (NOT DEFINED CB_THREADSANITIZER AND NOT DEFINED CB_ADDRESSSANITIZER)
+    ADD_TEST(couchstore-file-deduper-test couchstore_file-deduper-test)
+    ADD_TEST(couchstore-file-merge-test couchstore_file-merger-test)
+    ADD_TEST(couchstore-file-sorter-test couchstore_file-sorter-test)
+    ADD_TEST(NAME couchstore-mapreduce-builtin-test COMMAND couchstore_mapreduce-builtin-test ${CMAKE_INSTALL_PREFIX}/bin/)
+    ADD_TEST(NAME couchstore-mapreduce-map-test COMMAND couchstore_mapreduce-map-test ${CMAKE_INSTALL_PREFIX}/bin/)
+    ADD_TEST(NAME couchstore-mapreduce-reduce-test COMMAND couchstore_mapreduce-reduce-test ${CMAKE_INSTALL_PREFIX}/bin/)
+    ADD_TEST(NAME couchstore-testapp COMMAND couchstore_testapp ${CMAKE_INSTALL_PREFIX}/bin/)
+endif ()
+
 ADD_TEST(couchstore-gtest couchstore_gtest)
 ADD_TEST(couchstore-internal-gtest couchstore_internal_gtest)
-ADD_TEST(NAME couchstore-mapreduce-builtin-test COMMAND couchstore_mapreduce-builtin-test ${CMAKE_INSTALL_PREFIX}/bin/)
-ADD_TEST(NAME couchstore-mapreduce-map-test COMMAND couchstore_mapreduce-map-test ${CMAKE_INSTALL_PREFIX}/bin/)
-ADD_TEST(NAME couchstore-mapreduce-reduce-test COMMAND couchstore_mapreduce-reduce-test ${CMAKE_INSTALL_PREFIX}/bin/)
-ADD_TEST(NAME couchstore-testapp COMMAND couchstore_testapp ${CMAKE_INSTALL_PREFIX}/bin/)
 ADD_TEST(couchstore-wrapped_fileops-test couchstore_wrapped_fileops_test)
 
 ADD_SUBDIRECTORY(programs)
