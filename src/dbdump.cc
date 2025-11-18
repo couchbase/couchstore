@@ -802,10 +802,10 @@ static couchstore_error_t local_doc_print_json(couchfile_lookup_request* rq,
     }
 
     nlohmann::json parsed;
-     parsed["id"] = std::string(k->buf, k->size);
+    parsed["id"] = std::string(k->buf, k->size);
     try {
         parsed["value"] = nlohmann::json::parse(value.buf, value.buf + value.size);
-    } catch (const nlohmann::json::exception& e) {
+    } catch (const nlohmann::json::exception&) {
         std::cerr << "WARNING: Failed nlohmann::json::parse of id:";
         std::cerr.write(k->buf, k->size);
         std::cerr << " with value:";
@@ -813,7 +813,6 @@ static couchstore_error_t local_doc_print_json(couchfile_lookup_request* rq,
         std::cerr << std::endl;
         return COUCHSTORE_ERROR_CORRUPT;
     }
-
 
     std::cout << parsed.dump(-1, ' ', true) << std::endl;
 

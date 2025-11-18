@@ -103,7 +103,7 @@ struct FileBuffer : public boost::intrusive::list_base_hook<> {
         // memory allocator reuse it without clearing such
         try {
             setAccessMode(AccessMode::Full);
-        } catch (const std::exception& e) {
+        } catch (const std::exception&) {
             // we failed to remove the restriction so we should probably just
             // leak the memory to avoid weird stuff to happen when the memory
             // gets reused
