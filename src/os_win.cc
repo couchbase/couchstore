@@ -39,16 +39,6 @@ static DWORD save_windows_error(couchstore_error_info_t *errinfo) {
     return err;
 }
 
-static HANDLE handle_to_win(couch_file_handle handle)
-{
-    return (HANDLE)(intptr_t)handle;
-}
-
-static couch_file_handle win_to_handle(HANDLE hdl)
-{
-    return (couch_file_handle)(intptr_t)hdl;
-}
-
 class WindowsFileOps : public FileOpsInterface {
 public:
     WindowsFileOps() {}
