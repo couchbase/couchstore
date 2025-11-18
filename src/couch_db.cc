@@ -32,11 +32,11 @@
 #include <platform/string_hex.h>
 
 #include <fcntl.h>
+#include <fmt/core.h>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include <fmt/core.h>
 
 #define ROOT_BASE_SIZE 12
 #define HEADER_BASE_SIZE 25
@@ -144,6 +144,7 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
         return (readsize < 0) ? static_cast<couchstore_error_t>(readsize)
                               : COUCHSTORE_ERROR_READ;
     }
+
     if (diskBlockType == DiskBlockType::Data ||
         diskBlockType == DiskBlockType::Meta) {
         return COUCHSTORE_ERROR_NO_HEADER;
@@ -157,6 +158,7 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
     }
 
     header_len = pread_header(&db->file, pos, &header_buf.buf, MAX_DB_HEADER_SIZE);
+    std::unique_ptr<char, cb_free_deleter> memguard(header_buf.buf);
     if (header_len < 0) {
         // MB-38788:
         // Prior to the fix for MB-38788, compaction would leave the first
@@ -214,7 +216,7 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
                 (char*)(header_buf.v12_raw + 1); // i.e. just past *header_buf
         break;
     default:
-        error_pass(COUCHSTORE_ERROR_HEADER_VERSION);
+        return COUCHSTORE_ERROR_HEADER_VERSION;
     }
 
     error_unless(db->header.purge_ptr <= db->header.position, COUCHSTORE_ERROR_CORRUPT);
@@ -229,7 +231,6 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
     error_pass(read_db_root(db, &db->header.local_docs_root, root_data, localrootsize));
 
 cleanup:
-    cb_free(header_buf.buf);
     return errcode;
 }
 
