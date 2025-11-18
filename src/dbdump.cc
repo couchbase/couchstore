@@ -443,11 +443,13 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
     if (dumpJson) {
         json["rev"] = docinfo->rev_seq;
         json["content_meta"] = cb::to_hex(docinfo->content_meta);
-        json["physical_size"] = (uint64_t)docinfo->physical_size;
+        json["physical_size"] = docinfo->physical_size;
+        json["file_offset"] = docinfo->bp;
     } else {
         printf("     rev: %" PRIu64 "\n", docinfo->rev_seq);
         printf("     content_meta: %#02x\n", docinfo->content_meta);
-        printf("     size (on disk): %" PRIu64 "\n", (uint64_t)docinfo->physical_size);
+        printf("     size (on disk): %zu\n", docinfo->physical_size);
+        printf("     file offset: %" PRIu64 "\n", docinfo->bp);
     }
 
     if (docinfo->rev_meta.size >= sizeof(CouchbaseRevMeta)) {
