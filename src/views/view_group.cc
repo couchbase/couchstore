@@ -1035,11 +1035,11 @@ static couchstore_error_t cleanup_view_btree(tree_file *file,
                         out_root);
 
     if (ret != COUCHSTORE_SUCCESS) {
-        const char* error_msg = nullptr;
+        const char* error = nullptr;
         if (red_ctx->error != nullptr) {
-            error_msg = red_ctx->error;
+            error = red_ctx->error;
         }
-        set_error_info(info, (const char *) error_msg, ret, error_info);
+        set_error_info(info, error, ret, error_info);
     }
 
     free_view_reducer_ctx(red_ctx);

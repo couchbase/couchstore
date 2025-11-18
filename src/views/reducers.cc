@@ -634,9 +634,8 @@ couchstore_error_t view_btree_reduce(char *dst,
     for (n = leaflist, c = 0; n != nullptr && c < count; n = n->next, ++c) {
         auto& v = values[c];
         sized_buf json_key{};
-        auto ret =
-                decode_view_btree_json_key(n->key.buf, n->key.size, json_key);
-        if (ret != COUCHSTORE_SUCCESS) {
+        auto rv = decode_view_btree_json_key(n->key.buf, n->key.size, json_key);
+        if (rv != COUCHSTORE_SUCCESS) {
             goto out;
         }
         for (i = 0; i < v.num_values; ++i) {

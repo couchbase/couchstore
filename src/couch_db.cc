@@ -2269,7 +2269,7 @@ couchstore_error_t seekFirstHeaderContaining(Db& db,
                 // That means that the search-seqno is higher then the current
                 // header, but the header next to the current one is the closer
                 // that contains the search-seqno.
-                const auto ret = seek(db, Direction::Forward);
+                ret = seek(db, Direction::Forward);
                 if (ret != COUCHSTORE_SUCCESS) {
                     throw std::logic_error(
                             "seekFirstHeaderContaining: header located, "
