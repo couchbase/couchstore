@@ -70,17 +70,12 @@ static file_merger_error_t write_record(FILE* f, void* buffer, void* ctx) {
     return FILE_MERGER_SUCCESS;
 }
 
-static int compare_records(const void* rec1, const void* rec2, void* ctx) {
-    int ret;
+static int compare_records(const void* rec1, const void* rec2, void*) {
     test_record_t *a, *b;
-    (void)ctx;
-
     a = (test_record_t*)rec1;
     b = (test_record_t*)rec2;
 
     return a->key - b->key;
-
-    return ret;
 }
 
 static void free_record(void* rec, void* ctx) {
