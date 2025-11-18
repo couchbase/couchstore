@@ -98,13 +98,11 @@ struct tree_file_options {
 struct tree_file {
     tree_file() = default;
 
+    // tree_file is like a "superclass" so it must not be copied or assigned
     tree_file(const tree_file&) = delete;
-
-    tree_file(tree_file&&) = default;
-
+    tree_file(tree_file&&) = delete;
     tree_file& operator=(const tree_file&) = delete;
-
-    tree_file& operator=(tree_file&&) = default;
+    tree_file& operator=(tree_file&&) = delete;
 
     couchstore_error_t close();
 

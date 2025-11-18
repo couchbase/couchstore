@@ -37,7 +37,10 @@ couchstore_error_t tree_file_open(tree_file* file,
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
 
     try {
-        *file = {};
+        errcode = file->close();
+        if (errcode != COUCHSTORE_SUCCESS) {
+            return errcode;
+        }
         file->crc_mode = crc_mode;
         file->options = file_options;
         file->path = filename;
@@ -96,9 +99,12 @@ couchstore_error_t tree_file::close() {
         }
         ops->destructor(handle);
     }
+    pos = 0;
     ops = nullptr;
     handle = nullptr;
     handle_open = false;
+    crc_mode = CRC_UNKNOWN;
+    options = {};
     path.clear();
     cipher.reset();
     cipher_keyid.clear();
