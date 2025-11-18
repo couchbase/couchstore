@@ -9,6 +9,7 @@
 #include "tree_writer.h"
 #include "util.h"
 
+#include <fmt/format.h>
 #include <platform/cb_malloc.h>
 #include <cstdio>
 #include <cstdlib>
@@ -111,7 +112,6 @@ couchstore_error_t cb::couchstore::compact(
     }
 
     Db* target = nullptr;
-    std::array<char, PATH_MAX> tmpFile;
     couchstore_error_t errcode;
     // Local error code for seq-tree scan.
     couchstore_error_t scan_err = COUCHSTORE_SUCCESS;
@@ -175,9 +175,8 @@ couchstore_error_t cb::couchstore::compact(
     }
 
     if (source.header.by_seq_root) {
-        strcpy(tmpFile.data(), target_filename);
-        strcat(tmpFile.data(), ".btree-tmp_0");
-        error_pass(ctx.tree_writer.open(tmpFile.data(),
+        const auto tmpFile = fmt::format("{}.btree-tmp_0", target_filename);
+        error_pass(ctx.tree_writer.open(tmpFile.c_str(),
                                         &source.file.lastError,
                                         ops,
                                         false,

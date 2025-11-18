@@ -47,14 +47,6 @@
 #define WRITE_BUFFER_CAPACITY (128 * 1024)
 #define READ_BUFFER_CAPACITY (4 * 1024)
 
-#ifdef WIN32
-#define PATH_MAX MAX_PATH
-#endif
-
-#ifndef PATH_MAX
-#define PATH_MAX 1024
-#endif
-
 #define MAX_ERR_STR_LEN 250
 
 // Previous header position is not stored in the file header (version < 14)
