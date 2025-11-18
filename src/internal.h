@@ -59,7 +59,8 @@
 
 // Previous header position is not stored in the file header (version < 14)
 // or we don't want to use that offset. The value is not written to disk.
-constexpr uint64_t UNKNOWN_PREV_HEADER_POS = -1;
+constexpr uint64_t UNKNOWN_PREV_HEADER_POS =
+        std::numeric_limits<uint64_t>::max();
 // Maximum 47-bit offset (max that can be stored)
 // which indicates that this is the first header in the file
 constexpr uint64_t NO_PREV_HEADER_POS = (1ULL << 47) - 1;
