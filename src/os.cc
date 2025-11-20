@@ -1,4 +1,3 @@
-/* -*- Mode: C++; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
  *     Copyright 2016 Couchbase, Inc
  *
@@ -14,7 +13,16 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
+
 #include "couchstore_config.h"
+#ifdef __linux__
+#define _GNU_SOURCE 1
+#endif
+#include <fcntl.h>
+#ifndef O_NOATIME
+#define O_NOATIME 0
+#endif
+
 #include "crc32.h"
 #include "internal.h"
 
@@ -22,8 +30,7 @@
 #include <phosphor/phosphor.h>
 #include <platform/cbassert.h>
 
-#include <fcntl.h>
-#include <errno.h>
+#include <cerrno>
 #include <sys/types.h>
 
 #undef LOG_IO
@@ -214,10 +221,26 @@ couchstore_error_t PosixFileOps::open(couchstore_error_info_t* errinfo,
         *handle = nullptr;
     }
 
+    oflag |= O_LARGEFILE;
+    if (!(oflag & O_RDWR)) {
+        oflag |= O_NOATIME;
+    }
     int fd;
-    do {
-        fd = ::open(path, oflag | O_LARGEFILE, 0666);
-    } while (fd == -1 && errno == EINTR);
+    for (;;) {
+        fd = ::open(path, oflag, 0666);
+        if (fd != -1) [[likely]] {
+            break;
+        }
+        if ((oflag & O_NOATIME) && errno == EPERM) {
+            // O_NOATIME requires the owner of the file to be the process user.
+            // Retry without the flag.
+            oflag &= ~O_NOATIME;
+            continue;
+        }
+        if (errno != EINTR) {
+            break;
+        }
+    }
 
     if (fd < 0) {
         save_errno(errinfo);
