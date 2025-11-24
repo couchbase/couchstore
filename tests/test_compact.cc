@@ -88,10 +88,10 @@ protected:
         if (!encrypt) {
             return nullptr;
         }
-        return std::make_shared<cb::crypto::DataEncryptionKey>(
-                cb::crypto::DataEncryptionKey{"MyKeyId",
-                                              cb::crypto::Cipher::AES_256_GCM,
-                                              std::string(32, 'k')});
+        return std::make_shared<cb::crypto::KeyDerivationKey>(
+                "MyKeyId",
+                cb::crypto::Cipher::AES_256_GCM,
+                std::string(32, 'k'));
     }
 
     static SharedEncryptionKey getTargetEncryptionKey(std::string_view) {

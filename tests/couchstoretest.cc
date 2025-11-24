@@ -96,10 +96,10 @@ void CouchstoreBaseTest::clean_up() {
 }
 
 CouchstoreEncryptedUnencryptedTest::CouchstoreEncryptedUnencryptedTest()
-    : sharedEncryptionKey(std::make_shared<cb::crypto::DataEncryptionKey>(
-              cb::crypto::DataEncryptionKey{"MyKeyId",
-                                            cb::crypto::Cipher::AES_256_GCM,
-                                            std::string(32, 'k')})) {
+    : sharedEncryptionKey(std::make_shared<cb::crypto::KeyDerivationKey>(
+              "MyKeyId",
+              cb::crypto::Cipher::AES_256_GCM,
+              std::string(32, 'k'))) {
 }
 
 couchstore_error_t CouchstoreEncryptedUnencryptedTest::open_db(

@@ -843,12 +843,9 @@ class CouchstoreMetadataTest : public CouchstoreInternalTest,
 
 TEST_P(CouchstoreMetadataTest, Metadata) {
     const std::string keyId(GetParam(), 'i');
-    auto encryptionKeyCB = [&keyId](std::string_view)
-            -> cb::couchstore::SharedEncryptionKey {
-        return std::make_shared<cb::crypto::DataEncryptionKey>(
-                cb::crypto::DataEncryptionKey{keyId,
-                                              cb::crypto::Cipher::AES_256_GCM,
-                                              std::string(32, 'k')});
+    auto encryptionKeyCB = [&keyId](std::string_view) {
+        return std::make_shared<cb::crypto::KeyDerivationKey>(
+                keyId, cb::crypto::Cipher::AES_256_GCM, std::string(32, 'k'));
     };
 
     if (GetParam() == 0 || GetParam() > UINT8_MAX) {

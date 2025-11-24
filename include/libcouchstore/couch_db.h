@@ -29,8 +29,8 @@
 
 namespace cb::couchstore {
 
-using SharedEncryptionKey =
-        std::shared_ptr<const cb::crypto::DataEncryptionKey>;
+// TODO: Switch to key derivation from key wrapping (MB-69624)
+using SharedEncryptionKey = std::shared_ptr<const cb::crypto::KeyDerivationKey>;
 
 /**
  * Callback that returns the encryption key that decrypts the per file key,

@@ -41,7 +41,7 @@ static std::string dump_keys_executable = DESTINATION_ROOT "/bin/dump-keys";
 static std::string gosecrets =
         DESTINATION_ROOT "/var/lib/couchbase/config/gosecrets.cfg";
 
-static cb::crypto::SharedEncryptionKey lookup_encryption_key(
+static cb::crypto::SharedKeyDerivationKey lookup_encryption_key(
         std::string_view id) {
     static cb::crypto::KeyStore key_store;
     if (id.empty()) {

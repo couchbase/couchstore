@@ -91,7 +91,7 @@ static int process_file(const char* file,
         if (cb::couchstore::isEncrypted(*db)) {
             key = cb::couchstore::getEncryptionKeyId(*db);
         } else {
-            key = cb::crypto::DataEncryptionKey::UnencryptedKeyId;
+            key = cb::crypto::KeyDerivationKey::UnencryptedKeyId;
         }
         printf("   Encryption key: %s\n", key.c_str());
     }

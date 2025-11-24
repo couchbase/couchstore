@@ -526,8 +526,8 @@ static couchstore_error_t read_and_set_encryption_key(
     }
 
     try {
-        auto cipher =
-                cb::crypto::SymmetricCipher::create(key->cipher, key->key);
+        auto cipher = cb::crypto::SymmetricCipher::create(key->cipher,
+                                                          key->derivationKey);
         // The key used for encrypting/decrypting data chunks
         auto fileKey = cipher->decrypt(encryptedFileKey, key->id);
         cipher = cb::crypto::SymmetricCipher::create(key->cipher,
@@ -565,8 +565,8 @@ static couchstore_error_t create_metadata_header(
         }
 
         // Encrypts with the master encryption key
-        auto cipher =
-                cb::crypto::SymmetricCipher::create(key->cipher, key->key);
+        auto cipher = cb::crypto::SymmetricCipher::create(key->cipher,
+                                                          key->derivationKey);
         // Generate a random file key that will be used for encrypting
         // data chunks
         auto fileKey = cb::crypto::SymmetricCipher::generateKey(key->cipher);

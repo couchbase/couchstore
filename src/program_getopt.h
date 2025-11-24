@@ -41,14 +41,15 @@ public:
     void usage(std::ostream& out) const;
 
     /// Get a lookup function which cache the result of key lookup
-    [[nodiscard]] std::function<crypto::SharedEncryptionKey(std::string_view)>
+    [[nodiscard]] std::function<
+            crypto::SharedKeyDerivationKey(std::string_view)>
     getKeyLookupFunction() {
         return [this](std::string_view id) { return lookup(id); };
     }
 
 protected:
     /// Look up the provided key id (and cache it for later use)
-    [[nodiscard]] crypto::SharedEncryptionKey lookup(std::string_view id);
+    [[nodiscard]] crypto::SharedKeyDerivationKey lookup(std::string_view id);
 
     getopt::CommandLineOptionsParser parser;
     std::string dumpKeysExecutable;

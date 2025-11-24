@@ -68,7 +68,7 @@ void ProgramGetopt::usage(std::ostream& out) const {
     parser.usage(out);
 }
 
-crypto::SharedEncryptionKey ProgramGetopt::lookup(std::string_view id) {
+cb::crypto::SharedKeyDerivationKey ProgramGetopt::lookup(std::string_view id) {
     if (id.empty()) {
         return keyStore.getActiveKey();
     }
