@@ -58,8 +58,8 @@ void TreeWriter::write_record(StreamHolder& sh,
                               std::string_view key,
                               std::string_view value) {
     KeyValueHeader header;
-    header.key_len = htonl(key.size());
-    header.value_len = htonl(value.size());
+    header.key_len = htonl(gsl::narrow_cast<uint32_t>(key.size()));
+    header.value_len = htonl(gsl::narrow_cast<uint32_t>(value.size()));
     sh.stream->write({reinterpret_cast<char*>(&header), sizeof(header)});
     sh.stream->write(key);
     sh.stream->write(value);

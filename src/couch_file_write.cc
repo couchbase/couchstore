@@ -101,7 +101,8 @@ couchstore_error_t write_header(tree_file* file,
 {
     cs_off_t write_pos = align_to_next_block(file->pos);
     ssize_t written;
-    uint32_t size = htonl(buf->size + 4); //Len before header includes hash len.
+    uint32_t size = htonl(gsl::narrow_cast<uint32_t>(buf->size) +
+                          4); // Len before header includes hash len.
     uint32_t crc32 = htonl(get_checksum(reinterpret_cast<uint8_t*>(buf->buf),
                                         buf->size,
                                         file->crc_mode));
@@ -189,7 +190,7 @@ couchstore_error_t db_write_buf(tree_file* file,
     cs_off_t write_pos = file->pos;
     cs_off_t end_pos = write_pos;
     ssize_t written;
-    uint32_t size = htonl(buf->size | 0x80000000);
+    uint32_t size = htonl(gsl::narrow_cast<uint32_t>(buf->size) | 0x80000000);
     uint32_t crc32 = htonl(get_checksum(reinterpret_cast<uint8_t*>(buf->buf),
                                         buf->size,
                                         file->crc_mode));

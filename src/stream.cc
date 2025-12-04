@@ -449,7 +449,7 @@ void EncryptedStream::write_chunk() {
         return;
     }
     auto encrypted = cipher->encrypt(chunk);
-    uint32_t cipher_len = htonl(encrypted.size());
+    uint32_t cipher_len = htonl(gsl::narrow_cast<uint32_t>(encrypted.size()));
     underlying->write(
             {reinterpret_cast<char*>(&cipher_len), sizeof(cipher_len)});
     underlying->write(encrypted);
