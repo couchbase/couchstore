@@ -64,7 +64,7 @@ protected:
     couchstore_error_t open_db(couchstore_open_flags extra_flags);
 
 private:
-    cb::couchstore::SharedEncryptionKey sharedEncryptionKey;
+    cb::crypto::SharedKeyDerivationKey keyDerivationKey;
 };
 
 class CouchstoreTest

@@ -15,14 +15,31 @@
  */
 #include <folly/portability/GTest.h>
 #include <libcouchstore/couch_db.h>
+
+#include <fmt/format.h>
 #include <platform/cb_malloc.h>
 #include <platform/dirutils.h>
 
 using namespace cb::couchstore;
 
+enum class EncryptionVersion { NoEncryption, KeyWrapping, KeyDerivation };
+
+static std::string_view format_as(EncryptionVersion encryption) {
+    switch (encryption) {
+    case EncryptionVersion::NoEncryption:
+        return "NoEncryption";
+    case EncryptionVersion::KeyWrapping:
+        return "KeyWrapping";
+    case EncryptionVersion::KeyDerivation:
+        return "KeyDerivation";
+    }
+    return {};
+}
+
 class CouchstoreCompactTest
     : public ::testing::Test,
-      public ::testing::WithParamInterface<std::tuple<bool, bool>> {
+      public ::testing::WithParamInterface<
+              std::tuple<EncryptionVersion, EncryptionVersion>> {
 protected:
     void SetUp() override {
         Test::SetUp();
@@ -38,9 +55,12 @@ protected:
     }
 
     UniqueDbPtr openDb(const std::string& fname) {
-        const bool encrypt =
-                (fname == sourceFilename && std::get<0>(GetParam())) ||
-                (fname == targetFilename && std::get<1>(GetParam()));
+        auto encrypt = EncryptionVersion::NoEncryption;
+        if (fname == sourceFilename) {
+            encrypt = std::get<0>(GetParam());
+        } else if (fname == targetFilename) {
+            encrypt = std::get<1>(GetParam());
+        }
         auto [status, db] = openDatabase(
                 fname,
                 COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_WITH_MPROTECT,
@@ -84,17 +104,24 @@ protected:
                   couchstore_save_local_document(&db, &localDoc));
     }
 
-    static SharedEncryptionKey getEncryptionKey(bool encrypt) {
-        if (!encrypt) {
+    static cb::crypto::SharedKeyDerivationKey getEncryptionKey(
+            EncryptionVersion encrypt) {
+        if (encrypt == EncryptionVersion::NoEncryption) {
             return nullptr;
         }
-        return std::make_shared<cb::crypto::KeyDerivationKey>(
+        auto key = std::make_shared<cb::crypto::KeyDerivationKey>(
                 "MyKeyId",
                 cb::crypto::Cipher::AES_256_GCM,
                 std::string(32, 'k'));
+        key->derivationMethod =
+                (encrypt == EncryptionVersion::KeyWrapping)
+                        ? cb::crypto::KeyDerivationMethod::NoDerivation
+                        : cb::crypto::KeyDerivationMethod::KeyBased;
+        return key;
     }
 
-    static SharedEncryptionKey getTargetEncryptionKey(std::string_view) {
+    static cb::crypto::SharedKeyDerivationKey getTargetEncryptionKey(
+            std::string_view) {
         return getEncryptionKey(std::get<1>(GetParam()));
     }
 
@@ -457,15 +484,19 @@ TEST_P(CouchstoreCompactTest, CompactionAllowsForRewritingDocInfo) {
     }
 }
 
+static auto encryptionVersions() {
+    return ::testing::Values(EncryptionVersion::NoEncryption,
+                             EncryptionVersion::KeyWrapping,
+                             EncryptionVersion::KeyDerivation);
+}
+
 INSTANTIATE_TEST_SUITE_P(
         CouchstoreCompactTest,
         CouchstoreCompactTest,
-        ::testing::Combine(::testing::Bool(), ::testing::Bool()),
-        [](const ::testing::TestParamInfo<std::tuple<bool, bool>>& testInfo)
-                -> std::string {
-            return std::string(std::get<0>(testInfo.param)
-                                       ? "FromEncrypted"
-                                       : "FromUnencrypted") +
-                   (std::get<1>(testInfo.param) ? "ToEncrypted"
-                                                : "ToUnencrypted");
+        ::testing::Combine(encryptionVersions(), encryptionVersions()),
+        [](const ::testing::TestParamInfo<
+                std::tuple<EncryptionVersion, EncryptionVersion>>& testInfo) {
+            return fmt::format("From{}To{}",
+                               std::get<0>(testInfo.param),
+                               std::get<1>(testInfo.param));
         });

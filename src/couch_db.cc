@@ -27,6 +27,7 @@
 #include "reduces.h"
 #include "util.h"
 
+#include <cbcrypto/key_derivation.h>
 #include <platform/cb_malloc.h>
 #include <platform/platform_socket.h>
 #include <platform/string_hex.h>
@@ -397,13 +398,14 @@ static std::optional<std::string> parse_short_string(
 }
 
 struct FileMetadata {
+    uint8_t version;
     std::string keyId;
-    std::string encryptedFileKey;
+    std::string fileKeyContext;
 };
 
 /**
  * Reads the metadata header (if present) that may contain the master key id
- * and encrypted file key (version 0)
+ * and encrypted file key (version 0) or key derivation context (version 1)
  */
 static std::pair<couchstore_error_t, FileMetadata> read_metadata_header(
         tree_file* file) {
@@ -424,39 +426,52 @@ static std::pair<couchstore_error_t, FileMetadata> read_metadata_header(
     std::unique_ptr<char, cb_free_deleter> scopedBuf{buf};
     if (gotBytes < 0) {
         return {static_cast<couchstore_error_t>(gotBytes), {}};
-    } else if (gotBytes == 0) {
+    }
+    if (gotBytes == 0) {
         log_last_internal_error(
                 "Couchstore::read_metadata_header() Read empty metadata");
         return {COUCHSTORE_ERROR_NOT_SUPPORTED, {}};
-    } else if (buf[0] != 0) {
+    }
+
+    FileMetadata metadata;
+    metadata.version = static_cast<uint8_t>(buf[0]);
+    if (metadata.version > 1) {
         log_last_internal_error(
                 "Couchstore::read_metadata_header() "
-                "Expected version 0 but got %d",
+                "Expected version 0-1 but got %d",
                 buf[0]);
         return {COUCHSTORE_ERROR_NOT_SUPPORTED, {}};
     }
-
     // View of remaining bytes to be parsed
     std::string_view remaining{buf + 1, static_cast<size_t>(gotBytes - 1)};
-    FileMetadata metadata;
     // Parse key ID
     auto readString = parse_short_string(remaining);
     if (!readString) {
         return {COUCHSTORE_ERROR_CORRUPT, {}};
     }
     metadata.keyId = std::move(*readString);
-    // Parse encrypted file key
+    // Parse file key context
     readString = parse_short_string(remaining);
     if (!readString) {
         return {COUCHSTORE_ERROR_CORRUPT, {}};
     }
-    metadata.encryptedFileKey = std::move(*readString);
+    metadata.fileKeyContext = std::move(*readString);
     return {COUCHSTORE_SUCCESS, std::move(metadata)};
+}
+
+static std::string derive_encryption_key(
+        const cb::crypto::KeyDerivationKey& kdk,
+        std::string_view fileKeyContext) {
+    return cb::crypto::deriveKey(
+            cb::crypto::SymmetricCipher::getKeySize(kdk.cipher),
+            kdk.derivationKey,
+            "FileKey",
+            "couchstore/" + std::string(fileKeyContext));
 }
 
 /**
  * Read the metadata header, and if encryption is enabled, fetch the master key,
- * decrypt the file key, and initialize the file cipher with the file key.
+ * derive the file key, and initialize the file cipher with the file key.
  */
 static couchstore_error_t read_and_set_encryption_key(
         Db* db, const cb::couchstore::EncryptionKeyGetter& encryptionKeyCB) {
@@ -480,10 +495,11 @@ static couchstore_error_t read_and_set_encryption_key(
         return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     }
 
-    cb::couchstore::SharedEncryptionKey key;
-    std::string encryptedFileKey;
+    cb::crypto::SharedKeyDerivationKey kdk;
+    FileMetadata metadata;
     try {
-        auto [err, metadata] = read_metadata_header(&db->file);
+        couchstore_error_t err;
+        std::tie(err, metadata) = read_metadata_header(&db->file);
         if (err) {
             if (err == COUCHSTORE_ERROR_NO_HEADER) {
                 log_last_internal_error(
@@ -504,19 +520,19 @@ static couchstore_error_t read_and_set_encryption_key(
             return COUCHSTORE_ERROR_NO_ENCRYPTION_KEY;
         }
 
-        key = encryptionKeyCB(metadata.keyId);
-        if (!key) {
+        kdk = encryptionKeyCB(metadata.keyId);
+        if (!kdk) {
             log_last_internal_error(
                     "Couchstore::read_and_set_encryption_key() "
                     "Encrypted file but no encryption key returned");
             return COUCHSTORE_ERROR_NO_ENCRYPTION_KEY;
-        } else if (key->id != metadata.keyId) {
+        }
+        if (kdk->id != metadata.keyId) {
             log_last_internal_error(
                     "Couchstore::read_and_set_encryption_key() "
                     "Returned encryption key ID mismatch");
             return COUCHSTORE_ERROR_NO_ENCRYPTION_KEY;
         }
-        encryptedFileKey = std::move(metadata.encryptedFileKey);
     } catch (const std::bad_alloc&) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
     } catch (const std::exception& ex) {
@@ -526,14 +542,24 @@ static couchstore_error_t read_and_set_encryption_key(
     }
 
     try {
-        auto cipher = cb::crypto::SymmetricCipher::create(key->cipher,
-                                                          key->derivationKey);
-        // The key used for encrypting/decrypting data chunks
-        auto fileKey = cipher->decrypt(encryptedFileKey, key->id);
-        cipher = cb::crypto::SymmetricCipher::create(key->cipher,
-                                                     std::move(fileKey));
-        db->file.cipher_keyid = key->id;
-        db->file.cipher = std::move(cipher);
+        if (metadata.version == 0) {
+            // Version 0 uses key wrapping. The context is the file key
+            // encrypted with the shared key.
+            auto cipher = cb::crypto::SymmetricCipher::create(
+                    kdk->cipher, kdk->derivationKey);
+            // The key used for encrypting/decrypting data chunks
+            auto fileKey = cipher->decrypt(metadata.fileKeyContext, kdk->id);
+            cipher = cb::crypto::SymmetricCipher::create(kdk->cipher,
+                                                         std::move(fileKey));
+            db->file.cipher_keyid = kdk->id;
+            db->file.cipher = std::move(cipher);
+        } else {
+            // Later versions use key derivation. The context is random bytes.
+            db->file.cipher = cb::crypto::SymmetricCipher::create(
+                    kdk->cipher,
+                    derive_encryption_key(*kdk, metadata.fileKeyContext));
+            db->file.cipher_keyid = kdk->id;
+        }
         return COUCHSTORE_SUCCESS;
     } catch (const std::bad_alloc&) {
         return COUCHSTORE_ERROR_ALLOC_FAIL;
@@ -564,14 +590,28 @@ static couchstore_error_t create_metadata_header(
             return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
         }
 
-        // Encrypts with the master encryption key
-        auto cipher = cb::crypto::SymmetricCipher::create(key->cipher,
-                                                          key->derivationKey);
-        // Generate a random file key that will be used for encrypting
-        // data chunks
-        auto fileKey = cb::crypto::SymmetricCipher::generateKey(key->cipher);
-        // We will store the file key encrypted
-        auto encryptedFileKey = cipher->encrypt(fileKey, key->id);
+        std::string fileKey;
+        std::string fileKeyContext;
+        if (key->derivationMethod ==
+            cb::crypto::KeyDerivationMethod::NoDerivation) {
+            // Encrypts with the master encryption key
+            auto cipher = cb::crypto::SymmetricCipher::create(
+                    key->cipher, key->derivationKey);
+            // Generate a random file key that will be used for encrypting
+            // data chunks
+            fileKey = cb::crypto::SymmetricCipher::generateKey(key->cipher);
+            // We will store the file key encrypted
+            fileKeyContext = cipher->encrypt(fileKey, key->id);
+        } else if (key->derivationMethod ==
+                   cb::crypto::KeyDerivationMethod::KeyBased) {
+            // Generate a random context for key derivation
+            fileKeyContext.resize(key->derivationKey.size());
+            cb::crypto::randomBytes(fileKeyContext);
+            fileKey = derive_encryption_key(*key, fileKeyContext);
+        } else {
+            return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+        }
+
         // Initialize a cipher with the file key
         db->file.cipher = cb::crypto::SymmetricCipher::create(
                 key->cipher, std::move(fileKey));
@@ -579,12 +619,16 @@ static couchstore_error_t create_metadata_header(
 
         // Serialized metadata
         std::string meta;
-        meta.reserve(3 + key->id.size() + encryptedFileKey.size());
-        meta += '\0'; // Version
+        meta.reserve(3 + key->id.size() + fileKeyContext.size());
+        // Version
+        meta += (key->derivationMethod ==
+                 cb::crypto::KeyDerivationMethod::NoDerivation)
+                        ? '\0'
+                        : '\1';
         meta += static_cast<char>(key->id.size());
         meta += key->id;
-        meta += static_cast<char>(encryptedFileKey.size());
-        meta += encryptedFileKey;
+        meta += static_cast<char>(fileKeyContext.size());
+        meta += fileKeyContext;
 
         sized_buf buf{meta.data(), meta.size()};
         cs_off_t pos = 0;

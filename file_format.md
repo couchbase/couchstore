@@ -141,23 +141,34 @@ length  | content
 
 ## Metadata Header
 
-When encryption is used, the master key ID and encrypted file key is
-stored in a metadata header. This appears as the first chunk of the
-first block. The first block then has type 0x02.
+When encryption is used, the master key ID and the context for getting
+the per-file key is stored in a metadata header. This appears as the
+first chunk of the first block. The first block then has type 0x02.
 
 length  | content
 --------|--------
 32 bits | Length of the following (including checksum)
 32 bits | CRC32C checksum of the following
-8 bits  | Version (currently 0)
+8 bits  | Version (currently 1)
 8 bits  | Key ID length
 ...     | Key ID
-8 bits  | Encrypted File Key length
-...     | Encrypted File Key
+8 bits  | File Key Context length
+...     | File Key Context
 
-The encrypted file key is prefixed by a random nonce and suffixed by
-the MAC tag (all included in length). The key ID is Authenticated as
+### Metadata Header Version 0
+
+The per-file encryption key is randomly generated and encrypted by the
+master key. The context is then the encrypted file key prefixed by the
+random nonce and suffixed by the MAC tag. The key ID is Authenticated as
 Associated Data.
+
+This method is known as key wrapping.
+
+### Metadata Header Version 1
+
+The per-file encryption key is derived from the master key using
+KBKDF HMAC/SHA2-256/Counter. The Label is "FileKey" and the Context
+is "couchstore/" + `File Key Context`.
 
 ## B-Tree Format
 

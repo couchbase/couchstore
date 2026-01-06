@@ -29,17 +29,14 @@
 
 namespace cb::couchstore {
 
-// TODO: Switch to key derivation from key wrapping (MB-69624)
-using SharedEncryptionKey = std::shared_ptr<const cb::crypto::KeyDerivationKey>;
-
 /**
- * Callback that returns the encryption key that decrypts the per file key,
+ * Callback that returns the cryptographic key used for key wrapping/derivation,
  * or null if encryption should not be used or the requested key was not found.
  *
  * @param keyId Requested key id or empty when creating a file
  */
-using EncryptionKeyGetter =
-        std::function<SharedEncryptionKey(std::string_view keyId)>;
+using EncryptionKeyGetter = std::function<cb::crypto::SharedKeyDerivationKey(
+        std::string_view keyId)>;
 
 } // namespace cb::couchstore
 

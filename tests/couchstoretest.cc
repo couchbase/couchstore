@@ -96,7 +96,7 @@ void CouchstoreBaseTest::clean_up() {
 }
 
 CouchstoreEncryptedUnencryptedTest::CouchstoreEncryptedUnencryptedTest()
-    : sharedEncryptionKey(std::make_shared<cb::crypto::KeyDerivationKey>(
+    : keyDerivationKey(std::make_shared<cb::crypto::KeyDerivationKey>(
               "MyKeyId",
               cb::crypto::Cipher::AES_256_GCM,
               std::string(32, 'k'))) {
@@ -113,11 +113,11 @@ couchstore_error_t CouchstoreEncryptedUnencryptedTest::open_db(
 
 cb::couchstore::EncryptionKeyGetter
 CouchstoreEncryptedUnencryptedTest::getEncryptionKeyCB() {
-    return [this](std::string_view) -> cb::couchstore::SharedEncryptionKey {
+    return [this](std::string_view) -> cb::crypto::SharedKeyDerivationKey {
         if (!isEncrypted()) {
             return nullptr;
         }
-        return sharedEncryptionKey;
+        return keyDerivationKey;
     };
 }
 
