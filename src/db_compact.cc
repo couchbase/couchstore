@@ -593,36 +593,37 @@ int couchstore_changes_callback(Db* db, DocInfo* docinfo, void* context) {
     return ctx->spool(docinfo, std::move(doc));
 }
 
-int couchstore_walk_local_tree_callback(Db* db,
-                                        int,
-                                        const DocInfo* doc_info,
-                                        uint64_t,
-                                        const sized_buf*,
-                                        void* context) {
-    if (doc_info != nullptr) {
-        auto* ctx = static_cast<Context*>(context);
-        auto st = ctx->preCopyHook(*db, *ctx->target, nullptr, doc_info);
-        if (st != COUCHSTORE_SUCCESS) {
-            return st;
-        }
-
-        auto [status, doc] = cb::couchstore::openLocalDocument(*db, *doc_info);
-        if (status == COUCHSTORE_SUCCESS) {
-            auto error = couchstore_save_local_document(ctx->target, doc.get());
-            if (error != COUCHSTORE_SUCCESS) {
-                throw std::runtime_error(
-                        std::string{"couchstore_walk_local_tree_callback() "
-                                    "Failed to save local document: "} +
-                        couchstore_strerror(error));
-            }
-        } else {
-            throw std::runtime_error(
-                    std::string{"couchstore_walk_local_tree_callback() Failed "
-                                "to open local document: "} +
-                    couchstore_strerror(status));
-        }
+static int couchstore_walk_local_tree_callback(Db* db,
+                                               int,
+                                               const DocInfo* doc_info,
+                                               uint64_t,
+                                               const sized_buf*,
+                                               void* context) {
+    if (doc_info == nullptr) {
+        return 0;
     }
-    return 0;
+    auto* ctx = static_cast<Context*>(context);
+    auto err = ctx->preCopyHook(*db, *ctx->target, nullptr, doc_info);
+    if (err != COUCHSTORE_SUCCESS) {
+        return static_cast<int>(err);
+    }
+    const auto [err_src, src] =
+            cb::couchstore::openLocalDocument(*db, *doc_info);
+    if (err_src != COUCHSTORE_SUCCESS) {
+        return static_cast<int>(err_src);
+    }
+    const auto [err_dst, dst] =
+            cb::couchstore::openLocalDocument(*ctx->target, *doc_info);
+    if (err_dst == COUCHSTORE_SUCCESS) {
+        if (std::string_view(src->json.buf, src->json.size) ==
+            std::string_view(dst->json.buf, dst->json.size)) {
+            return 0;
+        }
+    } else if (err_dst != COUCHSTORE_ERROR_DOC_NOT_FOUND) {
+        return static_cast<int>(err_dst);
+    }
+    err = couchstore_save_local_document(ctx->target, src.get());
+    return static_cast<int>(err);
 }
 
 couchstore_error_t findNextHeader(Db& source,
