@@ -982,10 +982,9 @@ extern "C" {
      *
      * @param target any database whose's purge_seq needs to be set
      * @param purge_seq the sequence number to set into the header's purge_seq.
-     * @return COUCHSTORE_SUCCESS on success
      */
     LIBCOUCHSTORE_API
-    couchstore_error_t couchstore_set_purge_seq(Db* target, uint64_t purge_seq);
+    void couchstore_set_purge_seq(Db* target, uint64_t purge_seq);
 
     using PrecommitHook =
             std::function<couchstore_error_t(Db& source, Db& target)>;
@@ -1365,15 +1364,11 @@ using PreCopyHook = std::function<couchstore_error_t(
 
 /**
  * Replay mutations from the current header in the source database to the
- * target database by using the specified delta as the granularity for the
- * number of headers to deduplicate. Stop when we reach the provided
- * sourceHeaderEndOffset. The precommit hook will be called for each commit
- * in the destination database
+ * target database. Stop when we reach the provided sourceHeaderEndOffset.
+ * The precommit hook will be called before commit in the destination database.
  *
  * @param source The database to copy from (current header offset)
  * @param target The database to copy data to
- * @param delta The delta between each header to persist (multiple headers
- *              within the same delta will be deduped)
  * @param sourceHeaderEndOffset The last header to include
  * @param preCopyHook The hook to be called before each document is copied over
  *        replay will copy localdocs before 'normal' documents
@@ -1383,7 +1378,6 @@ using PreCopyHook = std::function<couchstore_error_t(
 LIBCOUCHSTORE_API
 couchstore_error_t replay(Db& source,
                           Db& target,
-                          uint64_t delta,
                           uint64_t sourceHeaderEndOffset,
                           PreCopyHook preCopyHook,
                           PrecommitHook precommitHook,

@@ -320,14 +320,10 @@ TEST_P(CouchstoreCxxTestWithParam, ReplayOfDeletedDocuments) {
             {});
     ASSERT_EQ(COUCHSTORE_SUCCESS, status) << "Failed to open target db";
 
-    ASSERT_EQ(COUCHSTORE_SUCCESS,
-              cb::couchstore::replay(*source,
-                                     *target,
-                                     uint64_t(-1),
-                                     end.headerPosition,
-                                     {},
-                                     {},
-                                     GetParam()));
+    ASSERT_EQ(
+            COUCHSTORE_SUCCESS,
+            cb::couchstore::replay(
+                    *source, *target, end.headerPosition, {}, {}, GetParam()));
 
     // verify that I can read out the 3 documents
     {
@@ -386,7 +382,6 @@ TEST_P(CouchstoreCxxTestWithParam,
               cb::couchstore::replay(
                       *source,
                       *target,
-                      uint64_t(-1),
                       end.headerPosition,
                       [&local, &regular](Db&,
                                          Db&,

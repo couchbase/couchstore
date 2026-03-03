@@ -489,9 +489,8 @@ cleanup:
     return errcode;
 }
 
-couchstore_error_t couchstore_set_purge_seq(Db* target, uint64_t purge_seq) {
+void couchstore_set_purge_seq(Db* target, uint64_t purge_seq) {
     target->header.purge_seq = purge_seq;
-    return COUCHSTORE_SUCCESS;
 }
 
 namespace cb::couchstore {
@@ -626,45 +625,9 @@ static int couchstore_walk_local_tree_callback(Db* db,
     return static_cast<int>(err);
 }
 
-couchstore_error_t findNextHeader(Db& source,
-                                  cs_off_t maxHeaderPosition,
-                                  uint64_t next) {
-    couchstore_error_t status;
-    auto current = couchstore_get_header_position(&source);
-    const auto start = current;
-    while ((status = cb::couchstore::seek(
-                    source, cb::couchstore::Direction::Forward)) ==
-           COUCHSTORE_SUCCESS) {
-        auto header = cb::couchstore::getHeader(source);
-
-        // Make sure that we don't process beyond the max header!
-        if (cs_off_t(header.headerPosition) > maxHeaderPosition) {
-            // we need to use the previous header
-            return cb::couchstore::seek(source, current);
-        }
-
-        if (header.timestamp < next) {
-            current = couchstore_get_header_position(&source);
-        } else if (header.timestamp > next && start != current) {
-            // we need to use the previous header
-            return cb::couchstore::seek(source, current);
-        } else {
-            return COUCHSTORE_SUCCESS;
-        }
-    }
-
-    // We reached the end... return success
-    if (status == COUCHSTORE_ERROR_NO_HEADER) {
-        return COUCHSTORE_SUCCESS;
-    }
-
-    return status;
-}
-
 LIBCOUCHSTORE_API
 couchstore_error_t replay(Db& source,
                           Db& target,
-                          uint64_t delta,
                           uint64_t sourceHeaderEndOffset,
                           PreCopyHook preCopyHook,
                           PrecommitHook precommitHook,
@@ -673,68 +636,53 @@ couchstore_error_t replay(Db& source,
     if (preCopyHook) {
         ctx.preCopyHook = std::move(preCopyHook);
     }
-    auto header = cb::couchstore::getHeader(source);
-    auto lastUpdateSeqno = header.updateSeqNum;
     ctx.target = &target;
-    couchstore_error_t status;
+    const auto startSeqno = source.header.update_seq + 1;
 
-    // Align our timeline to the delta-boundary.
-    uint64_t boundary = header.timestamp - (header.timestamp % delta) + delta;
+    auto err = seek(source, static_cast<cs_off_t>(sourceHeaderEndOffset));
+    if (err != COUCHSTORE_SUCCESS) {
+        throw std::runtime_error(std::string{"cb::couchstore::replay() - "
+                                             "failed seek to source end: "} +
+                                 couchstore_strerror(err));
+    }
 
-    while ((status = findNextHeader(source, sourceHeaderEndOffset, boundary)) ==
-           COUCHSTORE_SUCCESS) {
-        header = cb::couchstore::getHeader(source);
+    err = couchstore_walk_local_tree(
+            &source, nullptr, 0, couchstore_walk_local_tree_callback, &ctx);
+    if (err != COUCHSTORE_SUCCESS) {
+        throw std::runtime_error(
+                std::string{"couchstore_walk_local_tree() Failed: "} +
+                couchstore_strerror(err));
+    }
 
-        // Note: Timeline already initialized at the delta-boundary - Next point
-        // in the timeline is at +delta
-        boundary += delta;
+    err = couchstore_changes_since(
+            &source, startSeqno, 0, couchstore_changes_callback, &ctx);
+    if (err != COUCHSTORE_SUCCESS) {
+        throw std::runtime_error(
+                std::string{"couchstore_changes_since() Failed: "} +
+                couchstore_strerror(err));
+    }
 
-        status = couchstore_walk_local_tree(
-                &source, nullptr, 0, couchstore_walk_local_tree_callback, &ctx);
-        if (status != COUCHSTORE_SUCCESS) {
+    ctx.flush();
+
+    couchstore_set_purge_seq(ctx.target, source.header.purge_seq);
+    if (precommitHook) {
+        err = precommitHook(source, *ctx.target);
+        if (err != COUCHSTORE_SUCCESS) {
             throw std::runtime_error(
-                    std::string{"couchstore_walk_local_tree() Failed: "} +
-                    couchstore_strerror(status));
-        }
-
-        status = couchstore_changes_since(&source,
-                                          lastUpdateSeqno + 1,
-                                          0,
-                                          couchstore_changes_callback,
-                                          &ctx);
-        if (status != COUCHSTORE_SUCCESS) {
-            throw std::runtime_error(
-                    std::string{"couchstore_changes_since() Failed: "} +
-                    couchstore_strerror(status));
-        }
-        lastUpdateSeqno = header.updateSeqNum;
-
-        ctx.flush();
-
-        couchstore_set_purge_seq(ctx.target, source.header.purge_seq);
-        if (precommitHook) {
-            status = precommitHook(source, *ctx.target);
-            if (status != COUCHSTORE_SUCCESS) {
-                throw std::runtime_error(
-                        std::string{"cb::couchstore::replay() - precommit hook "
-                                    "Failed: "} +
-                        couchstore_strerror(status));
-            }
-        }
-
-        status = couchstore_commit_ex(ctx.target, header.timestamp);
-        if (status != COUCHSTORE_SUCCESS) {
-            throw std::runtime_error(
-                    std::string{"couchstore_commit_ex() Failed: "} +
-                    couchstore_strerror(status));
-        }
-        if (header.headerPosition == sourceHeaderEndOffset) {
-            // We're reached the end!
-            break;
+                    std::string{"cb::couchstore::replay() - precommit hook "
+                                "Failed: "} +
+                    couchstore_strerror(err));
         }
     }
 
-    return status;
+    err = couchstore_commit_ex(ctx.target, source.header.timestamp);
+    if (err != COUCHSTORE_SUCCESS) {
+        throw std::runtime_error(
+                std::string{"couchstore_commit_ex() Failed: "} +
+                couchstore_strerror(err));
+    }
+
+    return err;
 }
 
 } // namespace cb::couchstore

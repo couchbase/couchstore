@@ -1491,7 +1491,7 @@ TEST_F(CouchstoreBaseTest, test_set_purge_seq) {
      * set the purge_seq to 1/2 of the last_sequence
      */
     uint64_t pseq = info1.last_sequence / 2;
-    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_set_purge_seq(db, pseq));
+    couchstore_set_purge_seq(db, pseq);
 
     /**
      * commit and close the file
