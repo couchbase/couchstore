@@ -495,6 +495,60 @@ void couchstore_set_purge_seq(Db* target, uint64_t purge_seq) {
 
 namespace cb::couchstore {
 
+static couchstore_error_t updateLocalDocumentsCallback(
+        couchfile_modify_request* rq, sized_buf* key, sized_buf* value, void*) {
+    auto* action =
+            reinterpret_cast<couchfile_modify_action*>(rq->fetch_callback_ctx);
+    if (key == nullptr || ebin_cmp(key, action->getKey()) != 0) {
+        return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+    }
+    if (value != nullptr && ebin_cmp(value, action->data) == 0) {
+        // equal; don't insert
+        action->setType(ACTION_FETCH);
+    }
+    rq->fetch_callback_ctx = action + 1;
+    return COUCHSTORE_SUCCESS;
+}
+
+static couchstore_error_t updateLocalDocuments(
+        Db& db, const std::vector<UniqueLocalDocPtr>& documents) {
+    if (db.dropped) {
+        return COUCHSTORE_ERROR_FILE_CLOSED;
+    }
+
+    size_t ii = 0;
+    std::vector<couchfile_modify_action> actions(documents.size());
+    for (const auto& doc : documents) {
+        auto& act = actions[ii++];
+        act.setType(ACTION_FETCH_INSERT);
+        act.setKey(&doc->id);
+        act.data = &doc->json;
+    }
+
+    std::sort(actions.begin(), actions.end(), [](auto& actL, auto& actR) {
+        return ebin_cmp(actL.getKey(), actR.getKey()) < 0;
+    });
+
+    couchfile_modify_request rq{};
+    rq.fetch_callback = updateLocalDocumentsCallback;
+    rq.fetch_callback_ctx = actions.data();
+    rq.cmp.compare = ebin_cmp;
+    rq.num_actions = actions.size();
+    rq.actions = actions.data();
+    rq.file = &db.file;
+    rq.kv_chunk_threshold = db.file.options.kv_nodesize;
+    rq.kp_chunk_threshold = db.file.options.kp_nodesize;
+
+    couchstore_error_t errcode = COUCHSTORE_SUCCESS;
+    auto* nroot = modify_btree(&rq, db.header.local_docs_root, &errcode);
+    if (errcode == COUCHSTORE_SUCCESS && nroot != db.header.local_docs_root) {
+        cb_free(db.header.local_docs_root);
+        db.header.local_docs_root = nroot;
+    }
+
+    return errcode;
+}
+
 struct Context {
     Context(size_t flushThreshold) : flushThreshold(flushThreshold) {
     }
@@ -505,6 +559,8 @@ struct Context {
         return COUCHSTORE_SUCCESS;
     };
 
+    /// Vector of LocalDoc unique_ptr that are owned and freed by this class
+    std::vector<UniqueLocalDocPtr> localDocs;
     /// Vector of DocInfo* that are owned and freed by this class
     std::vector<DocInfo*> docInfos;
     /// Vector of Doc* that are owned and freed by this class
@@ -512,6 +568,15 @@ struct Context {
 
     size_t size = 0;
     const size_t flushThreshold{0};
+
+    int spool(UniqueLocalDocPtr ldoc) {
+        size += ldoc->id.size + ldoc->json.size;
+        localDocs.push_back(std::move(ldoc));
+        if (size > flushThreshold) {
+            return static_cast<int>(flush());
+        }
+        return 0;
+    }
 
     /**
      * Spool the document document so that we may flush documents to disk
@@ -534,39 +599,56 @@ struct Context {
         size += info->physical_size;
         if (size > flushThreshold) {
             // flush to avoid eating up too much resources
-            flush();
+            auto err = flush();
+            if (err != COUCHSTORE_SUCCESS) {
+                docInfos.pop_back(); // caller frees
+                return static_cast<int>(err);
+            }
         }
         // This object always takes ownership. Return value of 1 informs the
         // caller to skip freeing of the info*
         return 1;
     }
 
-    void flush() {
+    couchstore_error_t flush() {
+        if (!localDocs.empty()) {
+            auto err = updateLocalDocuments(*target, localDocs);
+            if (err == COUCHSTORE_SUCCESS) {
+                localDocs.clear();
+                size = 0;
+            }
+            return err;
+        }
+
         if (docs.empty()) {
-            return;
+            return COUCHSTORE_SUCCESS;
         }
         auto error = couchstore_save_documents(target,
                                                docs.data(),
                                                docInfos.data(),
                                                docs.size(),
                                                COUCHSTORE_SEQUENCE_AS_IS);
-        for (auto& d : docs) {
+        if (error == COUCHSTORE_SUCCESS) {
+            for (auto* d : docs) {
+                couchstore_free_document(d);
+            }
+            for (auto* d : docInfos) {
+                couchstore_free_docinfo(d);
+            }
+            docs.clear();
+            docInfos.clear();
+            size = 0;
+        }
+
+        return error;
+    }
+
+    ~Context() {
+        for (auto* d : docs) {
             couchstore_free_document(d);
         }
-
-        for (auto& d : docInfos) {
+        for (auto* d : docInfos) {
             couchstore_free_docinfo(d);
-        }
-
-        docs.clear();
-        docInfos.clear();
-        size = 0;
-
-        if (error != COUCHSTORE_SUCCESS) {
-            throw std::runtime_error(
-                    std::string{"cb::couchstore::Context::flush() Failed to "
-                                "save documents: "} +
-                    couchstore_strerror(error));
         }
     }
 };
@@ -606,23 +688,17 @@ static int couchstore_walk_local_tree_callback(Db* db,
     if (err != COUCHSTORE_SUCCESS) {
         return static_cast<int>(err);
     }
-    const auto [err_src, src] =
-            cb::couchstore::openLocalDocument(*db, *doc_info);
+    auto [err_src, src] = cb::couchstore::openLocalDocument(*db, *doc_info);
     if (err_src != COUCHSTORE_SUCCESS) {
         return static_cast<int>(err_src);
     }
-    const auto [err_dst, dst] =
-            cb::couchstore::openLocalDocument(*ctx->target, *doc_info);
-    if (err_dst == COUCHSTORE_SUCCESS) {
-        if (std::string_view(src->json.buf, src->json.size) ==
-            std::string_view(dst->json.buf, dst->json.size)) {
-            return 0;
-        }
-    } else if (err_dst != COUCHSTORE_ERROR_DOC_NOT_FOUND) {
-        return static_cast<int>(err_dst);
+    try {
+        return ctx->spool(std::move(src));
+    } catch (const std::bad_alloc&) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    } catch (const std::exception&) {
+        return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
     }
-    err = couchstore_save_local_document(ctx->target, src.get());
-    return static_cast<int>(err);
 }
 
 LIBCOUCHSTORE_API
@@ -654,6 +730,14 @@ couchstore_error_t replay(Db& source,
                 couchstore_strerror(err));
     }
 
+    err = ctx.flush();
+    if (err != COUCHSTORE_SUCCESS) {
+        throw std::runtime_error(
+                std::string{"cb::couchstore::Context::flush() "
+                            "Failed to save local documents: "} +
+                couchstore_strerror(err));
+    }
+
     err = couchstore_changes_since(
             &source, startSeqno, 0, couchstore_changes_callback, &ctx);
     if (err != COUCHSTORE_SUCCESS) {
@@ -662,7 +746,12 @@ couchstore_error_t replay(Db& source,
                 couchstore_strerror(err));
     }
 
-    ctx.flush();
+    err = ctx.flush();
+    if (err != COUCHSTORE_SUCCESS) {
+        throw std::runtime_error(std::string{"cb::couchstore::Context::flush() "
+                                             "Failed to save documents: "} +
+                                 couchstore_strerror(err));
+    }
 
     couchstore_set_purge_seq(ctx.target, source.header.purge_seq);
     if (precommitHook) {

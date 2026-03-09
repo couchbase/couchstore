@@ -351,6 +351,67 @@ TEST_P(CouchstoreCxxTestWithParam, ReplayOfDeletedDocuments) {
     }
 }
 
+TEST_P(CouchstoreCxxTestWithParam, ReplayOfLocalDocuments) {
+    auto source = openDb();
+    auto start = cb::couchstore::getHeader(*source);
+
+    storeLocalDocument(*source, "a", "1");
+    storeLocalDocument(*source, "c", "4");
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(source.get()));
+    auto end = cb::couchstore::getHeader(*source);
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::seek(*source, start.headerPosition));
+
+    const std::string targetdb = filename + ".ex";
+    dbfiles.emplace_back(targetdb);
+
+    auto [status, target] = openDatabase(
+            targetdb,
+            COUCHSTORE_OPEN_FLAG_CREATE | COUCHSTORE_OPEN_FLAG_UNBUFFERED,
+            {});
+    ASSERT_EQ(COUCHSTORE_SUCCESS, status) << "Failed to open target db";
+
+    ASSERT_EQ(
+            COUCHSTORE_SUCCESS,
+            cb::couchstore::replay(
+                    *source, *target, end.headerPosition, {}, {}, GetParam()));
+
+    {
+        auto [err, doc] = cb::couchstore::openLocalDocument(*target, "a");
+        ASSERT_EQ(COUCHSTORE_SUCCESS, err);
+        EXPECT_EQ("1", std::string_view(doc->json.buf, doc->json.size));
+    }
+    {
+        auto [err, doc] = cb::couchstore::openLocalDocument(*target, "c");
+        ASSERT_EQ(COUCHSTORE_SUCCESS, err);
+        EXPECT_EQ("4", std::string_view(doc->json.buf, doc->json.size));
+    }
+
+    storeLocalDocument(*source, "b", "2");
+    storeLocalDocument(*source, "c", "3");
+
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(source.get()));
+    start = end;
+    end = cb::couchstore::getHeader(*source);
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              cb::couchstore::seek(*source, start.headerPosition));
+
+    ASSERT_EQ(
+            COUCHSTORE_SUCCESS,
+            cb::couchstore::replay(
+                    *source, *target, end.headerPosition, {}, {}, GetParam()));
+
+    for (char key = 'a'; key <= 'c'; ++key) {
+        auto [err, doc] = cb::couchstore::openLocalDocument(
+                *target, std::string_view(&key, 1));
+        ASSERT_EQ(COUCHSTORE_SUCCESS, err);
+        char value = key - 'a' + '1';
+        EXPECT_EQ(std::string_view(&value, 1),
+                  std::string_view(doc->json.buf, doc->json.size));
+    }
+}
+
 // Validate the pre-copy hook copies local documents before regular ones
 TEST_P(CouchstoreCxxTestWithParam,
        ReplayOfLocalDocumentsBeforeRegularDocuments) {
