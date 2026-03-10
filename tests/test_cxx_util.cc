@@ -298,6 +298,50 @@ TEST_F(CouchstoreCxxTest, GetHeaderJson) {
     EXPECT_EQ(10, json["update_seq"]);
 }
 
+TEST_F(CouchstoreCxxTest, ScanLocalDocs) {
+    auto db = openDb();
+    std::vector<std::pair<std::string, std::string>> found;
+    std::vector<std::pair<std::string, std::string>> docs{
+            {{"a", "1"}, {"b", "2"}, {"c", "3"}}};
+    for (const auto& [key, value] : docs) {
+        storeLocalDocument(*db, key, value);
+    }
+
+    auto err = cb::couchstore::scanLocalDocs(
+            *db, {}, [&found](UniqueLocalDocPtr doc) {
+                std::string key{doc->id.buf, doc->id.size};
+                std::string value{doc->json.buf, doc->json.size};
+                found.emplace_back(std::move(key), std::move(value));
+                return COUCHSTORE_SUCCESS;
+            });
+    EXPECT_EQ(COUCHSTORE_SUCCESS, err);
+    EXPECT_EQ(docs, found);
+
+    found.clear();
+    err = cb::couchstore::scanLocalDocs(
+            *db, "b", [&found](UniqueLocalDocPtr doc) {
+                std::string key{doc->id.buf, doc->id.size};
+                std::string value{doc->json.buf, doc->json.size};
+                found.emplace_back(std::move(key), std::move(value));
+                return COUCHSTORE_SUCCESS;
+            });
+    EXPECT_EQ(COUCHSTORE_SUCCESS, err);
+    docs.erase(docs.begin());
+    EXPECT_EQ(docs, found);
+
+    found.clear();
+    err = cb::couchstore::scanLocalDocs(
+            *db, "b", [&found](UniqueLocalDocPtr doc) {
+                std::string key{doc->id.buf, doc->id.size};
+                std::string value{doc->json.buf, doc->json.size};
+                found.emplace_back(std::move(key), std::move(value));
+                return COUCHSTORE_ERROR_CANCEL;
+            });
+    EXPECT_EQ(COUCHSTORE_ERROR_CANCEL, err);
+    docs.pop_back();
+    EXPECT_EQ(docs, found);
+}
+
 TEST_P(CouchstoreCxxTestWithParam, ReplayOfDeletedDocuments) {
     auto source = openDb();
     auto start = cb::couchstore::getHeader(*source);

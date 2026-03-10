@@ -1197,6 +1197,20 @@ std::pair<couchstore_error_t, UniqueDocInfoPtr> openDocInfo(
         Db& db, std::string_view key);
 
 /**
+ * Scans (iterates) the local doc index and calls back for each document.
+ *
+ * @param db the database to scan
+ * @param from the local doc key to start scanning from
+ * @param callback the function to call for each local doc
+ * @return status from callback or error code for scan failures
+ */
+LIBCOUCHSTORE_API
+couchstore_error_t scanLocalDocs(
+        Db& db,
+        std::string_view from,
+        const std::function<couchstore_error_t(UniqueLocalDocPtr)>& callback);
+
+/**
  * Helper method to wrap the C api to open a database
  *
  * @param filename The file name to open the file

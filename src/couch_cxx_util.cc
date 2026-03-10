@@ -14,7 +14,8 @@
  *   limitations under the License.
  */
 
-#include "internal.h"
+#include "couch_btree.h"
+#include "util.h"
 #include <nlohmann/json.hpp>
 #include <platform/string_hex.h>
 #include <libcouchstore/json_utils.h>
@@ -89,6 +90,71 @@ std::pair<couchstore_error_t, UniqueDocInfoPtr> openDocInfo(
         return {error, UniqueDocInfoPtr{docInfo}};
     }
     return {error, UniqueDocInfoPtr{}};
+}
+
+static couchstore_error_t scanLocalDocsCallback(couchfile_lookup_request* rq,
+                                                const sized_buf* key,
+                                                const sized_buf* value) {
+    auto buf = fatbuf_alloc(sizeof(LocalDoc) + key->size + value->size);
+    if (buf == nullptr) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
+
+    auto doc = reinterpret_cast<LocalDoc*>(fatbuf_get(buf, sizeof(LocalDoc)));
+    doc->id.buf = reinterpret_cast<char*>(fatbuf_get(buf, key->size));
+    doc->id.size = key->size;
+
+    doc->json.buf = reinterpret_cast<char*>(fatbuf_get(buf, value->size));
+    doc->json.size = value->size;
+
+    doc->deleted = 0;
+
+    memcpy(doc->id.buf, key->buf, key->size);
+    memcpy(doc->json.buf, value->buf, value->size);
+
+    try {
+        auto& callback = *reinterpret_cast<
+                const std::function<couchstore_error_t(UniqueLocalDocPtr)>*>(
+                rq->callback_ctx);
+        return callback(UniqueLocalDocPtr{doc});
+    } catch (const std::bad_alloc&) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    } catch (const std::exception& ex) {
+        log_last_internal_error(
+                "cb::couchstore::scanLocalDocs() Callback failed: %s",
+                ex.what());
+        return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
+    }
+}
+
+LIBCOUCHSTORE_API
+couchstore_error_t scanLocalDocs(
+        Db& db,
+        std::string_view from,
+        const std::function<couchstore_error_t(UniqueLocalDocPtr)>& callback) {
+    if (db.dropped) {
+        return COUCHSTORE_ERROR_FILE_CLOSED;
+    }
+    if (db.header.local_docs_root == nullptr) {
+        return COUCHSTORE_SUCCESS;
+    }
+
+    sized_buf first{const_cast<char*>(from.data()), from.size()};
+    if (first.buf == nullptr) {
+        first.buf = const_cast<char*>("");
+    }
+    auto keys = &first;
+
+    couchfile_lookup_request rq{};
+    rq.cmp.compare = ebin_cmp;
+    rq.file = &db.file;
+    rq.num_keys = 1;
+    rq.keys = &keys;
+    rq.callback_ctx = (void*)&callback;
+    rq.fetch_callback = scanLocalDocsCallback;
+    rq.fold = 1;
+
+    return btree_lookup(&rq, db.header.local_docs_root->pointer);
 }
 
 std::pair<couchstore_error_t, UniqueDbPtr> openDatabase(
