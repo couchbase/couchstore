@@ -569,13 +569,13 @@ struct Context {
     size_t size = 0;
     const size_t flushThreshold{0};
 
-    int spool(UniqueLocalDocPtr ldoc) {
+    couchstore_error_t spool(UniqueLocalDocPtr ldoc) {
         size += ldoc->id.size + ldoc->json.size;
         localDocs.push_back(std::move(ldoc));
         if (size > flushThreshold) {
-            return static_cast<int>(flush());
+            return flush();
         }
-        return 0;
+        return COUCHSTORE_SUCCESS;
     }
 
     /**
@@ -674,33 +674,6 @@ int couchstore_changes_callback(Db* db, DocInfo* docinfo, void* context) {
     return ctx->spool(docinfo, std::move(doc));
 }
 
-static int couchstore_walk_local_tree_callback(Db* db,
-                                               int,
-                                               const DocInfo* doc_info,
-                                               uint64_t,
-                                               const sized_buf*,
-                                               void* context) {
-    if (doc_info == nullptr) {
-        return 0;
-    }
-    auto* ctx = static_cast<Context*>(context);
-    auto err = ctx->preCopyHook(*db, *ctx->target, nullptr, doc_info);
-    if (err != COUCHSTORE_SUCCESS) {
-        return static_cast<int>(err);
-    }
-    auto [err_src, src] = cb::couchstore::openLocalDocument(*db, *doc_info);
-    if (err_src != COUCHSTORE_SUCCESS) {
-        return static_cast<int>(err_src);
-    }
-    try {
-        return ctx->spool(std::move(src));
-    } catch (const std::bad_alloc&) {
-        return COUCHSTORE_ERROR_ALLOC_FAIL;
-    } catch (const std::exception&) {
-        return COUCHSTORE_ERROR_INVALID_ARGUMENTS;
-    }
-}
-
 LIBCOUCHSTORE_API
 couchstore_error_t replay(Db& source,
                           Db& target,
@@ -722,11 +695,19 @@ couchstore_error_t replay(Db& source,
                                  couchstore_strerror(err));
     }
 
-    err = couchstore_walk_local_tree(
-            &source, nullptr, 0, couchstore_walk_local_tree_callback, &ctx);
+    err = scanLocalDocs(source, {}, [&source, &ctx](UniqueLocalDocPtr ldoc) {
+        DocInfo docInfo{};
+        docInfo.id = ldoc->id;
+        docInfo.physical_size = ldoc->json.size;
+        auto st = ctx.preCopyHook(source, *ctx.target, nullptr, &docInfo);
+        if (st != COUCHSTORE_SUCCESS) {
+            return st;
+        }
+        return ctx.spool(std::move(ldoc));
+    });
     if (err != COUCHSTORE_SUCCESS) {
         throw std::runtime_error(
-                std::string{"couchstore_walk_local_tree() Failed: "} +
+                std::string{"cb::couchstore::scanLocalDocs() Failed: "} +
                 couchstore_strerror(err));
     }
 
