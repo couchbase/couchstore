@@ -120,11 +120,22 @@ void decode_kv_length(const raw_kv_length *kv, uint32_t *klen, uint32_t *vlen);
 raw_kv_length encode_kv_length(size_t klen, size_t vlen);
 
 /**
- * Parses an in-memory buffer containing a 5-byte key/value length followed by key and value data,
- * and fills in sized_bufs to point to the key and data.
- * @return Number of bytes consumed from the buffer
+ * Parses an in-memory buffer containing a 5-byte key/value length followed by
+ * key and value data, and fills in sized_bufs to point to the key and data.
+ *
+ * @param buf Pointer to the start of the buffer
+ * @param buf_start Byte offset within buf where the key/value entry begins
+ * @param buf_end Byte offset within buf marking the end of valid data
+ * @param[out] key Key within buf
+ * @param[out] value Value within buf
+ * @return Number of bytes consumed from the buffer, or 0 if the buffer is
+ *         too small (key and value are zeroed in that case)
  */
-size_t read_kv(const void *buf, sized_buf *key, sized_buf *value);
+size_t read_kv(const void* buf,
+               size_t buf_start,
+               size_t buf_end,
+               sized_buf& key,
+               sized_buf& value);
 
 void* write_kv(void *buf, sized_buf key, sized_buf value);
 

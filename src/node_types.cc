@@ -12,16 +12,31 @@
 #include <platform/cb_malloc.h>
 #include <cstring>
 
-size_t read_kv(const void *buf, sized_buf *key, sized_buf *value)
-{
-    const raw_kv_length* kvlen = static_cast<const raw_kv_length*>(buf);
+size_t read_kv(const void* buf,
+               size_t buf_start,
+               size_t buf_end,
+               sized_buf& key,
+               sized_buf& value) {
+    if (buf_end < buf_start + sizeof(raw_kv_length)) {
+        key = {};
+        value = {};
+        return 0;
+    }
+    const auto start = static_cast<const char*>(buf) + buf_start;
+    const auto kvlen = reinterpret_cast<const raw_kv_length*>(start);
     uint32_t klen, vlen;
     decode_kv_length(kvlen, &klen, &vlen);
-    key->size = klen;
-    key->buf = (char*)(kvlen + 1);
-    value->size = vlen;
-    value->buf = key->buf + klen;
-    return sizeof(raw_kv_length) + klen + vlen;
+    const auto total = sizeof(raw_kv_length) + klen + vlen;
+    if (buf_end - buf_start < total) {
+        key = {};
+        value = {};
+        return 0;
+    }
+    key.size = klen;
+    key.buf = const_cast<char*>(start) + sizeof(raw_kv_length);
+    value.size = vlen;
+    value.buf = key.buf + klen;
+    return total;
 }
 
 void* write_kv(void *buf, sized_buf key, sized_buf value)
@@ -38,7 +53,7 @@ void* write_kv(void *buf, sized_buf key, sized_buf value)
 
 node_pointer *read_root(void *buf, int size)
 {
-    if (size == 0) {
+    if (size < 0 || static_cast<size_t>(size) < sizeof(raw_btree_root)) {
         return nullptr;
     }
 

@@ -41,10 +41,14 @@
  */
 #include "src/couch_btree.h"
 #include "src/exception.h"
+#include "src/fatbuf.h"
 #include "src/internal.h"
 #include "src/merge_sort.h"
+#include "src/node_types.h"
+#include "src/reduces.h"
 #include "src/stream.h"
 #include "src/tree_writer.h"
+#include "src/util.h"
 
 using namespace testing;
 
@@ -1830,4 +1834,214 @@ TEST_F(TreeWriterTest, SortWithWrongKey) {
     ASSERT_EQ(COUCHSTORE_SUCCESS, treeWriter->enable_encryption());
     openCopy();
     ASSERT_EQ(COUCHSTORE_ERROR_CORRUPT, treeWriter->sort());
+}
+
+TEST(MemorySafetyTest, ReadRootUndersizedBuffer) {
+    char buf[12] = {};
+    EXPECT_EQ(nullptr, read_root(buf, 4));
+}
+
+TEST(MemorySafetyTest, ReadKvExceedingBuffer) {
+    // Encode a kv_length claiming klen=100, vlen=200 but provide only
+    // sizeof(raw_kv_length) + a few extra bytes of actual data.
+    constexpr size_t bufSize = 16;
+    char buf[bufSize] = {};
+    *reinterpret_cast<raw_kv_length*>(buf) = encode_kv_length(100, 200);
+
+    sized_buf key;
+    sized_buf value;
+    // A safe implementation must return 0 when the claimed kv lengths
+    // exceed the available buffer.
+    EXPECT_EQ(0, read_kv(buf, 0, bufSize, key, value))
+            << "read_kv should return 0 for a corrupted node that claims "
+               "more data than the buffer contains";
+}
+
+TEST(MemorySafetyTest, FatbufGetOverflow) {
+    // Allocate a small fatbuf
+    auto fb = fatbuf_alloc(64);
+    ASSERT_NE(nullptr, fb);
+
+    // Consume some of the buffer to set pos > 0
+    ASSERT_NE(nullptr, fatbuf_get(fb, 32));
+    EXPECT_EQ(32, fb->pos);
+
+    // Now try to get SIZE_MAX bytes. If the implementation checks
+    // (pos + bytes > size) without overflow protection:
+    // pos + SIZE_MAX wraps to (32 + SIZE_MAX) mod 2^64 = 31
+    // 31 > 64 is false, so the check would pass!
+    EXPECT_EQ(nullptr, fatbuf_get(fb, SIZE_MAX));
+
+    fatbuf_free(fb);
+}
+
+TEST(MemorySafetyTest, BySeqReadDocinfoIdSizeOverflow) {
+    // Build a minimal raw_seq_index_value buffer whose sizes field claims
+    // an id of 200 bytes, but the buffer only has room for 2 bytes of id.
+    constexpr size_t extraBytes = 2;
+    constexpr size_t bufSize = sizeof(raw_seq_index_value) + extraBytes;
+    char buf[bufSize] = {};
+
+    auto raw = reinterpret_cast<raw_seq_index_value*>(buf);
+    // Claim idsize=200 (fits in 12-bit field), datasize=0
+    raw->sizes = encode_kv_length(200, 0);
+
+    // Need a valid key for db_seq decoding (6 bytes)
+    char keybuf[6] = {};
+    sized_buf key{keybuf, sizeof(keybuf)};
+    sized_buf val{buf, bufSize};
+
+    DocInfo* info = nullptr;
+    couchstore_error_t err = by_seq_read_docinfo(&info, &key, &val);
+
+    // A safe implementation must detect idsize > extraSize and return corrupt.
+    EXPECT_EQ(COUCHSTORE_ERROR_CORRUPT, err)
+            << "by_seq_read_docinfo should reject idsize exceeding buffer";
+    EXPECT_EQ(nullptr, info);
+}
+
+TEST(MemorySafetyTest, BySeqReadDocinfoUndersizedKey) {
+    // Build a valid raw_seq_index_value with extra bytes for id
+    constexpr size_t bufSize = sizeof(raw_seq_index_value) + 4;
+    char buf[bufSize] = {};
+    auto* raw = reinterpret_cast<raw_seq_index_value*>(buf);
+    raw->sizes = encode_kv_length(4, 0);
+
+    // Key is only 2 bytes - too short for a 6-byte sequence key
+    char keybuf[2] = {0x01, 0x02};
+    sized_buf key{keybuf, 2};
+    sized_buf val{buf, bufSize};
+
+    DocInfo* info = nullptr;
+    couchstore_error_t err = by_seq_read_docinfo(&info, &key, &val);
+    EXPECT_EQ(COUCHSTORE_ERROR_CORRUPT, err)
+            << "by_seq_read_docinfo should reject key shorter than "
+               "sizeof(raw_by_seq_key)";
+    EXPECT_EQ(nullptr, info);
+}
+
+TEST(MemorySafetyTest, ReadPointerUndersizedBuffer) {
+    arena* a = new_arena(256);
+    ASSERT_NE(nullptr, a);
+
+    // Provide a buffer smaller than sizeof(raw_node_pointer) (14 bytes)
+    char buf[4] = {0x01, 0x02, 0x03, 0x04};
+    sized_buf key{buf, 4};
+    sized_buf val{buf, 4};
+
+    // A safe implementation must return nullptr
+    EXPECT_EQ(nullptr, read_pointer(a, key, val))
+            << "read_pointer should reject buffer smaller than "
+               "sizeof(raw_node_pointer)";
+
+    delete_arena(a);
+}
+
+TEST(MemorySafetyTest, ByIdReduceUndersizedValue) {
+    // Provide a nodelist item with data smaller than raw_id_index_value
+    char buf[4] = {};
+    nodelist item = {};
+    item.data.buf = buf;
+    item.data.size = 4;
+    item.next = nullptr;
+
+    char dst[64] = {};
+    size_t size_r = 0;
+
+    // A safe implementation must detect the undersized value and return
+    // COUCHSTORE_ERROR_CORRUPT (or at least not read past the buffer).
+    couchstore_error_t err = by_id_reduce(dst, &size_r, &item, 1, nullptr);
+    EXPECT_EQ(COUCHSTORE_ERROR_CORRUPT, err)
+            << "by_id_reduce should reject leaf value smaller than "
+               "sizeof(raw_id_index_value)";
+}
+
+TEST(MemorySafetyTest, BySeqRereduceUndersizedReduceValue) {
+    // Set up a node_pointer with a reduce_value that's too small
+    char buf[2] = {};
+    node_pointer ptr = {};
+    ptr.reduce_value.buf = buf;
+    ptr.reduce_value.size = 2;
+
+    nodelist item = {};
+    item.pointer = &ptr;
+    item.next = nullptr;
+
+    char dst[64] = {};
+    size_t size_r = 0;
+
+    couchstore_error_t err = by_seq_rereduce(dst, &size_r, &item, 1, nullptr);
+    EXPECT_EQ(COUCHSTORE_ERROR_CORRUPT, err)
+            << "by_seq_rereduce should reject reduce_value smaller than "
+               "sizeof(raw_by_seq_reduce)";
+}
+
+TEST(MemorySafetyTest, ByIdRereduceUndersizedReduceValue) {
+    // Set up a node_pointer with a reduce_value that's too small
+    char buf[4] = {};
+    node_pointer ptr = {};
+    ptr.reduce_value.buf = buf;
+    ptr.reduce_value.size = 4;
+
+    nodelist item = {};
+    item.pointer = &ptr;
+    item.next = nullptr;
+
+    char dst[64] = {};
+    size_t size_r = 0;
+
+    couchstore_error_t err = by_id_rereduce(dst, &size_r, &item, 1, nullptr);
+    EXPECT_EQ(COUCHSTORE_ERROR_CORRUPT, err)
+            << "by_id_rereduce should reject reduce_value smaller than "
+               "sizeof(raw_by_id_reduce)";
+}
+
+TEST(MemorySafetyTest, ArenaSpecialCopyBufOobRead) {
+    arena* a = new_arena(1024);
+    ASSERT_NE(nullptr, a);
+
+    // Create a buffer that's exactly sizeof(raw_seq_index_value) but encode
+    // an idsize that claims there are 100 more bytes of id data.
+    constexpr size_t bufSize = sizeof(raw_seq_index_value);
+    char buf[bufSize] = {};
+    auto* raw = reinterpret_cast<raw_seq_index_value*>(buf);
+    // encode_kv_length encodes idsize=100, datasize=0 into the sizes field
+    raw->sizes = encode_kv_length(100, 0);
+
+    sized_buf val{buf, bufSize};
+
+    DocInfo docinfo = {};
+    docinfo.rev_meta.buf = nullptr;
+    docinfo.rev_meta.size = 0;
+
+    // Should return nullptr (reject) because sizeof(raw_seq_index_value) + 100
+    // exceeds val.size
+    sized_buf* result = arena_special_copy_buf_and_revmeta(a, &val, &docinfo);
+    EXPECT_EQ(nullptr, result)
+            << "arena_special_copy_buf_and_revmeta should reject val when "
+               "sizeof(raw_seq_index_value) + idsize > val->size";
+
+    delete_arena(a);
+}
+
+TEST(MemorySafetyTest, DbInfoUndersizedIdReduceValue) {
+    // Set up a node_pointer with an undersized reduce_value
+    char reduce_buf[4] = {0x01, 0x02, 0x03, 0x04};
+    node_pointer id_root = {};
+    id_root.reduce_value.buf = reduce_buf;
+    id_root.reduce_value.size = 4; // Too small for raw_by_id_reduce (16 bytes)
+
+    Db db = {};
+    db.header.by_id_root = &id_root;
+    db.header.by_seq_root = nullptr;
+    db.header.local_docs_root = nullptr;
+
+    DbInfo dbinfo = {};
+    couchstore_error_t err = couchstore_db_info(&db, &dbinfo);
+    EXPECT_EQ(COUCHSTORE_ERROR_CORRUPT, err)
+            << "couchstore_db_info should reject by_id_root with "
+               "reduce_value smaller than sizeof(raw_by_id_reduce)";
+
+    // Prevent db_header destructor from freeing our stack-allocated pointer
+    db.header.by_id_root = nullptr;
 }

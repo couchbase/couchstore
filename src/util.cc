@@ -65,7 +65,7 @@ fatbuf *fatbuf_alloc(size_t bytes)
 
 void *fatbuf_get(fatbuf *fb, size_t bytes)
 {
-    if (fb->pos + bytes > fb->size) {
+    if (fb->size < fb->pos || bytes > fb->size - fb->pos) {
         return nullptr;
     }
 #ifdef DEBUG
@@ -108,6 +108,9 @@ sized_buf* arena_copy_buf(arena* a, const sized_buf *src)
 sized_buf* arena_special_copy_buf_and_revmeta(arena *a, const sized_buf *val,
                                               const DocInfo *docinfo)
 {
+    if (val->size < sizeof(raw_seq_index_value)) {
+        return nullptr;
+    }
     sized_buf *nbuf = static_cast<sized_buf*>(arena_alloc(a, sizeof(sized_buf)));
     if (nbuf == nullptr) {
         return nullptr;
@@ -116,6 +119,9 @@ sized_buf* arena_special_copy_buf_and_revmeta(arena *a, const sized_buf *val,
     const raw_seq_index_value *raw = (const raw_seq_index_value*)val->buf;
     uint32_t idsize, datasize;
     decode_kv_length(&raw->sizes, &idsize, &datasize);
+    if (sizeof(*raw) + idsize > val->size) {
+        return nullptr;
+    }
 
     nbuf->size = sizeof(*raw) + idsize + docinfo->rev_meta.size;
     nbuf->buf = static_cast<char*>(arena_alloc(a, nbuf->size));

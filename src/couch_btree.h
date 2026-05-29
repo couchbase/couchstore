@@ -192,7 +192,7 @@
 
     node_pointer* copy_node_pointer(node_pointer* ptr);
 
-    node_pointer *read_pointer(arena* a, sized_buf *key, char *buf);
+    node_pointer* read_pointer(arena* a, sized_buf key, sized_buf val);
 
     node_pointer *finish_root(couchfile_modify_request *rq,
                               couchfile_modify_result *root_result,

@@ -265,6 +265,9 @@ static couchstore_error_t output_seqtree_item(const sized_buf *k,
     // assemble_id_index_value in couch_db.c:
     rawSeq = (const raw_seq_index_value*)v_c->buf;
     decode_kv_length(&rawSeq->sizes, &idsize, &datasize);
+    error_unless(sizeof(raw_seq_index_value) + idsize <= v_c->size,
+                 COUCHSTORE_ERROR_CORRUPT);
+    error_unless(k->size >= sizeof(raw_48), COUCHSTORE_ERROR_CORRUPT);
     revMetaSize = (uint32_t)v_c->size - (sizeof(raw_seq_index_value) + idsize);
 
     // Set up sized_bufs for the ID tree key and value:
@@ -296,6 +299,10 @@ static couchstore_error_t compact_seq_fetchcb(couchfile_lookup_request *rq,
                                               const sized_buf *k,
                                               const sized_buf *v)
 {
+    if (v->size < sizeof(raw_seq_index_value)) {
+        return COUCHSTORE_ERROR_CORRUPT;
+    }
+
     DocInfo* info = nullptr;
     couchstore_error_t errcode = COUCHSTORE_SUCCESS;
     compact_ctx *ctx = (compact_ctx *) rq->callback_ctx;

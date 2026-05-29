@@ -26,6 +26,9 @@ couchstore_error_t by_seq_rereduce(char *dst, size_t *size_r, const nodelist *pt
     (void) ctx;
 
     while (i != nullptr && count > 0) {
+        if (i->pointer->reduce_value.size < sizeof(raw_by_seq_reduce)) {
+            return COUCHSTORE_ERROR_CORRUPT;
+        }
         const raw_by_seq_reduce *reduce = (const raw_by_seq_reduce*) i->pointer->reduce_value.buf;
         total += decode_raw40(reduce->count);
         
@@ -57,6 +60,9 @@ couchstore_error_t by_id_reduce(char *dst, size_t *size_r, const nodelist *leafl
     (void) ctx;
 
     while (i != nullptr && count > 0) {
+        if (i->data.size < sizeof(raw_id_index_value)) {
+            return COUCHSTORE_ERROR_CORRUPT;
+        }
         const raw_id_index_value *raw = (const raw_id_index_value*)i->data.buf;
         if (decode_raw48(raw->bp) & BP_DELETED_FLAG) {
             deleted++;
@@ -83,6 +89,9 @@ couchstore_error_t by_id_rereduce(char *dst, size_t *size_r, const nodelist *ptr
     (void) ctx;
 
     while (i != nullptr && count > 0) {
+        if (i->pointer->reduce_value.size < sizeof(raw_by_id_reduce)) {
+            return COUCHSTORE_ERROR_CORRUPT;
+        }
         const raw_by_id_reduce *reduce = (const raw_by_id_reduce*) i->pointer->reduce_value.buf;
         notdeleted += decode_raw40(reduce->notdeleted);
         deleted += decode_raw40(reduce->deleted);

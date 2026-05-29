@@ -177,19 +177,25 @@ static couchstore_error_t mr_push_pointerinfo(node_pointer *ptr,
     return maybe_flush(dst);
 }
 
-node_pointer *read_pointer(arena* a, sized_buf *key, char *buf)
-{
-    //Parse KP pair into a node_pointer {K, {ptr, reduce_value, subtreesize}}
+node_pointer* read_pointer(arena* a, sized_buf key, sized_buf val) {
+    // Parse KP pair into a node_pointer {K, {ptr, reduce_value, subtreesize}}
+    if (val.size < sizeof(raw_node_pointer)) {
+        return nullptr;
+    }
+    const auto raw = reinterpret_cast<const raw_node_pointer*>(val.buf);
+    size_t reduce_size = decode_raw16(raw->reduce_value_size);
+    if (sizeof(raw_node_pointer) + reduce_size > val.size) {
+        return nullptr;
+    }
     node_pointer *p = (node_pointer *) arena_alloc(a, sizeof(node_pointer));
     if (!p) {
         return nullptr;
     }
-    const raw_node_pointer *raw = (const raw_node_pointer*)buf;
     p->pointer = decode_raw48(raw->pointer);
     p->subtreesize = decode_raw48(raw->subtreesize);
-    p->reduce_value.size = decode_raw16(raw->reduce_value_size);
-    p->reduce_value.buf = buf + sizeof(*raw);
-    p->key = *key;
+    p->reduce_value.size = reduce_size;
+    p->reduce_value.buf = val.buf + sizeof(*raw);
+    p->key = key;
     return p;
 }
 
@@ -490,7 +496,10 @@ static couchstore_error_t modify_node(couchfile_modify_request* rq,
         local_result->node_type = KV_NODE;
         while (bufpos < nodebuflen) {
             sized_buf cmp_key, val_buf;
-            bufpos += read_kv(nodebuf + bufpos, &cmp_key, &val_buf);
+            size_t kvlen =
+                    read_kv(nodebuf, bufpos, nodebuflen, cmp_key, val_buf);
+            error_unless(kvlen > 0, COUCHSTORE_ERROR_CORRUPT);
+            bufpos += kvlen;
             int advance = 0;
             while (!advance && start < end) {
                 advance = 1;
@@ -637,15 +646,18 @@ static couchstore_error_t modify_node(couchfile_modify_request* rq,
         local_result->node_type = KP_NODE;
         while (bufpos < nodebuflen && start < end) {
             sized_buf cmp_key, val_buf;
-            bufpos += read_kv(nodebuf + bufpos, &cmp_key, &val_buf);
+            size_t kvlen =
+                    read_kv(nodebuf, bufpos, nodebuflen, cmp_key, val_buf);
+            error_unless(kvlen > 0, COUCHSTORE_ERROR_CORRUPT);
+            bufpos += kvlen;
             int cmp_val =
                     rq->cmp.compare(&cmp_key, rq->actions[start].getKey());
             if (bufpos == nodebuflen) {
                 //We're at the last item in the kpnode, must apply all our
                 //actions here.
-                node_pointer *desc = read_pointer(dst->arena, &cmp_key, val_buf.buf);
+                node_pointer* desc = read_pointer(dst->arena, cmp_key, val_buf);
                 if (!desc) {
-                    errcode = COUCHSTORE_ERROR_ALLOC_FAIL;
+                    errcode = COUCHSTORE_ERROR_CORRUPT;
                     goto cleanup;
                 }
 
@@ -659,9 +671,9 @@ static couchstore_error_t modify_node(couchfile_modify_request* rq,
             if (cmp_val < 0) {
                 //Key in node item less than action item and not at end
                 //position, so just add it and continue.
-                node_pointer *add = read_pointer(dst->arena, &cmp_key, val_buf.buf);
+                node_pointer* add = read_pointer(dst->arena, cmp_key, val_buf);
                 if (!add) {
-                    errcode = COUCHSTORE_ERROR_ALLOC_FAIL;
+                    errcode = COUCHSTORE_ERROR_CORRUPT;
                     goto cleanup;
                 }
 
@@ -680,9 +692,9 @@ static couchstore_error_t modify_node(couchfile_modify_request* rq,
                     range_end++;
                 }
 
-                node_pointer *desc = read_pointer(dst->arena, &cmp_key, val_buf.buf);
+                node_pointer* desc = read_pointer(dst->arena, cmp_key, val_buf);
                 if (!desc) {
-                    errcode = COUCHSTORE_ERROR_ALLOC_FAIL;
+                    errcode = COUCHSTORE_ERROR_CORRUPT;
                     goto cleanup;
                 }
 
@@ -695,10 +707,13 @@ static couchstore_error_t modify_node(couchfile_modify_request* rq,
         }
         while (bufpos < nodebuflen) {
             sized_buf cmp_key, val_buf;
-            bufpos += read_kv(nodebuf + bufpos, &cmp_key, &val_buf);
-            node_pointer *add = read_pointer(dst->arena, &cmp_key, val_buf.buf);
+            size_t kvlen =
+                    read_kv(nodebuf, bufpos, nodebuflen, cmp_key, val_buf);
+            error_unless(kvlen > 0, COUCHSTORE_ERROR_CORRUPT);
+            bufpos += kvlen;
+            node_pointer* add = read_pointer(dst->arena, cmp_key, val_buf);
             if (!add) {
-                errcode = COUCHSTORE_ERROR_ALLOC_FAIL;
+                errcode = COUCHSTORE_ERROR_CORRUPT;
                 goto cleanup;
             }
 
@@ -916,7 +931,10 @@ static couchstore_error_t purge_node(couchfile_modify_request *rq,
         local_result->node_type = KV_NODE;
         while (bufpos < nodebuflen) {
             sized_buf cmp_key, val_buf;
-            bufpos += read_kv(nodebuf + bufpos, &cmp_key, &val_buf);
+            size_t kvlen =
+                    read_kv(nodebuf, bufpos, nodebuflen, cmp_key, val_buf);
+            error_unless(kvlen > 0, COUCHSTORE_ERROR_CORRUPT);
+            bufpos += kvlen;
 
             errcode = maybe_purgekv(rq, &cmp_key, &val_buf, local_result);
             if (errcode != COUCHSTORE_SUCCESS) {
@@ -927,11 +945,14 @@ static couchstore_error_t purge_node(couchfile_modify_request *rq,
         local_result->node_type = KP_NODE;
         while (bufpos < nodebuflen) {
             sized_buf cmp_key, val_buf;
-            bufpos += read_kv(nodebuf + bufpos, &cmp_key, &val_buf);
+            size_t kvlen =
+                    read_kv(nodebuf, bufpos, nodebuflen, cmp_key, val_buf);
+            error_unless(kvlen > 0, COUCHSTORE_ERROR_CORRUPT);
+            bufpos += kvlen;
 
-            node_pointer *desc = read_pointer(dst->arena, &cmp_key, val_buf.buf);
+            node_pointer* desc = read_pointer(dst->arena, cmp_key, val_buf);
             if (!desc) {
-                errcode = COUCHSTORE_ERROR_ALLOC_FAIL;
+                errcode = COUCHSTORE_ERROR_CORRUPT;
                 goto cleanup;
             }
 

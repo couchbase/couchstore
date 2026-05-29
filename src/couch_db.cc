@@ -1149,12 +1149,15 @@ couchstore_error_t by_seq_read_docinfo(DocInfo **pInfo,
 {
     const raw_seq_index_value *raw = (const raw_seq_index_value*)v->buf;
     ssize_t extraSize = v->size - sizeof(*raw);
-    if (extraSize < 0) {
+    if (extraSize < 0 || k->size < sizeof(raw_by_seq_key)) {
         return COUCHSTORE_ERROR_CORRUPT;
     }
 
     uint32_t idsize, datasize;
     decode_kv_length(&raw->sizes, &idsize, &datasize);
+    if (idsize > static_cast<uint32_t>(extraSize)) {
+        return COUCHSTORE_ERROR_CORRUPT;
+    }
     uint64_t bp = decode_raw48(raw->bp);
     int deleted = (bp & BP_DELETED_FLAG) != 0;
     bp &= ~BP_DELETED_FLAG;
@@ -1851,6 +1854,9 @@ couchstore_error_t couchstore_db_info(Db *db, DbInfo* dbinfo) {
     dbinfo->deleted_count = dbinfo->doc_count = dbinfo->space_used = 0;
     dbinfo->file_size = db->file.pos;
     if (id_root) {
+        if (id_root->reduce_value.size < sizeof(raw_by_id_reduce)) {
+            return COUCHSTORE_ERROR_CORRUPT;
+        }
         raw_by_id_reduce* id_reduce = (raw_by_id_reduce*) id_root->reduce_value.buf;
         dbinfo->doc_count = decode_raw40(id_reduce->notdeleted);
         dbinfo->deleted_count = decode_raw40(id_reduce->deleted);
@@ -2055,7 +2061,9 @@ static couchstore_error_t btree_eval_seq_reduce(Db *db,
     node_type = nodebuf[0];
     while(bufpos < nodebuflen) {
         sized_buf k, v;
-        bufpos += read_kv(nodebuf + bufpos, &k, &v);
+        size_t kvlen = read_kv(nodebuf, bufpos, nodebuflen, k, v);
+        error_unless(kvlen > 0, COUCHSTORE_ERROR_CORRUPT);
+        bufpos += kvlen;
         int left_cmp = seq_cmp(&k, left);
         int right_cmp = seq_cmp(&k, right);
         if(left_cmp < 0) {

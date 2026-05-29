@@ -47,7 +47,10 @@ static couchstore_error_t btree_lookup_inner(couchfile_lookup_request* rq,
     if (nodebuf[0] == 0) { //KP Node
         while (bufpos < nodebuflen && current < end) {
             sized_buf cmp_key, val_buf;
-            bufpos += read_kv(nodebuf + bufpos, &cmp_key, &val_buf);
+            size_t kvlen =
+                    read_kv(nodebuf, bufpos, nodebuflen, cmp_key, val_buf);
+            error_unless(kvlen > 0, COUCHSTORE_ERROR_CORRUPT);
+            bufpos += kvlen;
 
             if (lookup_compare(rq, &cmp_key, rq->keys[current]) >= 0) {
                 if (rq->fold) {
@@ -62,11 +65,18 @@ static couchstore_error_t btree_lookup_inner(couchfile_lookup_request* rq,
                     last_item++;
                 } while (last_item < end && lookup_compare(rq, &cmp_key, rq->keys[last_item]) >= 0);
 
+                error_unless(val_buf.size >= sizeof(raw_node_pointer),
+                             COUCHSTORE_ERROR_CORRUPT);
                 const raw_node_pointer *raw = (const raw_node_pointer*)val_buf.buf;
+                size_t reduce_size = decode_raw16(raw->reduce_value_size);
+                error_unless(
+                        sizeof(raw_node_pointer) + reduce_size <= val_buf.size,
+                        COUCHSTORE_ERROR_CORRUPT);
                 if(rq->node_callback) {
                     uint64_t subtreeSize = decode_raw48(raw->subtreesize);
-                    sized_buf reduce_value =
-                    {val_buf.buf + sizeof(raw_node_pointer), decode_raw16(raw->reduce_value_size)};
+                    sized_buf reduce_value{
+                            val_buf.buf + sizeof(raw_node_pointer),
+                            reduce_size};
                     error_pass(rq->node_callback(rq, subtreeSize, &reduce_value));
                 }
 
@@ -97,7 +107,10 @@ static couchstore_error_t btree_lookup_inner(couchfile_lookup_request* rq,
             // Only try and read the next-key if requested and we're still in
             // the node length
             if (next_key && bufpos < nodebuflen) {
-                bufpos += read_kv(nodebuf + bufpos, &cmp_key, &val_buf);
+                size_t kvlen =
+                        read_kv(nodebuf, bufpos, nodebuflen, cmp_key, val_buf);
+                error_unless(kvlen > 0, COUCHSTORE_ERROR_CORRUPT);
+                bufpos += kvlen;
             } else if (next_key) {
                 // else if next_key is true and we're out of buf space, break
                 break;

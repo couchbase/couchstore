@@ -136,6 +136,9 @@ static couchstore_error_t idfetch_update_cb(couchfile_modify_request*,
     if (v == nullptr) { // Doc not found
         return COUCHSTORE_SUCCESS;
     }
+    if (v->size < sizeof(raw_id_index_value)) {
+        return COUCHSTORE_ERROR_CORRUPT;
+    }
 
     // v contains a seq we need to remove ( {Seq,_,_,_,_} )
     auto* ctx = static_cast<index_update_ctx*>(arg);
@@ -150,6 +153,9 @@ static couchstore_error_t idfetch_update_cb(couchfile_modify_request*,
     }
 
     delbuf->buf = static_cast<char*>(fatbuf_get(&ctx->deltermbuf, 6));
+    if (!delbuf->buf) {
+        return COUCHSTORE_ERROR_ALLOC_FAIL;
+    }
     delbuf->size = 6;
     encode_raw48(oldseq, (raw_48*)delbuf->buf);
 
