@@ -66,6 +66,24 @@ All changes must be submitted via:
 - https://github.com/couchbase/tlm/README.md describes how to configure and build
 - tlm must exist as a local checkout alongside couchstore
 
+### Building hints
+
+The project uses CMake for build configuration.
+
+- To build all code (including all tests) use the target `couchstore_everything`
+  which can be invoked from `build/`
+- Prefer to reuse an existing build directory and do incremental builds.
+  - Do not create a new build directory unless asked.
+  - Check for an existing `build/` directory in the directory above the
+    `couchstore` git repository.
+- Prefer `ninja` when building.
+- If configuring a new build prefer `ninja` as build tool (`cmake -G Ninja ..`)
+
+### Testing hints
+
+From the directory `build/couchstore/` run `ctest -j8`.
+If tests fail run `ctest --rerun-failed --output-on-failure`.
+
 ---
 
 ## ⏳ Agents Must Not Wait for Review
