@@ -248,6 +248,40 @@ TYPED_TEST_P(BufferedWrappedOpsTest, sync_bufferflush) {
               this->ops.sync(&this->errinfo, this->handle));
 }
 
+/**
+ * After writing to an offset that was previously read (and cached in a
+ * read buffer), a subsequent read must return the new data, not stale
+ * cached data.
+ */
+TYPED_TEST_P(BufferedWrappedOpsTest, read_after_overwrite_coherency) {
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              this->ops.open(&this->errinfo,
+                             &this->handle,
+                             this->file_path.c_str(),
+                             FILE_FLAGS));
+
+    // Write initial data and sync to disk.
+    const char* initial = "AAAA";
+    ASSERT_EQ(4, this->ops.pwrite(&this->errinfo, this->handle, initial, 4, 0));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, this->ops.sync(&this->errinfo, this->handle));
+
+    // Read it back (populates read buffer cache).
+    char buf[5] = {};
+    ASSERT_EQ(4, this->ops.pread(&this->errinfo, this->handle, buf, 4, 0));
+    ASSERT_STREQ(initial, buf);
+
+    // Overwrite the same offset with new data and sync.
+    const char* updated = "BBBB";
+    ASSERT_EQ(4, this->ops.pwrite(&this->errinfo, this->handle, updated, 4, 0));
+    ASSERT_EQ(COUCHSTORE_SUCCESS, this->ops.sync(&this->errinfo, this->handle));
+
+    // Read again - must return the new data.
+    memset(buf, 0, 4);
+    ASSERT_EQ(4, this->ops.pread(&this->errinfo, this->handle, buf, 4, 0));
+    EXPECT_STREQ(updated, buf) << "Read returned stale cached data instead of "
+                                  "the overwritten data";
+}
+
 REGISTER_TYPED_TEST_SUITE_P(
     WrappedOpsTest,
     open, close, pread_single, sync, goto_eof,
@@ -259,4 +293,4 @@ REGISTER_TYPED_TEST_SUITE_P(
 
 REGISTER_TYPED_TEST_SUITE_P(
     BufferedWrappedOpsTest,
-    sync_bufferflush);
+    sync_bufferflush, read_after_overwrite_coherency);

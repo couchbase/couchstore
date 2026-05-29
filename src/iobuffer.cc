@@ -210,6 +210,7 @@ public:
     ~ReadBufferManager();
     FileBuffer* findBuffer(BufferedFileHandle* h, cs_off_t offset);
     void relocateBuffer(cs_off_t old_offset, cs_off_t new_offset);
+    void invalidateRange(cs_off_t offset, size_t nbyte, size_t buf_capacity);
 
 private:
     // LRU list for buffers.
@@ -309,6 +310,22 @@ void ReadBufferManager::relocateBuffer(cs_off_t old_offset,
     tmp->offset = new_offset;
     tmp->length = 0;
     readMap.insert(std::make_pair(new_offset, std::move(tmp)));
+}
+
+void ReadBufferManager::invalidateRange(cs_off_t offset,
+                                        size_t nbyte,
+                                        size_t buf_capacity) {
+    if (nbyte == 0 || buf_capacity == 0) {
+        return;
+    }
+    cs_off_t block_start = offset - (offset % buf_capacity);
+    cs_off_t end = offset + nbyte;
+    for (cs_off_t blk = block_start; blk < end; blk += buf_capacity) {
+        auto itr = readMap.find(blk);
+        if (itr != readMap.end()) {
+            itr->second->length = 0;
+        }
+    }
 }
 
 //////// BUFFER WRITES:
@@ -688,6 +705,13 @@ ssize_t BufferedFileOps::pwrite(couchstore_error_info_t* errinfo,
     }
 
     auto* h = (BufferedFileHandle*)handle;
+
+    // Invalidate any read buffers that overlap the written range to
+    // prevent subsequent reads from returning stale cached data.
+    if (h->read_buffer_mgr) {
+        h->read_buffer_mgr->invalidateRange(
+                offset, nbyte, h->params.read_buffer_capacity);
+    }
 
     if (!h->write_buffer) {
         allocate_write_buffer(handle);
