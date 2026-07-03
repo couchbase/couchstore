@@ -61,11 +61,11 @@ cleanup:
     return errcode;
 }
 
-static int rawHeader2internalHeader(const raw_file_header_v12* source,
-                                    db_header& header,
-                                    int& seqrootsize,
-                                    int& idrootsize,
-                                    int& localrootsize) {
+static void raw_header_to_internal_header(const raw_file_header_v12* source,
+                                          db_header& header,
+                                          int& seqrootsize,
+                                          int& idrootsize,
+                                          int& localrootsize) {
     header.disk_version = decode_raw08(source->version);
     header.update_seq = decode_raw48(source->update_seq);
     header.purge_seq = decode_raw48(source->purge_seq);
@@ -76,14 +76,13 @@ static int rawHeader2internalHeader(const raw_file_header_v12* source,
     seqrootsize = decode_raw16(source->seqrootsize);
     idrootsize = decode_raw16(source->idrootsize);
     localrootsize = decode_raw16(source->localrootsize);
-    return sizeof(raw_file_header_v12);
 }
 
-static int rawHeader2internalHeader(const raw_file_header_v13* source,
-                                    db_header& header,
-                                    int& seqrootsize,
-                                    int& idrootsize,
-                                    int& localrootsize) {
+static void raw_header_to_internal_header(const raw_file_header_v13* source,
+                                          db_header& header,
+                                          int& seqrootsize,
+                                          int& idrootsize,
+                                          int& localrootsize) {
     header.disk_version = decode_raw08(source->version);
     header.update_seq = decode_raw48(source->update_seq);
     header.purge_seq = decode_raw48(source->purge_seq);
@@ -94,14 +93,13 @@ static int rawHeader2internalHeader(const raw_file_header_v13* source,
     seqrootsize = decode_raw16(source->seqrootsize);
     idrootsize = decode_raw16(source->idrootsize);
     localrootsize = decode_raw16(source->localrootsize);
-    return sizeof(raw_file_header_v13);
 }
 
-static int rawHeader2internalHeader(const raw_file_header_v14* source,
-                                    db_header& header,
-                                    int& seqrootsize,
-                                    int& idrootsize,
-                                    int& localrootsize) {
+static void raw_header_to_internal_header(const raw_file_header_v14* source,
+                                          db_header& header,
+                                          int& seqrootsize,
+                                          int& idrootsize,
+                                          int& localrootsize) {
     header.disk_version = decode_raw08(source->version);
     header.update_seq = decode_raw48(source->update_seq);
     header.purge_seq = decode_raw48(source->purge_seq);
@@ -113,7 +111,6 @@ static int rawHeader2internalHeader(const raw_file_header_v14* source,
     seqrootsize = decode_raw16(source->seqrootsize);
     idrootsize = decode_raw16(source->idrootsize);
     localrootsize = decode_raw16(source->localrootsize);
-    return sizeof(raw_file_header_v14);
 }
 
 // Attempts to initialize the database from a header at the given file position
@@ -189,30 +186,36 @@ static couchstore_error_t find_header_at_pos(Db *db, cs_off_t pos)
     // Version 11 use CRC32
     switch (db->header.disk_version) {
     case COUCH_DISK_VERSION_14:
-        header_size = rawHeader2internalHeader(header_buf.v14_raw,
-                                               db->header,
-                                               seqrootsize,
-                                               idrootsize,
-                                               localrootsize);
+        header_size = sizeof(raw_file_header_v14);
+        error_unless(header_len >= header_size, COUCHSTORE_ERROR_CORRUPT);
+        raw_header_to_internal_header(header_buf.v14_raw,
+                                      db->header,
+                                      seqrootsize,
+                                      idrootsize,
+                                      localrootsize);
         root_data =
                 (char*)(header_buf.v14_raw + 1); // i.e. just past *header_buf
         break;
     case COUCH_DISK_VERSION_13:
-        header_size = rawHeader2internalHeader(header_buf.v13_raw,
-                                               db->header,
-                                               seqrootsize,
-                                               idrootsize,
-                                               localrootsize);
+        header_size = sizeof(raw_file_header_v13);
+        error_unless(header_len >= header_size, COUCHSTORE_ERROR_CORRUPT);
+        raw_header_to_internal_header(header_buf.v13_raw,
+                                      db->header,
+                                      seqrootsize,
+                                      idrootsize,
+                                      localrootsize);
         root_data =
                 (char*)(header_buf.v13_raw + 1); // i.e. just past *header_buf
         break;
     case COUCH_DISK_VERSION_12:
     case COUCH_DISK_VERSION_11:
-        header_size = rawHeader2internalHeader(header_buf.v12_raw,
-                                               db->header,
-                                               seqrootsize,
-                                               idrootsize,
-                                               localrootsize);
+        header_size = sizeof(raw_file_header_v12);
+        error_unless(header_len >= header_size, COUCHSTORE_ERROR_CORRUPT);
+        raw_header_to_internal_header(header_buf.v12_raw,
+                                      db->header,
+                                      seqrootsize,
+                                      idrootsize,
+                                      localrootsize);
         root_data =
                 (char*)(header_buf.v12_raw + 1); // i.e. just past *header_buf
         break;
@@ -2071,6 +2074,9 @@ static couchstore_error_t btree_eval_seq_reduce(Db *db,
         }
         if(node_type == KP_NODE) {
             // In-range Item in a KP Node
+            error_unless(v.size >= sizeof(raw_node_pointer) +
+                                           sizeof(raw_by_seq_reduce),
+                         COUCHSTORE_ERROR_CORRUPT);
             const raw_node_pointer *raw = (const raw_node_pointer*)v.buf;
             const raw_by_seq_reduce *rawreduce = (const raw_by_seq_reduce*) (v.buf + sizeof(raw_node_pointer));
             uint64_t subcount = decode_raw40(rawreduce->count);

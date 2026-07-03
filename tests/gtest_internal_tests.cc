@@ -145,6 +145,36 @@ TEST_F(CouchstoreInternalTest, corrupt_header) {
     clean_up();
 }
 
+TEST_F(CouchstoreInternalTest, undersized_header) {
+    ASSERT_EQ(COUCHSTORE_SUCCESS, open_db(COUCHSTORE_OPEN_FLAG_CREATE));
+
+    // A header payload of a single byte: a valid version, nothing else.
+    char payload[1];
+    payload[0] = static_cast<char>(COUCH_DISK_VERSION_13);
+    sized_buf hbuf{payload, sizeof(payload)};
+
+    cs_off_t pos = 0;
+    ASSERT_EQ(COUCHSTORE_SUCCESS,
+              write_header(&db->file, &hbuf, &pos, DiskBlockType::Header));
+
+    // Reopen; the newest (crafted) header must be parsed without an
+    // out-of-bounds read and rejected as corrupt.
+    couchstore_close_file(db);
+    couchstore_free_db(db);
+    db = nullptr;
+
+    couchstore_error_t err = open_db(0);
+    EXPECT_EQ(COUCHSTORE_ERROR_CORRUPT, err)
+            << "opening a db whose newest header has a payload shorter than "
+               "the header struct should be rejected as corrupt";
+
+    // open_db() does not hand back a usable db on failure; make sure the
+    // fixture teardown does not touch a freed/partial handle.
+    if (err != COUCHSTORE_SUCCESS) {
+        db = nullptr;
+    }
+}
+
 TEST_F(CouchstoreInternalTest, rewind_db_header) {
     open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, 200);
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
@@ -655,6 +685,45 @@ TEST_F(CouchstoreInternalTest, corrupted_btree_node_empty) {
     EXPECT_THAT(cb::couchstore::getLastInternalError(),
                 StartsWith("'btree_lookup_inner: (nodebuflen > 0) "
                            "check failed on line "));
+}
+
+TEST_F(CouchstoreInternalTest, changes_count_undersized_kp_value) {
+    open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, 3);
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    ASSERT_NE(nullptr, db->header.by_seq_root);
+    // For a handful of documents the by_seq tree is a single leaf node;
+    // point the crafted KP entry at it so the (buggy) recursion succeeds.
+    const uint64_t realRoot = db->header.by_seq_root->pointer;
+
+    // Build a KP node containing a single key/value pair whose value is
+    // too short to hold raw_node_pointer + raw_by_seq_reduce (19 bytes).
+    char node[1 + sizeof(raw_kv_length) + 6 /*key*/ + 6 /*value*/] = {};
+    node[0] = KP_NODE;
+    *reinterpret_cast<raw_kv_length*>(node + 1) = encode_kv_length(6, 6);
+
+    // Key: a 6-byte sequence number that falls within the query range.
+    encode_raw48(1,
+                 reinterpret_cast<raw_48*>(node + 1 + sizeof(raw_kv_length)));
+    // Value: only the 6-byte pointer field, aimed at the real leaf node.
+    encode_raw48(
+            realRoot,
+            reinterpret_cast<raw_48*>(node + 1 + sizeof(raw_kv_length) + 6));
+
+    sized_buf nodebuf{node, sizeof(node)};
+    cs_off_t corruptPos = 0;
+    ASSERT_EQ(
+            COUCHSTORE_SUCCESS,
+            db_write_buf_compressed(&db->file, &nodebuf, &corruptPos, nullptr));
+
+    // Redirect the by_seq root at the crafted (corrupt) KP node.
+    db->header.by_seq_root->pointer = static_cast<uint64_t>(corruptPos);
+
+    uint64_t count = 0;
+    couchstore_error_t err = couchstore_changes_count(db, 0, 1000, &count);
+    EXPECT_EQ(COUCHSTORE_ERROR_CORRUPT, err)
+            << "couchstore_changes_count should reject a KP value smaller "
+               "than sizeof(raw_node_pointer) + sizeof(raw_by_seq_reduce)";
 }
 
 /**
