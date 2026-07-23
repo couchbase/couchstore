@@ -103,7 +103,7 @@ struct CouchbaseRevMeta{
 
 // Additional Couchbase V1 metadata:
 struct CouchbaseRevMetaV1 {
-    uint8_t flex_code;
+    uint8_t deleteSource;
     uint8_t datatype;
 };
 
@@ -478,7 +478,7 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
     if (docinfo->rev_meta.size >=
         sizeof(CouchbaseRevMeta) + sizeof(CouchbaseRevMetaV1)) {
         // 18 bytes of rev_meta indicates CouchbaseRevMetaV1 - adds
-        // flex_meta_code (1B) and datatype (1B)
+        // deleteSource (1B) and datatype (1B)
         if (docinfo->rev_meta.size <
             sizeof(CouchbaseRevMeta) + sizeof(CouchbaseRevMetaV1)) {
             printf("     Error parsing the document: Possible corruption\n");
@@ -488,12 +488,10 @@ static int foldprint(Db *db, DocInfo *docinfo, void *ctx)
                 (const CouchbaseRevMetaV1*)(docinfo->rev_meta.buf +
                                             sizeof(CouchbaseRevMeta));
 
-        if (metaV1->flex_code < 0x01) {
-            printf("     Error: Flex code mismatch (bad code: %d)\n",
-                   metaV1->flex_code);
-            return 1;
-        }
-        ttl_delete = ((metaV1->flex_code >> 7) & 0x1) == 1;
+        // deleteSource is the MSB of the first byte of V1 metadata. This is
+        // because this field used to have a dual meaning, but now only one
+        // meaning.
+        ttl_delete = metaV1->deleteSource >> 7;
 
         datatype = metaV1->datatype;
         const auto datatype_string = cb::mcbp::datatype::to_string(datatype);
