@@ -1079,6 +1079,12 @@ struct LIBCOUCHSTORE_API LocalDocDeleter {
 using UniqueLocalDocPtr = std::unique_ptr<LocalDoc, LocalDocDeleter>;
 
 /**
+ * Return the on-disk storage format version written by the current library.
+ */
+LIBCOUCHSTORE_API
+uint32_t getFileFormatVersion();
+
+/**
  * Seek and load the database at the header at the given offset
  *
  * @param db The database instance to use

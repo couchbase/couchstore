@@ -38,6 +38,7 @@
 #define COUCH_DISK_VERSION_13 13
 // Version 14 adds position of previous header and support for encryption
 #define COUCH_DISK_VERSION_14 14
+#define COUCH_DISK_VERSION_CURRENT COUCH_DISK_VERSION_14
 
 // Conservative estimate; just for sanity check
 #define MAX_DB_HEADER_SIZE 1024

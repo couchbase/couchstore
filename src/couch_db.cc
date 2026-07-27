@@ -653,7 +653,7 @@ static couchstore_error_t create_header(Db* db, couchstore_open_flags flags) {
         db->header.disk_version = COUCH_DISK_VERSION_11;
     } else {
         // user is using latest
-        db->header.disk_version = COUCH_DISK_VERSION_14;
+        db->header.disk_version = COUCH_DISK_VERSION_CURRENT;
     }
     db->header.update_seq = 0;
     db->header.by_id_root = nullptr;
@@ -2133,6 +2133,10 @@ cleanup:
 
 namespace cb {
 namespace couchstore {
+
+uint32_t getFileFormatVersion() {
+    return COUCH_DISK_VERSION_CURRENT;
+}
 
 couchstore_error_t seek(Db& db, cs_off_t offset) {
     COLLECT_LATENCY();

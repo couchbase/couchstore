@@ -845,7 +845,7 @@ TEST_F(CouchstoreBaseTest, legacy_crc_flags) {
 
     // Should be in crc32c
     EXPECT_EQ(CRC32C, db->file.crc_mode);
-    EXPECT_GE(uint64_t(COUCH_DISK_VERSION_14), db->header.disk_version);
+    EXPECT_EQ(COUCH_DISK_VERSION_CURRENT, db->header.disk_version);
 
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_close_file(db));
     ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_free_db(db));

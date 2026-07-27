@@ -278,6 +278,7 @@ TEST_F(CouchstoreCxxTest, CommitTimestamp) {
 }
 
 TEST_F(CouchstoreCxxTest, GetHeaderJson) {
+    EXPECT_EQ(14, cb::couchstore::getFileFormatVersion());
     auto db = openDb();
     couchstore_commit_ex(db.get(), 0xdeadbeef);
     auto header = cb::couchstore::getHeader(*db);
