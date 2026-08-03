@@ -33,7 +33,7 @@
 #include <platform/string_hex.h>
 
 #include <fcntl.h>
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
