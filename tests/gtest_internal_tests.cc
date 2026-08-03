@@ -726,6 +726,59 @@ TEST_F(CouchstoreInternalTest, changes_count_undersized_kp_value) {
                "than sizeof(raw_node_pointer) + sizeof(raw_by_seq_reduce)";
 }
 
+TEST_F(CouchstoreInternalTest, changes_since_oversized_idsize) {
+    open_db_and_populate(COUCHSTORE_OPEN_FLAG_CREATE, 3);
+    ASSERT_EQ(COUCHSTORE_SUCCESS, couchstore_commit(db));
+
+    ASSERT_NE(nullptr, db->header.by_seq_root);
+
+    // Build a by_seq leaf node holding a single key/value pair. The value is a
+    // raw_seq_index_value followed by two bytes of trailing data, but its
+    // packed sizes field claims a 200-byte id.
+    //
+    // by_seq_read_docinfo() derives rev_meta.size as
+    // (v->size - sizeof(raw_seq_index_value)) - idsize, which underflows to
+    // ~SIZE_MAX when idsize exceeds the trailing data. The id and rev_meta
+    // sizes then cancel out in couchstore_alloc_docinfo()'s allocation size,
+    // so the allocation succeeds at the smaller size and the id memcpy writes
+    // (idsize - trailing) bytes past the end of it.
+    constexpr uint32_t claimedIdSize = 200;
+    constexpr size_t trailingBytes = 2;
+    constexpr size_t keyLen = sizeof(raw_by_seq_key);
+    constexpr size_t valueLen = sizeof(raw_seq_index_value) + trailingBytes;
+    char node[1 + sizeof(raw_kv_length) + keyLen + valueLen] = {};
+    node[0] = KV_NODE;
+    *reinterpret_cast<raw_kv_length*>(node + 1) =
+            encode_kv_length(keyLen, valueLen);
+
+    // Key: a 6-byte sequence number that falls within the query range.
+    char* key = node + 1 + sizeof(raw_kv_length);
+    encode_raw48(1, reinterpret_cast<raw_48*>(key));
+
+    auto* value = reinterpret_cast<raw_seq_index_value*>(key + keyLen);
+    value->sizes = encode_kv_length(claimedIdSize, 0);
+
+    sized_buf nodebuf{node, sizeof(node)};
+    cs_off_t corruptPos = 0;
+    ASSERT_EQ(
+            COUCHSTORE_SUCCESS,
+            db_write_buf_compressed(&db->file, &nodebuf, &corruptPos, nullptr));
+
+    // Redirect the by_seq root at the crafted (corrupt) leaf node.
+    db->header.by_seq_root->pointer = static_cast<uint64_t>(corruptPos);
+
+    size_t callbackCount = 0;
+    auto callback = [](Db*, DocInfo*, void* ctx) -> int {
+        ++*static_cast<size_t*>(ctx);
+        return 0;
+    };
+    EXPECT_EQ(COUCHSTORE_ERROR_CORRUPT,
+              couchstore_changes_since(db, 0, 0, callback, &callbackCount))
+            << "couchstore_changes_since should reject a by_seq value whose "
+               "idsize exceeds the data following raw_seq_index_value";
+    EXPECT_EQ(0, callbackCount);
+}
+
 /**
  * Test for couch_dbck tool.
  */
