@@ -585,6 +585,7 @@ static file_sorter_error_t write_record_list(void **records,
          * exists it means a temporary file name collision happened or
          * some previous sort left temporary files that were never
          * deleted. */
+        fclose(f);
         return FILE_SORTER_ERROR_NOT_EMPTY_TMP_FILE;
     }
 

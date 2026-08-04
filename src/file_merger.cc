@@ -21,12 +21,13 @@
 
 #include "file_merger.h"
 
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
-
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
+#include <new>
+#include <vector>
 
 typedef struct {
     void      *data;
@@ -41,29 +42,41 @@ typedef struct {
 
 struct file_merger_ctx_t;
 
-typedef struct {
-    struct file_merger_ctx_t  *ctx;
-    record_t                  **data;
-    unsigned                  count;
-} sorted_vector_t;
+struct sorted_vector_t {
+    file_merger_ctx_t* ctx = nullptr;
+    record_t** data = nullptr;
+    unsigned count = 0;
 
-typedef struct file_merger_ctx_t {
-    unsigned                            num_files;
-    FILE                                **files;
-    FILE                                *dest_file;
-    file_merger_read_record_t           read_record;
-    file_merger_write_record_t          write_record;
-    file_merger_record_free_t           free_record;
-    file_merger_compare_records_t       compare_records;
-    file_merger_deduplicate_records_t   dedup_records;
-    file_merger_feed_record_t           feed_record;
-    void                                *user_ctx;
-    sorted_vector_t                     sorted_vector;
-} file_merger_ctx_t;
+    ~sorted_vector_t();
+};
 
+struct file_merger_ctx_t {
+    std::vector<FILE*> files;
+    FILE* dest_file = nullptr;
+    file_merger_read_record_t read_record;
+    file_merger_write_record_t write_record;
+    file_merger_record_free_t free_record;
+    file_merger_compare_records_t compare_records;
+    file_merger_deduplicate_records_t dedup_records;
+    file_merger_feed_record_t feed_record;
+    void* user_ctx;
+    sorted_vector_t sorted_vector;
 
-static int  init_sorted_vector(sorted_vector_t *sorted_vector, unsigned max_elements, file_merger_ctx_t *ctx);
-static void sorted_vector_destroy(sorted_vector_t *sorted_vector);
+    ~file_merger_ctx_t() {
+        if (dest_file) {
+            fclose(dest_file);
+        }
+        for (auto* fp : files) {
+            if (fp) {
+                fclose(fp);
+            }
+        }
+    }
+};
+
+static int init_sorted_vector(sorted_vector_t* sorted_vector,
+                              unsigned max_elements,
+                              file_merger_ctx_t* ctx);
 static void sorted_vector_pop(sorted_vector_t *sorted_vector,
                               record_t ***records,
                               size_t *n);
@@ -89,13 +102,12 @@ file_merger_error_t merge_files(const char *source_files[],
 {
     file_merger_ctx_t ctx;
     file_merger_error_t ret;
-    unsigned i, j;
+    unsigned i;
 
     if (num_files == 0) {
         return FILE_MERGER_ERROR_BAD_ARG;
     }
 
-    ctx.num_files = num_files;
     ctx.read_record = read_record;
     ctx.write_record = write_record;
     ctx.free_record = free_record;
@@ -108,22 +120,18 @@ file_merger_error_t merge_files(const char *source_files[],
         ctx.dest_file = nullptr;
     } else {
         ctx.dest_file = fopen(dest_file, "ab");
+        if (ctx.dest_file == nullptr) {
+            return FILE_MERGER_ERROR_OPEN_FILE;
+        }
     }
 
     if (!init_sorted_vector(&ctx.sorted_vector, num_files, &ctx)) {
         return FILE_MERGER_ERROR_ALLOC;
     }
 
-    if (feed_record == nullptr && ctx.dest_file == nullptr) {
-        sorted_vector_destroy(&ctx.sorted_vector);
-        return FILE_MERGER_ERROR_OPEN_FILE;
-    }
-
-    ctx.files = (FILE **) cb_malloc(sizeof(FILE *) * num_files);
-
-    if (ctx.files == nullptr) {
-        sorted_vector_destroy(&ctx.sorted_vector);
-        fclose(ctx.dest_file);
+    try {
+        ctx.files.resize(num_files);
+    } catch (const std::bad_alloc&) {
         return FILE_MERGER_ERROR_ALLOC;
     }
 
@@ -131,31 +139,15 @@ file_merger_error_t merge_files(const char *source_files[],
         ctx.files[i] = fopen(source_files[i], "rb");
 
         if (ctx.files[i] == nullptr) {
-            fprintf(stderr, "Error while opening file %s errcode %s\n",
-                    source_files[i], strerror(errno));
-            for (j = 0; j < i; ++j) {
-                fclose(ctx.files[j]);
-            }
-            cb_free(ctx.files);
-            fclose(ctx.dest_file);
-            sorted_vector_destroy(&ctx.sorted_vector);
-
+            fprintf(stderr,
+                    "Error while opening file %s errcode %s\n",
+                    source_files[i],
+                    strerror(errno));
             return FILE_MERGER_ERROR_OPEN_FILE;
         }
     }
 
     ret = do_merge_files(&ctx);
-
-    for (i = 0; i < ctx.num_files; ++i) {
-        if (ctx.files[i] != nullptr) {
-            fclose(ctx.files[i]);
-        }
-    }
-    cb_free(ctx.files);
-    sorted_vector_destroy(&ctx.sorted_vector);
-    if (ctx.dest_file) {
-        fclose(ctx.dest_file);
-    }
 
     return ret;
 }
@@ -163,7 +155,7 @@ file_merger_error_t merge_files(const char *source_files[],
 
 static file_merger_error_t do_merge_files(file_merger_ctx_t *ctx)
 {
-    for (unsigned int i = 0; i < ctx->num_files; ++i) {
+    for (unsigned int i = 0; i < ctx->files.size(); ++i) {
         FILE *f = ctx->files[i];
         int record_len;
         void *record_data;
@@ -282,18 +274,13 @@ static int init_sorted_vector(sorted_vector_t *sorted_vector,
     return 1;
 }
 
-
-static void sorted_vector_destroy(sorted_vector_t *sorted_vector)
-{
-    unsigned i;
-
-    for (i = 0; i < sorted_vector->count; ++i) {
-        FREE_RECORD(sorted_vector->ctx, sorted_vector->data[i]);
+sorted_vector_t::~sorted_vector_t() {
+    for (unsigned ii = 0; ii < count; ++ii) {
+        FREE_RECORD(ctx, data[ii]);
     }
 
-    cb_free(sorted_vector->data);
+    cb_free(data);
 }
-
 
 #define SORTED_VECTOR_CMP(h, a, b)  \
     (*(h)->ctx->compare_records)((a)->data, (b)->data, (h)->ctx->user_ctx)
@@ -350,7 +337,7 @@ static int sorted_vector_add(sorted_vector_t *sorted_vector, record_t *record)
 {
     unsigned l, r;
 
-    if (sorted_vector->count == sorted_vector->ctx->num_files) {
+    if (sorted_vector->count == sorted_vector->ctx->files.size()) {
         /* sorted_vector full */
         return 0;
     }
