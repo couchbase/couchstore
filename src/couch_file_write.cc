@@ -97,8 +97,7 @@ static ssize_t raw_write(const DiskBlockType diskBlockType,
 couchstore_error_t write_header(tree_file* file,
                                 const sized_buf* buf,
                                 cs_off_t* pos,
-                                DiskBlockType blockType)
-{
+                                DiskBlockType blockType) {
     cs_off_t write_pos = align_to_next_block(file->pos);
     ssize_t written;
     uint32_t size = htonl(buf->size + 4); //Len before header includes hash len.

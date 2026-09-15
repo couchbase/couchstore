@@ -32,11 +32,12 @@
 #include <platform/string_hex.h>
 
 #include <fcntl.h>
+#include <fmt/format.h>
+#include <gsl/gsl-lite.hpp>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include <fmt/core.h>
 
 #define ROOT_BASE_SIZE 12
 #define HEADER_BASE_SIZE 25
