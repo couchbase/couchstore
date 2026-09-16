@@ -34,6 +34,7 @@
 
 #include <fcntl.h>
 #include <fmt/format.h>
+#include <gsl/gsl-lite.hpp>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
