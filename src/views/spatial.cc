@@ -21,6 +21,7 @@
 #include <platform/cb_malloc.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <cstring>
 #include "spatial.h"
 #include "../bitfield.h"
 #include "../couch_btree.h"

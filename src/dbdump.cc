@@ -34,6 +34,7 @@
 #include <cstring>
 #include <iostream>
 #include <optional>
+#include <sstream>
 
 #define MAX_HEADER_SIZE (64 * 1024)
 

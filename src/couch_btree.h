@@ -10,9 +10,8 @@
 // GFLAGS_DLL_DEFINE_FLAG / GOOGLE_GLOG_DLL_DECL as empty to avoid this.
 # define GOOGLE_GLOG_DLL_DECL
 
-#include <folly/PackedSyncPtr.h>
-
 #include <libcouchstore/couch_common.h>
+#include <platform/tagged_ptr.h>
 
 // B+tree KV (leaf) node size limit.
 #define DB_KV_CHUNK_THRESHOLD 1279
@@ -86,29 +85,34 @@
 
     typedef struct couchfile_modify_action {
         uint8_t getType() const {
-            return gsl::narrow_cast<uint8_t>(packedKeyPtr.extra());
+            return gsl::narrow_cast<uint8_t>(packedKeyPtr.getTag());
         }
         sized_buf* getKey() const {
             return packedKeyPtr.get();
         }
 
         void setType(uint8_t t) {
-            packedKeyPtr.setExtra(t);
+            packedKeyPtr.setTag(t);
         }
 
         void setKey(sized_buf* k) {
             packedKeyPtr.set(k);
         }
 
-        // Packed ptr to allow us to reduce the size of couchfile_modify_action
-        // by 8 bytes as we pack the type into the overhead of the ptr to the
-        // key
-        folly::PackedSyncPtr<sized_buf> packedKeyPtr;
+        // Tagged ptr to allow us to reduce the size of couchfile_modify_action
+        // by 8 bytes as we pack the type into the unused high bits of the ptr
+        // to the key
+        TaggedPtr<sized_buf> packedKeyPtr;
         sized_buf* data;
 
         // Pointer to the user request
         void* userReq = nullptr;
     } couchfile_modify_action;
+
+#ifndef CB_MEMORY_INEFFICIENT_TAGGED_PTR
+    static_assert(sizeof(couchfile_modify_action) == 3 * sizeof(void*),
+                  "The action type should be packed into the key pointer");
+#endif
 
     /* Guided purge related constants */
 #define PURGE_ITEM    0

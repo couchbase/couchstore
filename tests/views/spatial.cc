@@ -20,6 +20,7 @@
 
 #include "spatial_tests.h"
 
+#include <folly/Portability.h>
 #include <platform/cb_malloc.h>
 #include <platform/cbassert.h>
 
