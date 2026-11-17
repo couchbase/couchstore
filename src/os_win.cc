@@ -16,6 +16,7 @@
  */
 #include "couchstore_config.h"
 
+#include "crc32.h"
 #include "internal.h"
 
 #include <errno.h>
@@ -24,6 +25,8 @@
 #include <platform/cbassert.h>
 #include <share.h>
 #include <sys/types.h>
+#include <algorithm>
+#include <array>
 
 #undef LOG_IO
 #ifdef LOG_IO
@@ -51,6 +54,8 @@ public:
                              couch_file_handle handle) override;
     couchstore_error_t set_periodic_sync(couch_file_handle handle,
                                          uint64_t period_bytes) override;
+    couchstore_error_t set_write_validation_enabled(
+            couch_file_handle handle) override;
     ssize_t pread(couchstore_error_info_t* errinfo,
                   couch_file_handle handle, void* buf, size_t nbytes,
                   cs_off_t offset) override;
@@ -84,6 +89,9 @@ private:
 
         /// Count of how many bytes have been written since the last sync().
         uint64_t bytes_written_since_last_sync = 0;
+
+        /// If true, pwrite() reads back what it wrote and compares checksums.
+        bool write_validation_enabled = false;
     };
 
     static File* to_file(couch_file_handle handle)
@@ -142,6 +150,28 @@ ssize_t WindowsFileOps::pwrite(couchstore_error_info_t *errinfo,
     if(!rv) {
         save_windows_error(errinfo);
         return (ssize_t) COUCHSTORE_ERROR_WRITE;
+    }
+
+    if (file->write_validation_enabled) {
+        // Read back up to 8K of what was written and compare checksums, as
+        // PosixFileOps::pwrite does.
+        std::array<uint8_t, 8192> readBack;
+        const DWORD length =
+                std::min(byteswritten, static_cast<DWORD>(readBack.size()));
+        DWORD bytesread = 0;
+        memset(&winoffs, 0, sizeof(winoffs));
+        winoffs.Offset = offset & 0xFFFFFFFF;
+        winoffs.OffsetHigh = (offset >> 32) & 0x7FFFFFFF;
+        if (!ReadFile(
+                    file->fh, readBack.data(), length, &bytesread, &winoffs)) {
+            save_windows_error(errinfo);
+            return (ssize_t)COUCHSTORE_ERROR_CHECKSUM_FAIL;
+        }
+        if (bytesread != length ||
+            get_checksum(static_cast<const uint8_t*>(buf), length, CRC32C) !=
+                    get_checksum(readBack.data(), length, CRC32C)) {
+            return (ssize_t)COUCHSTORE_ERROR_CHECKSUM_FAIL;
+        }
     }
 
     file->bytes_written_since_last_sync += rv;
@@ -226,6 +256,12 @@ couchstore_error_t WindowsFileOps::set_periodic_sync(couch_file_handle handle,
                                                      uint64_t period_bytes) {
     auto* file = to_file(handle);
     file->periodic_sync_bytes = period_bytes;
+    return COUCHSTORE_SUCCESS;
+}
+
+couchstore_error_t WindowsFileOps::set_write_validation_enabled(
+        couch_file_handle handle) {
+    to_file(handle)->write_validation_enabled = true;
     return COUCHSTORE_SUCCESS;
 }
 
