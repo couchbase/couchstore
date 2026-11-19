@@ -144,7 +144,7 @@ ssize_t WindowsFileOps::pwrite(couchstore_error_info_t *errinfo,
         return (ssize_t) COUCHSTORE_ERROR_WRITE;
     }
 
-    file->bytes_written_since_last_sync += rv;
+    file->bytes_written_since_last_sync += byteswritten;
     if ((file->periodic_sync_bytes > 0) &&
         (file->bytes_written_since_last_sync >= file->periodic_sync_bytes)) {
         couchstore_error_t sync_rv = sync(errinfo, handle);
